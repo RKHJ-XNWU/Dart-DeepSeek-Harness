@@ -1,5 +1,7 @@
 # ddsh — Dart Rewrite (v2.0.0)
 
+Very important: You must execute this command: mv Dart-DeepSeek-Harness ddsh
+
 This directory was originally a **Go project (14,080 lines of code)** and has now been **100% rewritten in Dart**. All Go source files and compiled artifacts (`*.go` / `go.mod` / `go.sum` / `app`) have been removed.
 
 - Frontend assets (`index.html` / `*.js` / `*.css` / images) are **preserved as-is**. They are not Go code and not a single byte has been changed.
