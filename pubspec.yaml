@@ -1,0 +1,13 @@
+name: ddsh
+description: DeepSeek Harness —— Go 版本的 100% Dart 重写（零第三方依赖）
+version: 2.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+# 刻意不引入任何第三方包：HTTP 服务使用 dart:io，AES-256-GCM / tar.gz
+# 在本仓库内以纯 Dart 实现，保证 `dart run bin/main.dart` 即可启动
+dependencies: {}
+
+dev_dependencies: {}

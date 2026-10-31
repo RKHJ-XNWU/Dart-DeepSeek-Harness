@@ -1,0 +1,478 @@
+/* ds-files.css - DeepSeek 文件管理样式（支持所有文件类型） */
+
+.dsc-files-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 340px;
+    max-width: 88vw;
+    background: #ffffff;
+    border-left: 1px solid #e5e7eb;
+    z-index: 20;
+    transform: translateX(100%);
+    /* 关闭态：不接收点击、不参与焦点遍历，避免隐藏面板造成任何可交互区域 */
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+}
+.dsc-files-panel.open { transform: translateX(0); visibility: visible; pointer-events: auto; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0s; }
+
+.dsc-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    background: #ffffff;
+}
+.dsc-files-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #4f46e5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.dsc-files-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.18s;
+}
+.dsc-files-close:hover { color: #ef4444; border-color: #fecaca; }
+
+/* 上传区 */
+.dsc-files-upload {
+    padding: 12px 14px;
+    border-bottom: 1px solid #ffffff;
+    flex-shrink: 0;
+}
+.dsc-upload-zone {
+    border: 2px dashed #e5e7eb;
+    border-radius: 12px;
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #f9fafb;
+}
+.dsc-upload-zone:hover,
+.dsc-upload-zone.dragover {
+    border-color: #4f46e5;
+    background: #eef2ff;
+}
+.dsc-upload-zone .icon {
+    font-size: 1.8rem;
+    display: block;
+    margin-bottom: 6px;
+    opacity: 0.7;
+}
+.dsc-upload-zone .main-text {
+    font-size: 0.82rem;
+    color: #4b5563;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+.dsc-upload-zone .sub-text {
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+.dsc-upload-zone input[type="file"] { display: none; }
+
+/* 分类筛选 */
+.dsc-files-filter {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #ffffff;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+.dsc-files-filter::-webkit-scrollbar { display: none; }
+.dsc-filter-chip {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.18s;
+    font-family: inherit;
+}
+.dsc-filter-chip.active {
+    background: #eef2ff;
+    border-color: #10b981;
+    color: #4f46e5;
+}
+.dsc-filter-chip:hover { border-color: #4f46e5; }
+
+/* 搜索 */
+.dsc-files-search {
+    padding: 8px 14px;
+    border-bottom: 1px solid #ffffff;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.dsc-files-search .wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.dsc-files-search input {
+    width: 100%;
+    padding: 8px 30px 8px 32px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 0.8rem;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.dsc-files-search input:focus {
+    border-color: #4f46e5;
+    background: #ffffff;
+}
+.dsc-files-search .s-icon {
+    position: absolute;
+    left: 10px;
+    color: #9ca3af;
+    font-size: 0.78rem;
+    pointer-events: none;
+}
+.dsc-files-search .s-clear {
+    position: absolute;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 0.65rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.dsc-files-search .s-clear.visible { display: flex; }
+
+.dsc-files-regex {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    width: fit-content;
+    user-select: none;
+}
+.dsc-files-regex input { accent-color: #4f46e5; margin: 0; }
+.dsc-files-regex.active {
+    color: #4f46e5;
+    border-color: #a7f3d0;
+    background: #eef2ff;
+}
+
+/* 文件列表 */
+.dsc-files-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.dsc-files-list::-webkit-scrollbar { width: 4px; }
+.dsc-files-list::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 2px;
+}
+
+.dsc-file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    transition: all 0.18s;
+    cursor: pointer;
+}
+.dsc-file-item:hover {
+    border-color: #d1d5db;
+    background: #eef2ff;
+}
+.dsc-file-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+.dsc-file-icon.image { background: #ecfdf5; border-color: #10b981; }
+.dsc-file-icon.video { background: #fdf2f8; border-color: #fbcfe8; }
+.dsc-file-icon.document { background: #f3f4f6; border-color: #d1d5db; }
+.dsc-file-icon.code { background: #f5f3ff; border-color: #c7d2fe; }
+.dsc-file-icon.minecraft { background: #f0fdf4; border-color: #86efac; }
+
+.dsc-file-info {
+    flex: 1;
+    min-width: 0;
+}
+.dsc-file-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1f2937;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 2px;
+}
+.dsc-file-meta {
+    font-size: 0.68rem;
+    color: #9ca3af;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.dsc-file-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.dsc-file-act-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 0.75rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.dsc-file-act-btn:hover {
+    border-color: #4f46e5;
+    color: #4f46e5;
+    background: #eef2ff;
+}
+.dsc-file-act-btn.del:hover {
+    border-color: #fecaca;
+    color: #ef4444;
+    background: #2a1a1a;
+}
+
+.dsc-files-empty {
+    text-align: center;
+    padding: 40px 16px;
+    color: #9ca3af;
+    font-size: 0.8rem;
+}
+.dsc-files-empty .emoji {
+    font-size: 2.4rem;
+    display: block;
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+/* 上传进度 */
+.dsc-upload-progress {
+    padding: 10px 14px;
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff;
+    flex-shrink: 0;
+}
+.dsc-up-name {
+    font-size: 0.72rem;
+    color: #4b5563;
+    margin-bottom: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dsc-up-bar {
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+.dsc-up-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #4f46e5);
+    border-radius: 3px;
+    transition: width 0.2s;
+    width: 0%;
+}
+.dsc-up-stat {
+    font-size: 0.68rem;
+    color: #9ca3af;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* 图片生成面板 */
+.dsc-gen-panel {
+    padding: 12px 14px;
+    border-bottom: 1px solid #ffffff;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.dsc-gen-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #db2777;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dsc-gen-row {
+    display: flex;
+    gap: 6px;
+}
+.dsc-gen-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #1f2937;
+    font-size: 0.8rem;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.dsc-gen-row input:focus { border-color: #4f46e5; }
+.dsc-gen-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #fbcfe8;
+    background: #fdf2f8;
+    color: #db2777;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    transition: all 0.18s;
+}
+.dsc-gen-btn:hover {
+    background: #fce7f3;
+    border-color: #4f46e5;
+    color: #4f46e5;
+}
+.dsc-gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 附件预览条 */
+.dsc-attach-bar {
+    display: none;
+    padding: 6px 12px 0;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.dsc-attach-bar.visible { display: flex; }
+.dsc-attach-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px 4px 10px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    font-size: 0.72rem;
+    color: #4b5563;
+    max-width: 180px;
+}
+.dsc-attach-chip .nm {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dsc-attach-chip .rm {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 0.6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.dsc-attach-chip .rm:hover { background: #fecaca; color: #ef4444; }
+
+/* 消息中的附件 */
+.dsc-msg-attach {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-top: 6px;
+    border-radius: 8px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: all 0.18s;
+    max-width: 240px;
+}
+.dsc-msg-attach:hover {
+    border-color: #4f46e5;
+    background: #eef2ff;
+}
+.dsc-msg-attach .ic { font-size: 1rem; }
+.dsc-msg-attach .nm {
+    font-size: 0.75rem;
+    color: #4b5563;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 移动端 */
+@media (max-width: 720px) {
+    .dsc-files-panel {
+        width: 100%;
+        max-width: 100%;
+        border-left: none;
+    }
+    .dsc-upload-zone { padding: 14px 10px; }
+    .dsc-upload-zone .icon { font-size: 1.5rem; }
+}

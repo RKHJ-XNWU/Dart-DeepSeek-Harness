@@ -1,0 +1,50 @@
+# ===== 密钥与凭证 =====
+*.key
+*.keys
+.main
+.mians
+.env
+.env.*
+!.env.example
+
+# ===== app 二进制文件（仅根目录）=====
+app
+
+# ===== 数据目录（任意层级）=====
+data/
+
+# ===== 备份与临时目录（锚定根目录）=====
+.backup_tmp/
+tmp/
+temp/
+.cache/
+*.tmp
+
+# ===== Dart 工具链缓存 =====
+.dart_tool/
+.packages
+build/
+pubspec.lock
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ===== 日志 =====
+*.log
+logs/
+
+# ===== 编辑器 =====
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# ===== 系统垃圾 =====
+.DS_Store
+Thumbs.db
+desktop.ini
