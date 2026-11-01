@@ -1,6 +1,16 @@
 # ddsh — Dart Rewrite (v2.0.0)
 
-Very important: You must execute this command: mv Dart-DeepSeek-Harness ddsh
+>**Copyright Notice: This source code does not directly or indirectly reference the official `DeepSeek Harness` source code or any `DeepSeek Harness` source code written by others. It is not a derivative product under any official or third-party `DeepSeek Harness` project, and it has no affiliation with the official `DeepSeek Harness` project or any third party. The author of this source code strictly complies with the *Copyright Law of the People's Republic of China*, the *Criminal Law of the People's Republic of China*, and the *Public Security Administration Punishments Law of the People's Republic of China*, and is firmly confident that no rights of any person — including third parties and the official `DeepSeek Harness` project — have been infringed, because this source code was written by me from scratch without referencing any other source code or any official source code; therefore the author considers that no infringement is constituted. This project runs on the `Termux` app. Based on the author's extensive testing and final testing, the decision was made to open-source it on `GitHub`, i.e. this website. Version updates will be published in the Discussions section. The project will be maintained over time and updates may take a long while to come out**
+
+**Not an official `DeepSeek` statement：**
+>**Although I used the official DeepSeek whale logo, this doesn't mean I have any connection with DeepSeek, nor does it necessarily mean I copied anything from them. I promise here that apart from that whale logo icon, I didn't copy any source code from DeepSeek or any third party. Additionally, the DeepSeek whale logo icon is not being used as a trademark; it's only used for decoration on the new session page, so it doesn't constitute any infringement**
+
+**Then you can deploy it with one click. Here are the instructions:**
+```
+git clone https://github.com/RKHJ-XNWU/Dart-DeepSeek-Harness && mv Dart-DeepSeek-Harness ddsh && chmod +x ddsh/st.py && ./ddsh/st.py
+```
+
+>**Regarding the prompt words, you can find them in the version update logs section of the discussion forum**
 
 This directory was originally a **Go project (14,080 lines of code)** and has now been **100% rewritten in Dart**. All Go source files and compiled artifacts (`*.go` / `go.mod` / `go.sum` / `app`) have been removed.
 
