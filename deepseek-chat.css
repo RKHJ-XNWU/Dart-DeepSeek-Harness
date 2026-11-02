@@ -1,7 +1,7 @@
-/* deepseek-chat.css - 完整版 v3（浅色主题 / 性能优化 / 小说模式 / TTS 优化） */
+/* deepseek-chat.css - 完整版 v3（浅色主题 / 性能优化 / 小説モード / TTS 优化） */
 #deepseekChatApp {
     position: fixed; inset: 0; z-index: 100000;
-    /* 横向锁定：clip 不产生滚动容器，任何内部溢出都无法左右拖动 */
+    /* 横方向ロック：clip はスクロールコンテナを生成しないため、内部のあふれは左右にドラッグできない */
     overflow-x: clip; max-width: 100vw;
     background: #ffffff; display: none; flex-direction: column;
     color: #1f2937;
@@ -10,7 +10,7 @@
 }
 #deepseekChatApp.open { display: flex; }
 
-/* ================= 顶栏 ================= */
+/* ================= 上部バー ================= */
 .dsc-topbar {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 12px; background: #ffffff;
@@ -32,10 +32,10 @@
 .dsc-title { font-size: 0.98rem; font-weight: 600; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsc-subtitle { font-size: 0.7rem; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ================= 主体 ================= */
+/* ================= 本体 ================= */
 .dsc-body { flex: 1; display: flex; overflow: hidden; overflow-x: clip; position: relative; overscroll-behavior-x: none; }
 
-/* ================= 侧边栏 ================= */
+/* ================= サイドバー ================= */
 .dsc-sidebar {
     width: 260px; flex-shrink: 0; background: #f9fafb;
     border-right: 1px solid #ececf1; display: flex; flex-direction: column;
@@ -91,13 +91,13 @@
 .dsc-batch-btn.danger:hover { background: #fee2e2; }
 .dsc-batch-btn.ghost { background: transparent; color: #6b7280; border-color: transparent; }
 
-/* ================= 主对话区 ================= */
+/* ================= メイン会話領域 ================= */
 .dsc-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #ffffff; position: relative; }
 .dsc-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 10px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: auto; }
 .dsc-messages::-webkit-scrollbar { width: 6px; }
 .dsc-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
-/* ================= 懒加载哨兵 ================= */
+/* ================= 遅延読み込みの番人 ================= */
 .dsc-load-more-sentinel {
     display: flex; justify-content: center; align-items: center;
     flex-shrink: 0;
@@ -110,7 +110,7 @@
 }
 .dsc-load-more-sentinel:hover { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
 
-/* ================= 空状态 ================= */
+/* ================= 空状態 ================= */
 .dsc-msg-empty {
     text-align: center;
     padding: 20px;
@@ -204,7 +204,7 @@
     border-radius: 0;
 }
 
-/* ---- 消息内 Markdown 样式 ---- */
+/* ---- メッセージ内 Markdown スタイル ---- */
 .dsc-msg-bubble p { margin: 0 0 0.85em; padding: 0; }
 .dsc-msg-bubble p:last-child { margin-bottom: 0; }
 .dsc-msg-bubble p:empty { display: none; }
@@ -235,7 +235,7 @@
 .dsc-msg-bubble th, .dsc-msg-bubble td { border: 1px solid #e5e7eb; padding: 8px 13px; text-align: left; line-height: 1.65; }
 .dsc-msg-bubble th { background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: #4f46e5; font-weight: 600; }
 
-/* ---- 单条消息真实 token 消耗（紧贴气泡下方 0.2em） ---- */
+/* ---- 1通のメッセージの実際の token 消費（吹き出しの 0.2em 下に密着） ---- */
 .dsc-msg-usage { margin-top: 0.2em; padding: 0 4px; display: flex; }
 .dsc-msg.user .dsc-msg-usage { display: none; }
 .dsc-usage-chip {
@@ -270,7 +270,7 @@
 .dsc-msg-speak-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 @keyframes dscSpeakPulse { 0% { opacity: 1; } 50% { opacity: 0.55; } 100% { opacity: 1; } }
 
-/* ---- 代码块 ---- */
+/* ---- コードブロック ---- */
 .dsc-code-block { position: relative; margin: 0.85em 0; border-radius: 12px; overflow: hidden; }
 .dsc-code-block pre { margin: 0; padding: 38px 16px 14px 16px; }
 .dsc-code-block::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, #c7d2fe, #818cf8, #c7d2fe); opacity: 0.9; z-index: 3; border-radius: 12px 12px 0 0; }
@@ -278,7 +278,7 @@
 .dsc-code-copy:hover { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
 .dsc-code-copy.copied { color: #059669; border-color: #a7f3d0; background: #ecfdf5; }
 
-/* ---- 打字动画 ---- */
+/* ---- タイピングアニメーション ---- */
 .dsc-typing { display: flex; gap: 4px; align-items: center; padding: 14px 16px; }
 .dsc-typing span { width: 7px; height: 7px; border-radius: 50%; background: #818cf8; animation: dscBounce 1.4s infinite ease-in-out both; opacity: 0.7; }
 .dsc-typing span:nth-child(1) { animation-delay: -0.32s; }
@@ -302,13 +302,13 @@
 .dsc-think-load-full:hover { background: #eef2ff; }
 .dsc-think-load-full:disabled { opacity: 0.6; cursor: default; }
 
-/* ================= 输入区 ================= */
+/* ================= 入力領域 ================= */
 .dsc-input-wrap { margin: 8px 12px 6px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 16px; padding: 8px 14px; display: flex; align-items: center; transition: border-color 0.18s, box-shadow 0.18s, background 0.18s; flex-shrink: 0; }
 .dsc-input-wrap:focus-within { border-color: #4f46e5; background: #ffffff; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08); }
 .dsc-input-wrap textarea { flex: 1; background: transparent; border: none; color: #1f2937; font-size: 0.92rem; font-family: inherit; resize: none; outline: none; padding: 4px 0; max-height: 140px; min-height: 24px; line-height: 1.5; box-sizing: border-box; }
 .dsc-input-wrap textarea::placeholder { color: #9ca3af; }
 
-/* ================= 底部工具条 ================= */
+/* ================= 下部ツールバー ================= */
 .dsc-action-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 10px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); gap: 6px; flex-shrink: 0; background: #ffffff; border-top: 1px solid #ececf1; margin-top: -1px; }
 .dsc-switch-group { display: flex; gap: 6px; align-items: center; flex-shrink: 1 !important; min-width: 0; overflow-x: auto; overflow-y: hidden; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px; scrollbar-width: none; }
 .dsc-switch-group::-webkit-scrollbar { display: none; }
@@ -330,7 +330,7 @@
 .dsc-advanced-btn.active::before { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
 .dsc-level-btn.active { border-color: #db2777; background: #fdf2f8; box-shadow: 0 0 12px rgba(219, 39, 119, 0.25); }
 .dsc-level-btn.active::before { background: #db2777; box-shadow: 0 0 8px #db2777; }
-/* 小说模式按钮 */
+/* 小説モード按钮 */
 .dsc-novel-btn { border-color: #d8b4fe; color: #a855f7; }
 .dsc-novel-btn:hover { border-color: #c084fc; background: #faf5ff; box-shadow: 0 0 12px rgba(168, 85, 247, 0.22); }
 .dsc-novel-btn.active { border-color: #a855f7; background: #faf5ff; box-shadow: 0 0 16px rgba(168, 85, 247, 0.32); }
@@ -346,7 +346,7 @@
 .dsc-newline-btn { width: 38px; height: 38px; border-radius: 12px; border: 1px solid #e5e7eb; background: #ffffff; color: #6b7280; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.18s; font-family: inherit; flex-shrink: 0; -webkit-tap-highlight-color: transparent; line-height: 1; padding-bottom: 2px; }
 .dsc-newline-btn:hover { border-color: #c7d2fe; color: #4f46e5; background: #eef2ff; }
 .dsc-newline-btn:active { transform: scale(0.94); }
-/* ================= 加号按钮：圆形 + 细边框 + 黑色细线加号 ================= */
+/* ================= プラスボタン：円形 + 細い枠線 + 黒い細線のプラス ================= */
 .dsc-plus-btn {
     width: 40px;
     height: 40px;
@@ -402,7 +402,7 @@
 .dsc-plus-btn.active::after {
     background: #1f2937;
 }
-/* ================= 发送按钮：圆形 + 蓝色 + 白箭头 ================= */
+/* ================= 送信ボタン：円形 + 青 + 白い矢印 ================= */
 .dsc-send-btn {
     width: 40px;
     height: 40px;
@@ -450,7 +450,7 @@
     }
 }
 
-/* ================= 加号菜单 ================= */
+/* ================= プラスメニュー ================= */
 .dsc-plus-menu { position: absolute; bottom: 64px; right: 12px; z-index: 30; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12); display: none; flex-direction: column; gap: 2px; min-width: 240px; animation: dscMenuIn 0.2s cubic-bezier(0.4, 0, 0.2, 1); padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 .dsc-plus-menu.open { display: flex; }
 @keyframes dscMenuIn { from { opacity: 0; transform: translateY(8px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -474,7 +474,7 @@
 .dsc-msg-attach .ic { font-size: 0.9rem; }
 .dsc-msg-attach .nm { color: #4b5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ================= 遮罩 & 弹窗 ================= */
+/* ================= オーバーレイ & ダイアログ ================= */
 .dsc-sidebar-overlay { display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.25); z-index: 5; backdrop-filter: blur(2px); }
 .dsc-sidebar-overlay.open { display: block; }
 .dsc-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); backdrop-filter: blur(6px); z-index: 100001; align-items: center; justify-content: center; padding: 16px; }
@@ -515,7 +515,7 @@
 @keyframes dscToastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dscToastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px); } }
 
-/* ================= 等级弹窗 ================= */
+/* ================= レベルダイアログ ================= */
 .dsc-level-display { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
 .dsc-level-num { font-size: 2.4rem; font-weight: 800; color: #db2777; font-family: ui-monospace, Menlo, Consolas, monospace; line-height: 1; text-shadow: 0 2px 12px rgba(219, 39, 119, 0.15); min-width: 60px; text-align: center; }
 .dsc-level-tag { font-size: 0.85rem; font-weight: 600; color: #4f46e5; background: #eef2ff; padding: 4px 12px; border-radius: 12px; border: 1px solid #c7d2fe; white-space: nowrap; }
@@ -531,7 +531,7 @@
 .dsc-level-info { text-align: center; font-size: 0.74rem; color: #6b7280; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; line-height: 1.6; }
 .dsc-level-info .hl { color: #db2777; font-weight: 600; }
 
-/* ================= 移动端 ================= */
+/* ================= モバイル ================= */
 @media (max-width: 720px) {
     .dsc-sidebar { position: absolute; top: 0; left: 0; bottom: 0; z-index: 10; transform: translateX(-100%); box-shadow: 4px 0 24px rgba(15, 23, 42, 0.15); }
     .dsc-sidebar.open { transform: translateX(0); }
@@ -571,15 +571,15 @@
     .dsc-newline-btn, .dsc-plus-btn, .dsc-send-btn { width: 34px; height: 34px; }
     .dsc-right-group { gap: 4px; }
 }
-/* 用户消息不显示时间与复制按钮 */
+/* ユーザーメッセージは時刻とコピーボタンを表示しない */
 .dsc-msg.user .dsc-msg-meta {
     display: none !important;
 }
-/* AI 消息只保留按钮，不显示时间（可选，按需启用） */
+/* AI メッセージはボタンのみ残し、時刻は表示しない（任意、必要に応じて有効化） */
 .dsc-msg.assistant .dsc-msg-meta .dsc-msg-time {
     display: none !important;
 }
-/* ================= 小说模式：科幻横向长方形浮窗 ================= */
+/* ================= 小説モード：科幻横向长方形浮窗 ================= */
 .dsc-novel-popup-overlay {
     position: fixed;
     top: 50%;
@@ -647,7 +647,7 @@
     pointer-events: none;
 }
 
-/* ===== 标题区 ===== */
+/* ===== タイトル領域 ===== */
 .dsc-novel-popup-overlay .dsc-modal-title {
     font-size: 1rem;
     font-weight: 700;
@@ -665,7 +665,7 @@
     flex-shrink: 0;
 }
 
-/* ===== 两列网格 ===== */
+/* ===== 2列グリッド ===== */
 .dsc-novel-popup-overlay .dsc-novel-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -678,7 +678,7 @@
     grid-column: 1 / -1;
 }
 
-/* ===== 字段 ===== */
+/* ===== フィールド ===== */
 .dsc-novel-popup-overlay .dsc-field {
     display: flex;
     flex-direction: column;
@@ -741,7 +741,7 @@
     font-size: 0.76rem;
 }
 
-/* 底部按钮 */
+/* 下部ボタン */
 .dsc-novel-popup-overlay .dsc-modal-footer {
     margin-top: 12px;
     gap: 10px;
@@ -756,7 +756,7 @@
     font-weight: 600;
 }
 
-/* 小屏适配 */
+/* 小画面対応 */
 @media (max-width: 480px) {
     .dsc-novel-popup-overlay {
         width: min(94vw, 92vw);
@@ -776,7 +776,7 @@
         max-height: 54px;
     }
 }
-/* ================= 自定义下拉框 ================= */
+/* ================= カスタムドロップダウン ================= */
 .dsc-custom-select {
     position: relative;
     width: 100%;
@@ -873,20 +873,20 @@
     font-size: 0.8rem;
     font-weight: 700;
 }
-/* ============ 性能补丁 ============ */
+/* ============ 性能パッチ ============ */
 .dsc-messages {
-    /* 让浏览器隔离此层，避免与页面其它部分互相触发重排 */
+    /* ブラウザにこの層を分離させ、ページの他の部分と相互に再レイアウトを誘発しないようにする */
     contain: content;
     overscroll-behavior: contain;
-    /* 去掉平滑滚动（每次流式 scrollToBottom 用 smooth 会疯狂重排） */
+    /* スムーズスクロールを廃止（ストリーミング中の scrollToBottom で smooth を使うと再レイアウトが多発する） */
     scroll-behavior: auto;
 }
 
 .dsc-msg {
-    /* 每条消息独立内容盒：屏幕外的消息不参与布局/绘制 */
+    /* 各メッセージを独立した内容ボックスに：画面外のメッセージはレイアウト/描画に参加しない */
     content-visibility: auto;
     contain-intrinsic-size: auto 200px;
-    /* 减少动画：只在第一条消息上做淡入 */
+    /* アニメーション削減：最初のメッセージだけフェードイン */
     animation: none;
 }
 .dsc-msg:first-child { animation: dscFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -897,27 +897,27 @@
     contain: content;
 }
 
-/* 关闭昂贵的模糊和阴影 */
+/* コストの高いブラーと影を無効化 */
 .dsc-sidebar { box-shadow: none; }
 .dsc-modal { box-shadow: 0 12px 32px rgba(15,23,42,0.12); }
 .dsc-topbar { box-shadow: none; }
 .dsc-toast { box-shadow: 0 4px 12px rgba(15,23,42,0.08); }
 
-/* 去掉 on-hover 的 scale 变换（会产生新的合成层） */
+/* ホバー時の scale 変形を廃止（新しい合成レイヤを生むため） */
 .dsc-switch-btn:hover,
 .dsc-advanced-btn:hover,
 .dsc-longtext-btn:hover,
 .dsc-level-btn:hover { transform: none; }
 
-/* 流式状态下的气泡不做 transition */
+/* ストリーミング中の吹き出しは transition しない */
 .dsc-msg-bubble { transition: none; }
 
-/* 移动端更严格 */
+/* モバイルではさらに厳格に */
 @media (max-width: 720px) {
     .dsc-msg { contain-intrinsic-size: auto 160px; }
 }
 /* ============================================================
-   全局会话搜索浮窗（内存缓存 + 游标分页版）
+   全会話検索のフローティングウィンドウ（メモリキャッシュ + カーソルページング版）
    ============================================================ */
 .dsc-search-overlay {
     position: fixed;
@@ -1124,7 +1124,7 @@
     font-weight: 600;
 }
 
-/* 底部加载指示 */
+/* 下部の読み込みインジケータ */
 .dsc-search-more {
     text-align: center;
     padding: 14px;
@@ -1156,10 +1156,10 @@
 }
 
 /* ============================================================
-   📞 deepseek 打电话（语音/视频通话）样式
+   📞 deepseek 通話（音声/ビデオ通話）スタイル
    ============================================================ */
 
-/* 打电话按钮 */
+/* 通話ボタン */
 .dsc-call-btn {
     border: none;
     background: rgba(99, 102, 241, 0.12);
@@ -1181,7 +1181,7 @@
 }
 .dsc-call-btn .ic { line-height: 1; }
 
-/* 通话覆盖层 */
+/* 通話オーバーレイ */
 .dsc-call-overlay {
     position: fixed;
     inset: 0;
@@ -1195,7 +1195,7 @@
 }
 .dsc-call-overlay.show { display: flex; }
 
-/* 舞台（视频 / 大肥鱼） */
+/* ステージ（ビデオ / 大肥魚） */
 .dsc-call-stage {
     position: relative;
     width: 100%;
@@ -1207,7 +1207,7 @@
 }
 
 
-/* 用户摄像头小窗（视频通话） */
+/* ユーザーカメラの小窓（ビデオ通話） */
 .dsc-call-selfvideo {
     position: absolute;
     top: 14px;
@@ -1225,7 +1225,7 @@
     display: none;
 }
 
-/* 大肥鱼 AI 形象（用户照片抠图） */
+/* 大肥魚 AI イメージ（ユーザー写真の切り抜き） */
 .dsc-call-fish-wrap {
     position: relative;
     z-index: 2;
@@ -1274,7 +1274,7 @@
     50% { transform: rotate(1.5deg) scale(1.04); }
 }
 
-/* 通话状态 + 名字 */
+/* 通話状態 + 名前 */
 .dsc-call-status {
     position: absolute;
     top: 16px;
@@ -1301,7 +1301,7 @@
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-/* 字幕区 */
+/* 字幕領域 */
 .dsc-call-subtitles {
     position: relative;
     z-index: 3;
@@ -1366,7 +1366,7 @@
     font-style: italic;
 }
 
-/* 输入兜底 */
+/* 入力フォールバック */
 .dsc-call-inputbar {
     position: relative;
     z-index: 3;
@@ -1401,7 +1401,7 @@
 }
 .dsc-call-sendbtn:hover { background: #4f46e5; }
 
-/* 控制栏 */
+/* コントロールバー */
 .dsc-call-controls {
     position: relative;
     z-index: 3;
@@ -1443,14 +1443,14 @@
 .dsc-call-end:hover { background: #dc2626; }
 
 /* ============================================================
-   顶栏「更多」集成菜单（把次要功能收进 ⋯ 按钮）
+   上部バー「その他」統合メニュー（二次機能を ⋯ ボタンに収める）
    ============================================================ */
 .dsc-more-wrap {
     position: relative;
     flex-shrink: 0;
 }
 .dsc-more-btn {
-    /* 复用 .dsc-icon-btn，此处仅做占位 */
+    /* .dsc-icon-btn を再利用。ここはプレースホルダのみ */
 }
 .dsc-more-menu {
     position: absolute;
@@ -1500,7 +1500,7 @@
 }
 
 /* ============================================================
-   底部「更多工具」折叠面板
+   下部「その他のツール」折りたたみパネル
    ============================================================ */
 .dsc-moretools-toggle .ic {
     font-size: 1.05rem;
@@ -1529,16 +1529,16 @@
 }
 
 /* ============================================================
-   UI 重叠修复
+   UI の重なり修正
    ============================================================ */
-/* 标题区避免被按钮挤压到不可见 */
+/* タイトル領域がボタンに押されて見えなくならないようにする */
 .dsc-title-wrap {
     min-width: 40px;
 }
 .dsc-title {
     max-width: 100%;
 }
-/* 底部工具组与右侧组避免挤压重叠 */
+/* 下部ツール群と右側群が押し合って重ならないようにする */
 .dsc-switch-group {
     flex-wrap: nowrap;
     min-width: 0;
@@ -1546,7 +1546,7 @@
 .dsc-right-group {
     flex-shrink: 0;
 }
-/* cosplay 角色列表：描述过长时不再与按钮重叠 */
+/* cosplay キャラクター一覧：説明が長くてもボタンと重ならない */
 .dsc-cosplay-role {
     align-items: flex-start;
 }
@@ -1570,13 +1570,13 @@
 
 
 /* ============================================================
-   ★ 顶栏改造（2026 强制首页改版）
-   - 一打开即进入聊天：顶部固定显示「探索未至之境」
-   - 右上角 X（返回）按钮必须不可见不可点
-   - 鲸鱼图标 🐳 左侧新增房子按钮 🏠（回首页）
+   ★ 上部バー改修（2026 トップページ全面刷新）
+   - 一打开即进入聊天：顶部固定显示「未踏の境地を探る」
+   - 右上の X（戻る）ボタンは不可視・不可タップにする
+   - クジラアイコン 🐳 の左に家ボタン 🏠 を追加（ホームへ）
    ============================================================ */
 
-/* X / 返回按钮：彻底隐藏（代码保留，不删除） */
+/* X / 戻るボタン：完全に非表示（コードは保持し削除しない） */
 #deepseekChatApp #dscCloseBtn,
 #deepseekChatApp .dsc-close-gone {
     display: none !important;
@@ -1587,7 +1587,7 @@
     border: 0 !important;
 }
 
-/* 顶部标题「探索未至之境」：字号适中、不溢出窗口 */
+/* 顶部标题「未踏の境地を探る」：字号适中、不溢出窗口 */
 #deepseekChatApp .dsc-title#dscChatTitle {
     font-size: 1.02rem;
     font-weight: 700;
@@ -1601,7 +1601,7 @@
 }
 
 
-/* 小屏幕适配：保证顶栏不拥挤、不越界 */
+/* 小画面対応：上部バーが窮屈にならず、はみ出さないようにする */
 @media (max-width: 420px) {
     #deepseekChatApp .dsc-title#dscChatTitle { font-size: 0.95rem; letter-spacing: 0.01em; }
 }
@@ -1611,7 +1611,7 @@
 
 
 /* ============================================================
-   角色扮演（Cosplay）面板
+   ロールプレイ（Cosplay）面板
    ============================================================ */
 .dsc-cosplay-modal .dsc-modal-sub {
     margin-bottom: 14px;
@@ -1768,9 +1768,9 @@
     .dsc-cosplay-list { max-height: 36vh; }
 }
 
-/* ================= 生成中：发送按钮 → 停止按钮（圆形内一个方块） ================= */
+/* ================= 生成中：送信ボタン → 停止ボタン（円の中に四角） ================= */
 .dsc-send-btn.is-stopping {
-    /* 停止态沿用发送键的蓝色渐变，内部保持白色小方块 */
+    /* 停止状態は送信キーの青いグラデーションを踏襲し、内部は白い小さな四角のまま */
     background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
@@ -1782,7 +1782,7 @@
     transform: scale(0.94);
 }
 
-/* ================= 继续生成按钮（挂在最新一条回答下方） ================= */
+/* ================= 続きを生成按钮（挂在最新一条回答下方） ================= */
 .dsc-msg-continue-btn {
     background: transparent;
     border: 1px solid rgba(148, 163, 184, 0.45);
@@ -1804,9 +1804,9 @@
     transform: scale(0.96);
 }
 
-/* ================= FIX: 长按按钮出现蓝色小方块（系统文本选择/点击高亮） ================= */
-/* 根因：Android WebView 长按元素时会触发文字选择，用系统默认的蓝色半透明块覆盖元素本身，
-   形状恰好等于控件尺寸；再加上部分控件未禁用 -webkit-touch-callout 会弹出长按菜单。 */
+/* ================= FIX: ボタン長押しで青い小さな四角が出る（システムのテキスト選択/タップハイライト） ================= */
+/* 原因：Android WebView は要素の長押しでテキスト選択を誘発し、システム既定の青い半透明ブロックで要素自体を覆う。
+   形がちょうどコントロールの寸法と一致する。さらに一部のコントロールで -webkit-touch-callout を無効化していないため、長押しメニューが出る。 */
 * {
     -webkit-tap-highlight-color: transparent !important;
 }
@@ -1848,14 +1848,14 @@ label[for],
     -webkit-touch-callout: none !important;
 }
 
-/* 按压/长按反馈改为中性灰，不再出现蓝色底块 */
+/* 押下/長押しのフィードバックを中立グレーに変更し、青い下地ブロックを出さない */
 .dsc-menu-item:active,
 .dsc-more-item:active {
     background: #f3f4f6 !important;
     color: inherit !important;
 }
 
-/* 正文仍允许长按选择，但改用柔和色，避免系统刺眼的蓝色方块 */
+/* 本文は長押し選択を許可するが、柔らかい色に変更し、システムのまぶしい青い四角を避ける */
 ::selection {
     background: rgba(79, 70, 229, 0.18);
     color: inherit;
@@ -1866,16 +1866,16 @@ label[for],
 }
 
 /* ===================================================================
-   FIX: 底部工具栏（输入框下方）无法左右滑动
+   FIX: 下部ツールバー（入力欄の下）が左右にスワイプできない
    ---------------------------------------------------------------
    根因：
-   1) .dsc-switch-group 已设 overflow-x:auto，但在 Android WebView 中
-      缺少 touch-action 授权时，横向拖动手势会被祖先
+   1) .dsc-switch-group には overflow-x:auto を設定済みだが、Android WebView では
+      touch-action の許可がないと、横方向のドラッグジェスチャが祖先要素に
       （#deepseekChatApp 的 overflow-x:clip / .dsc-body 的 overflow:hidden）
-      判定为页面级横滑而吞掉，导致容器完全滚不动。
-   2) 同时存在的 -webkit-overflow-scrolling:touch 是 iOS 专用遗留属性，
-      在 Android WebView 上反而会干扰横向滚动判定。
-   修复：显式授权横向手势 + 关闭 iOS 专用滚动属性 + 锁定子项不被压缩。
+      ページ全体の横スワイプと判定されて飲み込まれ、コンテナがまったくスクロールできなくなる。
+   2) 同時に存在する -webkit-overflow-scrolling:touch は iOS 専用のレガシー属性で、
+      Android WebView ではかえって横スクロールの判定を妨げる。
+   修正：横方向のジェスチャを明示的に許可 + iOS 専用スクロール属性を無効化 + 子項目が圧縮されないよう固定。
    =================================================================== */
 .dsc-action-bar {
     min-width: 0;
@@ -1900,17 +1900,17 @@ label[for],
 }
 
 /* ===================================================================
-   FIX v2: 工具栏「任意位置」横向滑动（配套 dsc-swipe.js?v=1）
+   FIX v2: ツールバー「任意の位置」での横スワイプ（dsc-swipe.js?v=1 とセット）
    ---------------------------------------------------------------
-   与上一版 FIX 的区别：
-   上一版只调整了 .dsc-switch-group 自身的滚动能力，但实测无效，
-   因为真正的手势拦路者是 index.html 里一段 document capture 触摸脚本
-   （它会 preventDefault 并把手势映射到 scrollTop），CSS 无法覆盖。
+   前版 FIX との違い：
+   前版は .dsc-switch-group 自身のスクロール能力だけを調整したが、実測では効果がなかった。
+   本当の妨害者は index.html 内の document capture タッチスクリプトで、
+   （preventDefault してジェスチャを scrollTop に割り当てるため）、CSS では上書きできない。
 
-   本版改为「JS 统一驱动滚动」，因此这里必须把横向手势从浏览器原生
-   滚动里收回，避免 JS 与原生同时滚动造成速度翻倍：
-     touch-action: pan-y  → 浏览器只处理纵向，横向全部交给 dsc-swipe.js
-   同时保留 overflow-x:auto，使 scrollLeft 仍然有效（也兼容鼠标/程序滚动）。
+   本版は「JS で一括してスクロールを駆動する」方式に変更したため、ここで横方向のジェスチャをブラウザのネイティブ
+   スクロールから取り戻し、JS とネイティブが同時にスクロールして速度が倍になるのを防ぐ：
+     touch-action: pan-y  → ブラウザは縦方向のみ処理し、横方向はすべて dsc-swipe.js に任せる
+   同時に overflow-x:auto を残し、scrollLeft を有効なままにする（マウス/プログラムによるスクロールにも対応）。
    =================================================================== */
 .dsc-action-bar {
     min-width: 0;
@@ -1940,7 +1940,7 @@ label[for],
     flex: 0 0 auto;
 }
 
-/* 拖动过程中禁用按钮的按压缩放/过渡，让位移跟手，不出现"发黏"手感 */
+/* ドラッグ中はボタンの押下スケール/トランジションを無効にし、移動が指に追従して「粘る」感触を出さない */
 .dsc-action-bar.dsc-swiping .dsc-switch-btn,
 .dsc-action-bar.dsc-swiping .dsc-advanced-btn,
 .dsc-action-bar.dsc-swiping .dsc-longtext-btn,
@@ -1954,14 +1954,14 @@ label[for],
 }
 
 /* ===================================================================
-   FIX v3: 顶栏「⋯」展开的工具菜单支持上下滑动（纵向滚动）
+   FIX v3: 上部バー「⋯」で展開するツールメニューが上下スワイプ（縦スクロール）に対応
    -------------------------------------------------------------------
-   问题：.dsc-more-menu 原先既没有 max-height 也没有 overflow-y，
-   菜单一旦比屏幕高，超出部分会被 #deepseekChatApp 的 overflow-x:clip
-   直接裁掉——裁掉的部分既看不见、也滚不到。
-   做法：给菜单一个视口内的最大高度并开启纵向滚动；横向仍然锁定。
-   （JS 侧 dsc-menu-scroll.js 会在展开时按实际位置精算 max-height，
-     这里只是原生兜底，保证脚本未加载时菜单也不会出屏。）
+   問題：.dsc-more-menu には元々 max-height も overflow-y もなく、
+   メニューが画面より高くなると、あふれた部分が #deepseekChatApp の overflow-x:clip で
+   直接切り取られ——切り取られた部分は見えず、スクロールもできない。
+   方法：メニューにビューポート内の最大高さを与えて縦スクロールを有効化。横方向は引き続き固定。
+   （JS 側の dsc-menu-scroll.js が展開時に実際の位置から max-height を精算し、
+     ここはネイティブのフォールバックで、スクリプト未読み込みでもメニューが画面外に出ないことを保証する。）
    =================================================================== */
 .dsc-more-menu {
     box-sizing: border-box;
@@ -1977,36 +1977,36 @@ label[for],
     -ms-overflow-style: none;
 }
 .dsc-more-menu::-webkit-scrollbar { display: none; width: 0; height: 0; }
-/* 防止 flex 子项被压缩，保证按内容真实高度滚动 */
+/* flex 子項目の圧縮を防ぎ、内容の実際の高さでスクロールできるようにする */
 .dsc-more-menu > * { flex-shrink: 0; }
-/* 拖动过程中关掉过渡，避免背景高亮「发黏」 */
+/* ドラッグ中はトランジションを切り、背景ハイライトの「粘り」を避ける */
 .dsc-more-menu.dsc-menu-scrolling .dsc-more-item {
     transition: none !important;
 }
 
 /* ===================================================================
-   FIX v4: 换行按钮「点击反馈」
+   FIX v4: 改行ボタン「タップフィードバック」
    -------------------------------------------------------------------
-   问题：点「↵」换行按钮几乎没有任何反馈。
-   根因有两层——
-   1) 原样式 `.dsc-newline-btn:active` 只有 transform:scale(0.94)，
-      白底灰字缩 6%，肉眼基本感知不到，没有颜色/背景变化。
-   2) 更关键的是 #dscNewlineBtn 被 index.html 那段 document 级
-      capture 脚本纳入了 SEL，并在 touchstart 阶段执行了
-      e.preventDefault()。Chromium 对 touchstart 做 preventDefault
-      会取消 :active 状态机 —— 于是那条 scale 从来没真正触发过。
-   做法：改用由 dsc-newline-fx.js 主动切换的 class 来控制反馈，
-   不再依赖 :active（:active 保留作兜底），并补充一个「已插入换行」
-   的成功脉冲动画，让点按有明确的即时确认。
+   問題：「↵」改行ボタンを押してもほとんどフィードバックがない。
+   原因は2層ある——
+   1) 元のスタイル `.dsc-newline-btn:active` は transform:scale(0.94) のみで、
+      白地に灰字が 6% 縮むだけで、肉眼ではほぼ分からず、色/背景の変化もない。
+   2) さらに重要なのは、#dscNewlineBtn が index.html の document 級
+      capture スクリプトの SEL に含まれ、touchstart 段階で
+      e.preventDefault() を呼んでいる。Chromium は touchstart に preventDefault を行うと
+      :active 状態機械が取り消される —— そのためこの scale は一度も実際に発火していない。
+   方法：dsc-newline-fx.js が能動的に切り替える class でフィードバックを制御する方式に変更し、
+   不再依赖 :active（:active 保留作兜底），并补充一个「已改行を挿入」
+   の成功パルスアニメーションで、タップに明確な即時確認を与える。
    =================================================================== */
 .dsc-newline-btn {
     position: relative;
-    /* 显式声明过渡属性，避免 all 过渡把脉冲动画一起拖慢 */
+    /* トランジション属性を明示し、all トランジションがパルスアニメーションまで遅くするのを避ける */
     transition: background-color .16s ease, border-color .16s ease,
                 color .16s ease, transform .12s ease, box-shadow .16s ease;
 }
 
-/* 按下态：:active 与 JS class 双保险（JS 那条在 preventDefault 下仍生效） */
+/* 押下状態：:active と JS class の二重保険（JS 側は preventDefault 下でも有効） */
 .dsc-newline-btn:active,
 .dsc-newline-btn.is-nl-pressed {
     background: #4f46e5 !important;
@@ -2017,7 +2017,7 @@ label[for],
                 0 2px 10px rgba(79, 70, 229, 0.35) !important;
 }
 
-/* 松手后的成功脉冲：深紫按下态向外扩散回浅紫常态，明确表示"已插入换行" */
+/* 松手后的成功脉冲：深紫按下态向外扩散回浅紫常态，明确表示"已改行を挿入" */
 .dsc-newline-btn.is-nl-done {
     animation: dscNlPulse 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
@@ -2047,7 +2047,7 @@ label[for],
     }
 }
 
-/* 尊重系统「减少动态效果」偏好：只保留颜色反馈，去掉缩放与扩散 */
+/* システムの「視差効果を減らす」設定を尊重：色のフィードバックのみ残し、スケールと拡散を除去 */
 @media (prefers-reduced-motion: reduce) {
     .dsc-newline-btn.is-nl-done { animation: none; }
     .dsc-newline-btn:active,
@@ -2055,22 +2055,22 @@ label[for],
 }
 
 /* ===================================================================
-   FIX v5: 空状态的 DeepSeek logo 没在页面正中间（实测横向偏右 20px）
+   FIX v5: 空状態の DeepSeek ロゴがページの真正中にない（実測で右に 20px ずれる）
    -------------------------------------------------------------------
-   根因：.dsc-msg-empty 同时声明了 width:100% 和 padding:20px，
-   而本项目并没有全局 box-sizing:border-box（CSS 默认是 content-box）。
-   于是它的外框宽度 = 父容器内容宽 + 左右各 20px padding = 比可视区还宽 40px，
-   多出来的部分被 .dsc-messages 的 overflow-x:hidden 从右边裁掉；
-   居中是对「内容盒」算的，内容盒整体右移，logo 与欢迎语因此偏右 20px，
-   看起来就是"not in the middle"。
+   原因：.dsc-msg-empty が width:100% と padding:20px を同時に宣言しており、
+   本プロジェクトにはグローバルな box-sizing:border-box がない（CSS の既定は content-box）。
+   そのため外枠の幅 = 親コンテナの内容幅 + 左右各 20px の padding = 可視領域より 40px 広くなる。
+   あふれた部分は .dsc-messages の overflow-x:hidden により右から切り取られる；
+   中央揃えは「内容ボックス」で計算され、内容ボックス全体が右にずれるため、ロゴと歓迎文が 20px 右に寄る。
+   見た目は「中央にない」状態になる。
 
-   测量方式：本地 Chromium 无头真实排版引擎，容器钉成 360x800
-   （= 720x1600 @DPR 2 的真机 CSS 视口），完全复刻 index.html 的 DOM。
-     修复前：IMG cx=200  PAGE_CENTER=180  DX=+20  BOX sw=400 > cw=360
-     修复后：IMG cx=180  PAGE_CENTER=180  DX=0    BOX sw=360 = cw=360
+   測定方法：ローカル Chromium のヘッドレス実レイアウトエンジンで、コンテナを 360x800 に固定
+   （= 720x1600 @DPR 2 の実機 CSS ビューポート）とし、index.html の DOM を完全再現。
+     修正前：IMG cx=200  PAGE_CENTER=180  DX=+20  BOX sw=400 > cw=360
+     修正後：IMG cx=180  PAGE_CENTER=180  DX=0    BOX sw=360 = cw=360
 
-   做法：改成 border-box（padding 计入宽度），并显式 max-width/margin auto
-   兜底，保证任何视口宽度下都不会再横向溢出、永远居中。
+   方法：border-box に変更（padding を幅に算入）し、max-width/margin auto を明示。
+   フォールバックとして、どのビューポート幅でも横にはみ出さず常に中央に来ることを保証する。
    =================================================================== */
 .dsc-msg-empty {
     box-sizing: border-box;
@@ -2080,12 +2080,12 @@ label[for],
 }
 
 /* ============================================================
-   FIX v6 —— 公告系统（announcements）
-   公告管理面板 = 全屏；公告弹窗 = 居中普通弹窗
-   bilibili 风格 switch 开关
+   FIX v6 —— お知らせシステム（announcements）
+   お知らせ管理面板 = 全屏；公告弹窗 = 居中普通弹窗
+   bilibili 風のスイッチ
    ============================================================ */
 
-/* ============ 公告管理面板（全屏） ============ */
+/* ============ お知らせ管理面板（全屏） ============ */
 #dscAnnAdminOverlay {
     padding: 0;
     background: #ffffff;
@@ -2111,7 +2111,7 @@ label[for],
     animation: none;
 }
 
-/* 顶部栏（固定） */
+/* 上部バー（固定） */
 .dsc-ann-admin-head {
     display: flex;
     align-items: center;
@@ -2134,7 +2134,7 @@ label[for],
 }
 .dsc-ann-admin-close-btn:hover { background: #f3f4f6; color: #1f2937; }
 
-/* 内容滚动区 */
+/* 内容スクロール領域 */
 .dsc-ann-admin-body {
     flex: 1;
     overflow-y: auto;
@@ -2160,7 +2160,7 @@ label[for],
 .dsc-ann-add { margin-bottom: 16px; }
 .dsc-ann-add .dsc-btn { width: 100%; padding: 12px; font-size: 0.9rem; }
 
-/* 编辑器 */
+/* エディタ */
 .dsc-ann-editor { border-top: 1px solid #f0f0f0; padding-top: 18px; margin-top: 6px; }
 .dsc-ann-group { border: 1px solid #f0f0f0; border-radius: 14px; padding: 16px 16px 6px; margin-bottom: 16px; background: #fafafa; }
 .dsc-ann-group-title { font-size: 0.75rem; font-weight: 700; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 14px; }
@@ -2186,7 +2186,7 @@ label[for],
 .dsc-ann-editor-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
 .dsc-ann-editor-footer .dsc-btn { padding: 10px 22px; }
 
-/* bilibili 风格 switch 开关 */
+/* bilibili 風のスイッチ */
 .dsc-switch { display: inline-flex; align-items: center; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
 .dsc-switch input { display: none; }
 .dsc-switch-track { position: relative; display: inline-block; width: 46px; height: 26px; border-radius: 999px; background: #e5e7eb; transition: background 0.22s ease; flex-shrink: 0; }
@@ -2196,7 +2196,7 @@ label[for],
 
 .dsc-btn.confirming { background: #fee2e2 !important; border-color: #ef4444 !important; color: #dc2626 !important; }
 
-/* ============ 用户端公告弹窗（居中普通弹窗） ============ */
+/* ============ ユーザー側のお知らせダイアログ（中央の通常ダイアログ） ============ */
 .dsc-modal-overlay.dsc-ann-popup { padding: 16px; background: rgba(15, 23, 42, 0.42); }
 .dsc-ann-popup-modal {
   width: 100%;
@@ -2223,7 +2223,7 @@ label[for],
 .dsc-ann-dismiss { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; color: #6b7280; margin-right: auto; cursor: pointer; user-select: none; }
 .dsc-ann-dismiss input { width: 16px; height: 16px; }
 
-/* 小屏适配 */
+/* 小画面対応 */
 @media (max-width: 720px) {
     .dsc-ann-admin-head { padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
     .dsc-ann-admin-body { padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
@@ -2231,7 +2231,7 @@ label[for],
     .dsc-ann-popup-modal { max-width: 100%; max-height: 86vh; }
 }
 
-/* ===== FIX v7: 自定义模型添加 UI ===== */
+/* ===== FIX v7: カスタムモデル追加 UI ===== */
 .dsc-model-add-btn { margin-left: auto; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid #c7d2fe; background: #eef2ff; color: #4f46e5; font-size: 0.85rem; font-weight: 700; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .18s; }
 .dsc-model-add-btn:hover { background: #4f46e5; color: #ffffff; border-color: #4f46e5; }
 .dsc-model-add-row { display: none; gap: 8px; margin-top: 8px; align-items: center; }
@@ -2246,51 +2246,51 @@ label[for],
 .dsc-model-chip b:hover { color: #ef4444; }
 
 /* ===================================================================
-   FIX v8: 顶栏「⋯」菜单最多显示 7 个按钮，超出部分必须上下滑动
+   FIX v8: 上部バー「⋯」メニューは最大7ボタンまで表示し、あふれた分は上下スワイプが必要
    -------------------------------------------------------------------
-   真实排版引擎实测（Chromium 360x800，根字号 16px）：
-     .dsc-more-item 单行高      = 35.52px
+   実レイアウトエンジンでの実測（Chromium 360x800、ルート文字サイズ 16px）：
+     .dsc-more-item の1行の高さ = 35.52px
      .dsc-more-menu gap         = 2px
      .dsc-more-menu 上下 padding = 6px / 6px
-   「恰好露出 7 项」的可视高度 = 第 7 项底边 - 菜单顶边 = 278px
-   （实测 360x800 Chromium：第 7 项底边 322 - 菜单顶边 44 = 278）
-   而第 8 项顶边距菜单顶 304.16px，所以上限只要 < 304 就不会露出第 8 项，
-   266.16 ~ 304.16 都安全；取 278 让第 7 项完整且底部留一点呼吸感。
+   「ちょうど7項目見える」可視高さ = 第7項の下端 - メニュー上端 = 278px
+   （実測 360x800 Chromium：第7項の下端 322 - メニュー上端 44 = 278）
+   第8項の上端はメニュー上端から 304.16px なので、上限が 304 未満なら第8項は表示されない。
+   266.16 〜 304.16 はすべて安全。278 を採用し、第7項を完全に見せつつ下端に少し余白を残す。
 
-   这里用 rem 表达，使它随根字号等比缩放；item 的 font-size 本来就是
-   rem，所以字号一改、上限跟着改。
-   兜底意义：脚本未加载 / 未执行时也保证不会露出第 8 项；
-   项数 <= 7 时该上限根本不生效（内容本来就矮于它），不会误伤。
-   JS 侧 dsc-menu-scroll.js 的 fit() 会按第 7 项真实位置再精算一次，
-   取两者更小值，以 JS 为准。
+   ここは rem で表現し、ルート文字サイズに比例して拡縮させる。item の font-size は元々
+   rem なので、文字サイズを変えれば上限も連動して変わる。
+   フォールバックの意義：スクリプト未読み込み/未実行でも第8項が表示されないことを保証；
+   項目数 <= 7 ではこの上限はそもそも効かない（内容が元々それより低い）ため、誤って制限しない。
+   JS 側 dsc-menu-scroll.js の fit() が第7項の実際の位置で再度精算し、
+   両者の小さい方を採用し、JS を正とする。
    =================================================================== */
-/* 基础上限：仅做「不要出屏」的保护（沿用 v3 的思路） */
+/* 基本の上限：「画面外に出さない」保護のみ（v3 の方針を踏襲） */
 .dsc-more-menu {
     max-height: calc(100dvh - 150px);
 }
-/* 只有「超过 7 项」时才把高度卡到 7 项。
-   用 :has() 按真实子元素数量判定，这样：
-     - <= 7 项：规则不命中，菜单按内容自然高度显示，完全不产生滚动；
-     - >  7 项：卡到 7 项高度，第 8 项起必须上下滑动才能看到。
-   为什么不用固定上限：实测 item 高 37px、gap 2px、padding 6px，
-   7 项内容高 283px，而第 8 项顶边在 279px —— 固定上限无法同时满足
-   「7 项不滚」和「第 8 项不露」，必须按项数分情况。 */
+/* 「7項を超える」ときだけ高さを7項目分に制限する。
+   :has() で実際の子要素数から判定する。これにより：
+     - <= 7 項：ルールが一致せず、メニューは内容の自然な高さで表示され、スクロールは一切発生しない；
+     - > 7 項：7項目分の高さに制限され、第8項以降は上下スワイプしないと見えない。
+   固定上限を使わない理由：実測で item の高さ 37px、gap 2px、padding 6px、
+   7項目の内容高は 283px、第8項の上端は 279px —— 固定上限では同時に満たせない。
+   「7項はスクロールしない」と「第8項を見せない」は両立しないため、項目数で場合分けが必要。 */
 .dsc-more-menu:has(> .dsc-more-item:nth-child(8)) {
     max-height: min(calc(100dvh - 150px), calc(7 * 2.22rem + 32px));
 }
-/* 还能继续下滑时，底部给一点内阴影，暗示「还有更多」。
-   用 data 属性而不是 class：class 会被 watch() 的 MutationObserver 捕获，
-   造成 fit() 抖动与 scrollTop 反复归零。 */
+/* さらに下へスクロールできるときは、下端に内側の影を付けて「まだ続きがある」ことを示す。
+   class ではなく data 属性を使う：class は watch() の MutationObserver に捕捉され、
+   fit() の揺れと scrollTop の繰り返しゼロリセットを引き起こす。 */
 .dsc-more-menu[data-has-more="1"] {
     box-shadow: 0 12px 36px rgba(15, 23, 42, 0.16),
                 inset 0 -16px 12px -12px rgba(15, 23, 42, 0.20);
 }
 
 /* ============================================================
-   DeepSeek 设置面板美化 v2
+   DeepSeek 設定パネルの美化 v2
    ============================================================ */
 
-/* ---- 弹窗外壳：去掉默认 padding，交给内部区块控制 ---- */
+/* ---- ダイアログ外枠：既定の padding を外し、内部ブロックに制御を任せる ---- */
 #dscSettingsOverlay .dsc-modal.dsc-settings-modal {
     max-width: 480px;
     max-height: calc(100vh - 32px);
@@ -2305,7 +2305,7 @@ label[for],
     background: #ffffff;
 }
 
-/* ---- 可滚动内容区：head/footer 固定，中间滚动，保证底部按钮始终可见可点 ---- */
+/* ---- スクロール可能な内容領域：head/footer を固定し中央をスクロール、下部ボタンが常に見えて押せることを保証 ---- */
 #dscSettingsOverlay .dsc-settings-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -2318,7 +2318,7 @@ label[for],
 #dscSettingsOverlay .dsc-settings-body::-webkit-scrollbar { width: 6px; }
 #dscSettingsOverlay .dsc-settings-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
-/* ---- 渐变头部 ---- */
+/* ---- グラデーションのヘッダー ---- */
 .dsc-settings-head {
     position: relative;
     display: flex;
@@ -2375,7 +2375,7 @@ label[for],
     letter-spacing: 0.01em;
 }
 
-/* ---- 状态胶囊 ---- */
+/* ---- 状態カプセル ---- */
 #dscSettingsOverlay .dsc-status {
     margin: 16px 24px 0;
     padding: 10px 14px;
@@ -2396,7 +2396,7 @@ label[for],
     color: #b91c1c;
 }
 
-/* ---- 分区标题 ---- */
+/* ---- セクション見出し ---- */
 .dsc-settings-sec { padding: 18px 24px 2px; }
 .dsc-settings-sec-title {
     display: flex;
@@ -2416,7 +2416,7 @@ label[for],
     background: linear-gradient(90deg, #e0e7ff, transparent);
 }
 
-/* ---- 字段 ---- */
+/* ---- フィールド ---- */
 #dscSettingsOverlay .dsc-field { margin-bottom: 18px; }
 #dscSettingsOverlay .dsc-field label {
     font-size: 0.8rem;
@@ -2460,7 +2460,7 @@ label[for],
     cursor: pointer;
 }
 
-/* ---- 底部按钮栏 ---- */
+/* ---- 下部ボタンバー ---- */
 #dscSettingsOverlay .dsc-modal-footer {
     flex-shrink: 0;
     margin-top: 6px;
@@ -2523,7 +2523,7 @@ label[for],
     color: #9ca3af;
     line-height: 1.45;
 }
-/* 开关 */
+/* スイッチ */
 .dsc-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
 .dsc-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 2; }
 .dsc-switch-track {
@@ -2549,7 +2549,7 @@ label[for],
 }
 .dsc-switch input:checked + .dsc-switch-track::before { transform: translateX(20px); }
 
-/* 卡片内输入 */
+/* カード内の入力 */
 .dsc-mr-field { margin-bottom: 12px; }
 .dsc-mr-field-label {
     display: block;
@@ -2585,12 +2585,12 @@ label[for],
     word-break: break-all;
 }
 
-/* ---- 更多菜单里的「设置」入口 ---- */
+/* ---- その他メニュー内の「設定」入口 ---- */
 .dsc-more-item#dscSettingsBtn .ic { transition: transform .25s; }
 .dsc-more-item#dscSettingsBtn:hover { background: #eef2ff; color: #4f46e5; }
 .dsc-more-item#dscSettingsBtn:hover .ic { transform: rotate(45deg); }
 
-/* ---- 窄屏适配 ---- */
+/* ---- 狭幅画面対応 ---- */
 @media (max-width: 480px) {
     #dscSettingsOverlay .dsc-settings-head { padding: 20px 18px 18px; }
     .dsc-settings-sec { padding-left: 18px; padding-right: 18px; }
@@ -2598,7 +2598,7 @@ label[for],
     .dsc-mr-card { margin-left: 18px; margin-right: 18px; }
     #dscSettingsOverlay .dsc-modal-footer { padding-left: 18px; padding-right: 18px; }
 }
-/* ===== 单条回复费用标签 ===== */
+/* ===== 1通の返信の料金ラベル ===== */
 .dsc-cost-chip {
     display: inline-flex;
     align-items: center;

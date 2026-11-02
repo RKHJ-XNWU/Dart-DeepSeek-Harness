@@ -479,26 +479,26 @@ Future<void> handleVocab(HttpRequest req) async {
     try {
       body = await readJsonBody(req);
     } catch (_) {
-      await dsJSONErr(res, 400, '无效请求体');
+      await dsJSONErr(res, 400, '無効なリクエストボディです');
       return;
     }
     final word = mStr(body, 'word').trim();
     if (word.isEmpty) {
-      await dsJSONErr(res, 400, '单词不能为空');
+      await dsJSONErr(res, 400, '単語は必須です');
       return;
     }
     if (runeLen(word) > VOCAB_MAX_WORD_LEN) {
-      await dsJSONErr(res, 400, '单词太长');
+      await dsJSONErr(res, 400, '単語が長すぎます');
       return;
     }
     final meaning = mStr(body, 'meaning');
     if (runeLen(meaning) > VOCAB_MAX_MEANING_LEN) {
-      await dsJSONErr(res, 400, '释义太长');
+      await dsJSONErr(res, 400, '語義が長すぎます');
       return;
     }
     final example = mStr(body, 'example');
     if (runeLen(example) > VOCAB_MAX_EXAMPLE_LEN) {
-      await dsJSONErr(res, 400, '例句太长');
+      await dsJSONErr(res, 400, '例文が長すぎます');
       return;
     }
     final tags = asList(body['tags'])
@@ -528,7 +528,7 @@ Future<void> handleVocab(HttpRequest req) async {
       );
       final rowWords = _readRow(newRow)..add(w);
       if (!_writeRow(newRow, rowWords)) {
-        await dsJSONErr(res, 500, '保存失败');
+        await dsJSONErr(res, 500, '保存に失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {'success': true, 'word': w.toJson()});
@@ -546,7 +546,7 @@ Future<void> handleVocab(HttpRequest req) async {
       }
     }
     if (old == null) {
-      await dsJSONErr(res, 404, '单词不存在');
+      await dsJSONErr(res, 404, '単語が存在しません');
       return;
     }
     final newMastered = body.containsKey('mastered') ? mBool(body, 'mastered') : old.mastered;
@@ -578,7 +578,7 @@ Future<void> handleVocab(HttpRequest req) async {
     _removeWordFromRow(oldRow, old.id);
     final newRowWords = _readRow(newRow)..add(updated);
     if (!_writeRow(newRow, newRowWords)) {
-      await dsJSONErr(res, 500, '保存失败');
+      await dsJSONErr(res, 500, '保存に失敗しました');
       return;
     }
     await dsJSONOk(res, 200, {'success': true, 'word': updated.toJson()});
@@ -701,19 +701,19 @@ Future<void> handleVocabUpload(HttpRequest req) async {
     final nextBoundary = '\r\n--$boundary';
     final contentEnd = bodyStr.indexOf(nextBoundary, contentStart);
     if (contentEnd < 0) {
-      await dsJSONErr(res, 400, '无效 multipart 结尾');
+      await dsJSONErr(res, 400, '無効な multipart 終端です');
       return;
     }
     final fileBytes = bytes.sublist(contentStart, contentEnd);
     final name = 'img_${fmtStamp14(DateTime.now())}_${randomHex(6)}$ext';
     final saved = await saveImageBytes(name, fileBytes);
     if (saved == null) {
-      await dsJSONErr(res, 500, '写入图片失败');
+      await dsJSONErr(res, 500, '画像の書き込みに失敗しました');
       return;
     }
     await dsJSONOk(res, 200, {'success': true, 'name': name});
   } catch (e) {
-    await dsJSONErr(res, 500, '上传失败: $e');
+    await dsJSONErr(res, 500, 'アップロードに失敗しました: $e');
   }
 }
 
@@ -735,7 +735,7 @@ Future<void> handleVocabReview(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final id = mStr(body, 'id').trim();
@@ -754,7 +754,7 @@ Future<void> handleVocabReview(HttpRequest req) async {
       if (idx >= 0) {
         ws[idx] = applyReview(ws[idx], correct);
         if (!_writeRow(r, ws)) {
-          await dsJSONErr(res, 500, '保存失败');
+          await dsJSONErr(res, 500, '保存に失敗しました');
           return;
         }
         await dsJSONOk(res, 200, {'success': true, 'word': ws[idx].toJson()});
@@ -762,7 +762,7 @@ Future<void> handleVocabReview(HttpRequest req) async {
       }
     }
   }
-  await dsJSONErr(res, 404, '单词不存在');
+  await dsJSONErr(res, 404, '単語が存在しません');
 }
 
 Future<void> handleVocabClear(HttpRequest req) async {

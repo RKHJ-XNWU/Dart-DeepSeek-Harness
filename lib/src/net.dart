@@ -119,7 +119,7 @@ void _applyProxy(HttpClient client) {
     logp('🌐 使用 HTTP 代理: $hp');
   } else if (p.socks5Host != null) {
     // Dart 的 HttpClient 无 SOCKS5 拨号注入点：保持直连并给出明确日志
-    logp('⚠️ 检测到 SOCKS5 代理 ${p.socks5Host}，dart:io 不支持自定义 SOCKS 拨号，已直连');
+    logp('⚠️ SOCKS5 プロキシ ${p.socks5Host} を検出しましたが、dart:io は独自の SOCKS ダイヤルに対応していないため、直接接続します');
   }
 }
 

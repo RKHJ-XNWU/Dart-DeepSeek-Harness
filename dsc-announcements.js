@@ -1,8 +1,8 @@
 // ============================================================
-// dsc-announcements.js —— 公告系统前端
-//   1) 入口按钮在右上角「⋯」菜单 → 打开公告管理面板
-//   2) 用户端：页面加载后拉取 active 公告，按优先级依次弹窗
-//   3) 今日内不再提示（localStorage，forceTop 最高级别除外）
+// dsc-announcements.js —— お知らせシステムのフロントエンド
+//   1) 入口ボタンは右上「⋯」メニュー → お知らせ管理パネルを開く
+//   2) 用户端：页面加载后拉取 active 公告，押す優先度依次弹窗
+//   3) 今日はもう表示しない（localStorage，forceTop 最上位除外）
 // ============================================================
 (function () {
   'use strict';
@@ -36,7 +36,7 @@
   }
   function dismissKey(id) { return 'ann_dismissed_' + id; }
 
-  // datetime-local 展示用转换
+  // datetime-local 表示用の変換
   function rfcToLocal(rfc) {
     if (!rfc) return '';
     var d = new Date(rfc);
@@ -97,18 +97,18 @@
   async function loadList() {
     var listEl = $('dscAnnList');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="dsc-ann-empty">加载中…</div>';
+    listEl.innerHTML = '<div class="dsc-ann-empty">読み込み中…</div>';
     var list = [];
     try {
       var res = await fetch('/api/announcements', { cache: 'no-store' });
       var data = await res.json();
       list = data.announcements || [];
     } catch (e) {
-      listEl.innerHTML = '<div class="dsc-ann-empty">加载失败</div>';
+      listEl.innerHTML = '<div class="dsc-ann-empty">読み込みに失敗</div>';
       return;
     }
     if (!list.length) {
-      listEl.innerHTML = '<div class="dsc-ann-empty">暂无公告</div>';
+      listEl.innerHTML = '<div class="dsc-ann-empty">お知らせはありません</div>';
       return;
     }
     var now = new Date();
@@ -116,20 +116,20 @@
     list.forEach(function (a) {
       var st = a.startTime ? new Date(a.startTime) : null;
       var en = a.endTime ? new Date(a.endTime) : null;
-      var state = '生效中', stateCls = 'on';
-      if (st && now < st) { state = '未开始'; stateCls = 'wait'; }
-      else if (en && now > en) { state = '已结束'; stateCls = 'off'; }
-      var force = a.forceTop ? '<span class="dsc-ann-tag force">最高级别</span>' : '';
+      var state = '表示中', stateCls = 'on';
+      if (st && now < st) { state = '未開始'; stateCls = 'wait'; }
+      else if (en && now > en) { state = '終了'; stateCls = 'off'; }
+      var force = a.forceTop ? '<span class="dsc-ann-tag force">最上位</span>' : '';
       html += '<div class="dsc-ann-item">' +
         '<div class="dsc-ann-item-head">' +
           '<span class="dsc-ann-item-title">' + escHtml(a.title) + '</span>' +
           force +
           '<span class="dsc-ann-tag ' + stateCls + '">' + state + '</span>' +
-          '<span class="dsc-ann-tag">优先级 ' + a.priority + '</span>' +
+          '<span class="dsc-ann-tag">優先度 ' + a.priority + '</span>' +
         '</div>' +
         '<div class="dsc-ann-item-ops">' +
-          '<button class="dsc-btn ghost dsc-ann-edit" data-id="' + escHtml(a.id) + '">编辑</button>' +
-          '<button class="dsc-btn danger dsc-ann-del" data-id="' + escHtml(a.id) + '">删除</button>' +
+          '<button class="dsc-btn ghost dsc-ann-edit" data-id="' + escHtml(a.id) + '">編集</button>' +
+          '<button class="dsc-btn danger dsc-ann-del" data-id="' + escHtml(a.id) + '">削除</button>' +
         '</div>' +
       '</div>';
     });
@@ -150,11 +150,11 @@
           return;
         }
         btn.setAttribute('data-confirm', '1');
-        btn.textContent = '确认删除?';
+        btn.textContent = '削除しますか?';
         btn.classList.add('confirming');
         setTimeout(function () {
           btn.removeAttribute('data-confirm');
-          btn.textContent = '删除';
+          btn.textContent = '削除';
           btn.classList.remove('confirming');
         }, 2500);
       });
@@ -165,20 +165,20 @@
     try {
       var res = await fetch('/api/announcements?id=' + encodeURIComponent(id), { method: 'DELETE' });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '删除失败', 'error'); return; }
-      showToast('已删除', 'success');
+      if (!res.ok) { showToast(data.error || '削除に失敗しました', 'error'); return; }
+      showToast('削除しました', 'success');
       loadList();
     } catch (e) {
-      showToast('删除失败', 'error');
+      showToast('削除に失敗しました', 'error');
     }
   }
 
   async function saveCurrent() {
     var title = $('dscAnnTitle').value.trim();
     var content = $('dscAnnContent').value;
-    if (!title) { showToast('标题不能为空', 'error'); return; }
-    if (runeLen(title) > 500) { showToast('标题最多 500 字', 'error'); return; }
-    if (runeLen(content) > 50000) { showToast('内容最多 50000 字', 'error'); return; }
+    if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+    if (runeLen(title) > 500) { showToast('タイトルは最大 500 字', 'error'); return; }
+    if (runeLen(content) > 50000) { showToast('本文は最大 50000 字', 'error'); return; }
     var startTime = $('dscAnnStart').value;
     var endTime = $('dscAnnEnd').value;
     var priority = parseInt($('dscAnnPriority').value, 10) || 0;
@@ -200,16 +200,16 @@
         body: JSON.stringify(payload)
       });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '保存失败', 'error'); return; }
-      showToast('已保存', 'success');
+      if (!res.ok) { showToast(data.error || '保存に失敗しました', 'error'); return; }
+      showToast('保存済み', 'success');
       hideEditor();
       loadList();
     } catch (e) {
-      showToast('保存失败', 'error');
+      showToast('保存に失敗しました', 'error');
     }
   }
 
-  // ============ 用户端全屏弹窗 ============
+  // ============ ユーザー側の全画面ダイアログ ============
   function buildPopup(a, onClose) {
     var overlay = document.createElement('div');
     overlay.className = 'dsc-modal-overlay dsc-ann-popup';
@@ -219,24 +219,24 @@
     var meta = '';
     if (a.startTime || a.endTime) {
       meta = '<div class="dsc-ann-popup-meta">' +
-        (a.startTime ? '开始：' + escHtml(a.startTime) : '') +
-        (a.endTime ? '　结束：' + escHtml(a.endTime) : '') +
+        (a.startTime ? '開始：' + escHtml(a.startTime) : '') +
+        (a.endTime ? '　終了：' + escHtml(a.endTime) : '') +
         '</div>';
     }
-    var forceTag = force ? '<span class="dsc-ann-tag force">最高级别</span>' : '';
+    var forceTag = force ? '<span class="dsc-ann-tag force">最上位</span>' : '';
     overlay.innerHTML =
       '<div class="dsc-modal dsc-ann-popup-modal">' +
         '<div class="dsc-ann-popup-head">' +
           '<div class="dsc-ann-popup-title">📢 ' + escHtml(a.title) + ' ' + forceTag + '</div>' +
-          '<button class="dsc-ann-popup-close" title="关闭">✕</button>' +
+          '<button class="dsc-ann-popup-close" title="閉じる">✕</button>' +
         '</div>' +
         '<div class="dsc-ann-popup-body">' +
           meta +
           '<div class="dsc-ann-popup-content">' + escHtml(a.content) + '</div>' +
         '</div>' +
         '<div class="dsc-ann-popup-footer">' +
-          (force ? '' : '<label class="dsc-ann-dismiss"><input type="checkbox"> 今日内不再提示</label>') +
-          '<button class="dsc-btn primary dsc-ann-ok">我知道了</button>' +
+          (force ? '' : '<label class="dsc-ann-dismiss"><input type="checkbox"> 今日はもう表示しない</label>') +
+          '<button class="dsc-btn primary dsc-ann-ok">了解しました</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -270,11 +270,11 @@
       }
       next();
     } catch (e) {
-      console.error('[ANN] 拉取公告失败', e);
+      console.error('[ANN] お知らせの取得に失敗', e);
     }
   }
 
-  // ============ 绑定 ============
+  // ============ バインド ============
   function bind() {
     var btn = $('dscAnnounceBtn');
     if (btn) btn.addEventListener('click', function (e) {

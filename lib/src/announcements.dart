@@ -1,5 +1,5 @@
 // ============================================================
-// announcements.dart —— 公告系统
+// announcements.dart —— 公告システム
 //   数据格式：与 sessions 同款的明文 .sts（#A 头行 + #C 内容行）
 //     #A|id|title|startTime|endTime|priority|forceTop|createdAt
 //     #C|content
@@ -150,7 +150,7 @@ bool deleteAnnouncement(String id) {
     if (File(path).existsSync()) File(path).deleteSync();
     return true;
   } catch (e) {
-    logp('❌ 删除公告失败: $e');
+    logp('❌ お知らせの削除に失敗しました: $e');
     return false;
   }
 }
@@ -192,7 +192,7 @@ Future<void> handleAnnouncements(HttpRequest req) async {
       try {
         body = await readJsonBody(req);
       } catch (_) {
-        await dsJSONErr(res, 400, '无效请求体');
+        await dsJSONErr(res, 400, '無効なリクエストボディです');
         return;
       }
       final existingId = trimOr(mStr(body, 'id'), '');
@@ -204,11 +204,11 @@ Future<void> handleAnnouncements(HttpRequest req) async {
       final forceTop = mBool(body, 'forceTop');
 
       if (title.isEmpty) {
-        await dsJSONErr(res, 400, '标题不能为空');
+        await dsJSONErr(res, 400, 'タイトルは必須です');
         return;
       }
       if (runeLen(title) > ANN_MAX_TITLE_RUNES) {
-        await dsJSONErr(res, 400, '标题最多 $ANN_MAX_TITLE_RUNES 字');
+        await dsJSONErr(res, 400, 'タイトルは最大 $ANN_MAX_TITLE_RUNES 文字までです');
         return;
       }
       if (runeLen(content) > ANN_MAX_CONTENT_RUNES) {
@@ -220,7 +220,7 @@ Future<void> handleAnnouncements(HttpRequest req) async {
       if (existingId.isEmpty) {
         final all = getAllAnnouncements();
         if (all.length >= ANN_MAX_COUNT) {
-          await dsJSONErr(res, 400, '最多只能存在 $ANN_MAX_COUNT 条公告，请先删除旧公告');
+          await dsJSONErr(res, 400, 'お知らせは最大 $ANN_MAX_COUNT 件までです。先に古いお知らせを削除してください');
           return;
         }
         final id = 'ann_${fmtStamp14(now)}_${randomHex(6)}';
@@ -235,7 +235,7 @@ Future<void> handleAnnouncements(HttpRequest req) async {
           createdAt: rfc3339(now),
         );
         if (!saveAnnouncement(a)) {
-          await dsJSONErr(res, 500, '保存失败');
+          await dsJSONErr(res, 500, '保存に失敗しました');
           return;
         }
         await dsJSONOk(res, 200, {'success': true, 'announcement': a.toJson()});
@@ -258,7 +258,7 @@ Future<void> handleAnnouncements(HttpRequest req) async {
         createdAt: existing.createdAt,
       );
       if (!saveAnnouncement(a)) {
-        await dsJSONErr(res, 500, '保存失败');
+        await dsJSONErr(res, 500, '保存に失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {'success': true, 'announcement': a.toJson()});

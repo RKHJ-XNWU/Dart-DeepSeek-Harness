@@ -1,22 +1,22 @@
 /* ===================================================================
- * dsc-newline-fx.js  ——  换行按钮点击反馈
+ * dsc-newline-fx.js  ——  换行ボタン点击反馈
  * -------------------------------------------------------------------
- * 为什么需要它：
- *   index.html 里有一段 document 级 capture 脚本，它把
- *   #dscNewlineBtn 也纳入了 SEL，并在 touchstart 阶段调用
- *   e.preventDefault()。Chromium 对 touchstart 做 preventDefault
- *   会取消后续的 :active 状态机——所以 CSS 里那条
- *   `.dsc-newline-btn:active { transform: scale(0.94) }` 根本不会触发，
- *   按钮按下去毫无变化。
+ * なぜ必要か：
+ * index.html には document 級の capture スクリプトがあり、それが
+ * #dscNewlineBtn も SEL に含め、touchstart 段階で
+ * e.preventDefault() を呼んでいる。Chromium は touchstart に preventDefault を行うと
+ *   :active 状態機械がキャンセルされる——そのため CSS のあの
+ * `.dsc-newline-btn:active { transform: scale(0.94) }` がまったく発火しない。
+ *   ボタン押下去まったく変化なし。
  *
  * 做法：
- *   1) 在 window 的 capture 阶段注册（早于 document 进入捕获流），
- *      必定先拿到手势；全程 passive，绝不 preventDefault，
- *      因此完全不干扰原有脚本的 click 派发与滚动逻辑。
- *   2) 手动给按钮加 .is-nl-pressed（按下）/ .is-nl-done（成功脉冲），
- *      由 CSS 提供强视觉反馈，不依赖 :active。
- *   3) 一旦检测到位移 > 6px（用户其实在横滑工具栏），立刻撤销按压态，
- *      避免滑动时误闪。
+ * 1) window の capture 段階で登録（document より早く捕捉フローに入る）、
+ * 必ず先にジェスチャを取得；全体 passive で、絶対に preventDefault しない、
+ * そのため元スクリプトの click 送出とスクロール処理をまったく妨げない。
+ *   2) 手動でボタンに .is-nl-pressed（押下）/ .is-nl-done（成功パルス）を付与し、
+ * 強い視覚フィードバックは CSS が提供し、:active に依存しない。
+ *   3) 一旦检测到位移 > 6px（用户其实在横滑工具栏），立刻撤销押す压态，
+ * スワイプ時に誤って光るのを防ぐ。
  * =================================================================== */
 (function () {
     'use strict';
@@ -24,10 +24,10 @@
     var BTN_ID   = 'dscNewlineBtn';
     var CLS_PRESS = 'is-nl-pressed';
     var CLS_DONE  = 'is-nl-done';
-    var MOVE_TOL  = 6;      // 位移容差(px)：超过即判定为滑动而非点击
-    var DONE_MS   = 380;    // 成功脉冲动画时长
+    var MOVE_TOL  = 6;      // 移動量の許容差(px)：超えるとクリックではなくスワイプと判定
+    var DONE_MS   = 380;    // 成功パルスアニメーションの長さ
 
-    var active = null;      // 当前被按下的按钮
+    var active = null;      // 現在被押下的ボタン
     var startX = 0, startY = 0, moved = false;
     var doneTimer = null;
 
@@ -37,7 +37,7 @@
 
     function hit(node) {
         if (!node) return null;
-        if (node.nodeType === 3) node = node.parentNode;   // 文本节点
+        if (node.nodeType === 3) node = node.parentNode;   // テキストノード
         if (!node || !node.closest) return null;
         return node.closest('#' + BTN_ID);
     }
@@ -49,11 +49,11 @@
         }
     }
 
-    /* 播放"已插入换行"的成功脉冲 */
+    /* 播放"改行を挿入しました"的成功脉冲 */
     function playDone(b) {
         if (!b) return;
         b.classList.remove(CLS_DONE);
-        void b.offsetWidth;                 // 强制重排，允许动画重复触发
+        void b.offsetWidth;                 // 強制的に再レイアウトし、アニメーションの再発火を許可
         b.classList.add(CLS_DONE);
         if (doneTimer) clearTimeout(doneTimer);
         doneTimer = setTimeout(function () {
@@ -62,12 +62,12 @@
         }, DONE_MS);
     }
 
-    /* ---------------- 触摸 ---------------- */
+    /* ---------------- タッチ ---------------- */
     function onStart(e) {
         var b = btn();
         if (!b) return;
         if (!hit(e.target)) return;
-        if (e.touches && e.touches.length > 1) return;   // 多点触控不接管
+        if (e.touches && e.touches.length > 1) return;   // マルチタッチは引き継がない
         var p = (e.touches && e.touches[0]) || e;
         startX = p.clientX;
         startY = p.clientY;
@@ -84,7 +84,7 @@
         if (Math.abs(p.clientX - startX) > MOVE_TOL ||
             Math.abs(p.clientY - startY) > MOVE_TOL) {
             moved = true;
-            clearPress();                   // 变成滑动 → 撤掉点击反馈
+            clearPress();                   // スワイプになる → クリックフィードバックを外す
         }
     }
 
@@ -93,15 +93,15 @@
         var b = active;
         active = null;
         b.classList.remove(CLS_PRESS);
-        if (moved) return;                  // 滑动不算点击
+        if (moved) return;                  // スワイプはクリックとみなさない
         playDone(b);
-        // 轻触觉反馈（无振动马达或权限时静默忽略）
+        // 軽い触覚フィードバック（振動モーターや権限がないときは静かに無視）
         try {
             if (navigator.vibrate) navigator.vibrate(12);
         } catch (err) { /* ignore */ }
     }
 
-    /* ---------------- 鼠标 / 键盘（非触摸环境） ---------------- */
+    /* ---------------- マウス / キーボード（非タッチ環境） ---------------- */
     function onMouseDown(e) {
         var b = hit(e.target);
         if (!b) return;
@@ -120,14 +120,14 @@
         playDone(b);
     }
 
-    /* click 兜底：原脚本在 touchend 里派发合成 click，这里确保脉冲一定播过 */
+    /* click フォールバック：元スクリプトが touchend で合成 click を送出するため、パルスが必ず再生されるようにする */
     function onClickCapture(e) {
         var b = hit(e.target);
         if (!b) return;
         if (!b.classList.contains(CLS_DONE)) playDone(b);
     }
 
-    /* window capture，早于 index.html 中 document 的拦截脚本 */
+    /* window capture。index.html の document 遮断スクリプトより先 */
     window.addEventListener('touchstart',  onStart, { capture: true, passive: true });
     window.addEventListener('touchmove',   onMove,  { capture: true, passive: true });
     window.addEventListener('touchend',    onEnd,   { capture: true, passive: true });
@@ -137,7 +137,7 @@
     document.addEventListener('mouseup',   onMouseUp,   true);
     document.addEventListener('click',     onClickCapture, true);
 
-    /* 调试入口：控制台可执行 dscNewlineFx.state() 自查 */
+    /* デバッグ入口：コンソールで dscNewlineFx.state() を実行して確認 */
     window.dscNewlineFx = {
         press: function () {
             var b = btn();

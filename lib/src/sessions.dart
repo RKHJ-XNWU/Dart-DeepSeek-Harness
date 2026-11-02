@@ -245,7 +245,7 @@ TailResult readDsSessionTailMsgs(String path, int limit) {
 bool saveDsSession(DsSession sess) {
   final path = dsSessionPath(sess.id);
   if (File(path).existsSync()) {
-    logp('⚠️ 会话已存在: ${sess.id}');
+    logp('⚠️ セッションは既に存在します: ${sess.id}');
     return false;
   }
   final line =
@@ -282,7 +282,7 @@ bool updateDsSession(String id, String newTitle, String updatedAt) {
 bool appendDsMessage(DsMessage m) {
   final path = dsSessionPath(m.sessionId);
   if (!File(path).existsSync()) {
-    logp('⚠️ 会话文件不存在: ${m.sessionId}');
+    logp('⚠️ セッションファイルが存在しません: ${m.sessionId}');
     return false;
   }
   final line = '#M|${m.id}|${m.role}|${escDs(m.content)}|${m.createdAt}|'
@@ -292,7 +292,7 @@ bool appendDsMessage(DsMessage m) {
     invalidateDsSessionCaches(path);
     return true;
   } catch (e) {
-    logp('❌ 追加消息失败: $e');
+    logp('❌ メッセージの追加に失敗しました: $e');
     return false;
   }
 }
@@ -338,7 +338,7 @@ DsMessage? updateDsMessageContent(String sessionID, String msgID,
     File(tmp).renameSync(path);
     invalidateDsSessionCaches(path);
   } catch (e) {
-    logp('❌ 重命名临时文件失败: $e');
+    logp('❌ 一時ファイルの名前変更に失敗しました: $e');
     return null;
   }
   return out;
@@ -564,7 +564,7 @@ bool deleteDsSessionRaw(String id) {
     invalidateDsSessionCaches(path);
     return true;
   } catch (e) {
-    logp('❌ 删除会话文件失败: $e');
+    logp('❌ セッションファイルの削除に失敗しました: $e');
     return false;
   }
 }
@@ -573,14 +573,14 @@ void deleteDsSession(String id) {
   if (id.isEmpty) return;
   final path = dsSessionPath(id);
   final attachments = collectSessionAttachments(path);
-  logp('🗑️ 删除会话 $id，关联附件 ${attachments.length} 个');
+  logp('🗑️ セッション $id を削除しました。関連添付 ${attachments.length} 件');
   deleteDsSessionRaw(id);
   if (attachments.isNotEmpty) {
     final stillUsed = collectAttachmentsInUse();
     for (final fid in attachments) {
       if (!stillUsed.contains(fid)) {
         deleteDsFileMeta(fid);
-        logp('🗑️ 已删除附件: $fid');
+        logp('🗑️ 添付ファイルを削除しました: $fid');
       }
     }
   }
@@ -635,7 +635,7 @@ void migrateDsChatToPerSession() {
   }
   if (!hasOldChat && !hasOldMsg) return;
 
-  logp('🔄 检测到旧版会话存储，开始迁移到单文件模式...');
+  logp('🔄 旧形式のセッション保存を検出しました。単一ファイル方式へ移行を開始します...');
   final oldSessions = <DsSession>[];
   for (final f in files) {
     if (f is! File) continue;
@@ -723,7 +723,7 @@ void migrateDsChatToPerSession() {
     }
   }
   invalidateAllDsSessionCaches();
-  logp('✅ 迁移完成，共 $count 个会话');
+  logp('✅ 移行完了: 全 $count セッション');
 }
 
 // ------------------------------------------------------------

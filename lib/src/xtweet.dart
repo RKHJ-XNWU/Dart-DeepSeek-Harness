@@ -136,7 +136,7 @@ Future<List<XTweet>> xRace(List<XSource> sources) async {
     }();
   }
   return completer.future.timeout(xTotalTimeout,
-      onTimeout: () => throw Exception('抓取超时'));
+      onTimeout: () => throw Exception('取得がタイムアウトしました'));
 }
 
 const List<String> xNitterInstances = [
@@ -370,7 +370,7 @@ Future<void> handleXTweet(HttpRequest req) async {
   final ids = qp(req, 'ids').trim();
 
   if (id.isEmpty && ids.isEmpty) {
-    await jsonResponse(res, 200, {'code': 400, 'message': '请提供 id 或 ids 参数'});
+    await jsonResponse(res, 200, {'code': 400, 'message': 'id または ids パラメータを指定してください'});
     return;
   }
 
@@ -384,7 +384,7 @@ Future<void> handleXTweet(HttpRequest req) async {
     targets.add(id);
   }
   if (targets.isEmpty) {
-    await jsonResponse(res, 200, {'code': 400, 'message': 'id 为空'});
+    await jsonResponse(res, 200, {'code': 400, 'message': 'id が空です'});
     return;
   }
 
@@ -424,7 +424,7 @@ Future<void> handleXTimeline(HttpRequest req) async {
   var name = (qp(req, 'screen_name')).trim();
   if (name.isEmpty) name = (qp(req, 'user')).trim();
   if (name.isEmpty) {
-    await jsonResponse(res, 200, {'code': 400, 'message': '请提供 screen_name 参数'});
+    await jsonResponse(res, 200, {'code': 400, 'message': 'screen_name パラメータを指定してください'});
     return;
   }
   if (name.startsWith('@')) name = name.substring(1);

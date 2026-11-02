@@ -43,19 +43,19 @@ void seedDsInjectPrompts() {
   final list = [
     DsInjectPrompt(
       id: 'dsp_${fmtStamp14(now)}_${randomHex(6)}',
-      title: '第一项',
-      content: '你好',
+      title: '第 1 項目',
+      content: 'こんにちは',
       createdAt: rfc3339(now),
     ),
     DsInjectPrompt(
       id: 'dsp_${fmtStamp14(now.add(const Duration(seconds: 1)))}_${randomHex(6)}',
-      title: '第二项',
+      title: '第 2 項目',
       content: '大家好',
       createdAt: rfc3339(now.add(const Duration(seconds: 1))),
     ),
   ];
   saveDsInjectPrompts(list);
-  logp('🌱 已初始化注入提示词种子数据（第一项=你好 / 第二项=大家好）');
+  logp('🌱 注入プロンプトの初期データを投入しました（第 1 項目=こんにちは / 第 2 項目=みなさんこんにちは）');
 }
 
 List<DsInjectPrompt> readDsInjectPrompts() {
@@ -120,14 +120,14 @@ Future<void> handleDsDevToolsPrompts(HttpRequest req) async {
       try {
         body = await readJsonBody(req);
       } catch (_) {
-        await errJson(res, 400, '无效请求体');
+        await errJson(res, 400, '無効なリクエストボディです');
         return;
       }
       var id = mStr(body, 'id');
       final title = trimOr(mStr(body, 'title'), '未命名');
       final content = mStr(body, 'content').trim();
       if (content.isEmpty) {
-        await errJson(res, 400, '提示词内容不能为空');
+        await errJson(res, 400, 'プロンプトの内容は必須です');
         return;
       }
       final list = readDsInjectPrompts();
@@ -142,7 +142,7 @@ Future<void> handleDsDevToolsPrompts(HttpRequest req) async {
           }
         }
         if (!found) {
-          await errJson(res, 404, '提示词不存在');
+          await errJson(res, 404, 'プロンプトが存在しません');
           return;
         }
       } else {
@@ -155,7 +155,7 @@ Future<void> handleDsDevToolsPrompts(HttpRequest req) async {
         ));
       }
       if (!saveDsInjectPrompts(list)) {
-        await errJson(res, 500, '保存失败');
+        await errJson(res, 500, '保存に失敗しました');
         return;
       }
       await jsonResponse(res, 200, {
@@ -168,7 +168,7 @@ Future<void> handleDsDevToolsPrompts(HttpRequest req) async {
     case 'DELETE':
       if (req.uri.queryParameters['all'] == 'true') {
         if (!saveDsInjectPrompts([])) {
-          await errJson(res, 500, '清空失败');
+          await errJson(res, 500, 'クリアに失敗しました');
           return;
         }
         await jsonResponse(res, 200, {'success': true});
@@ -181,7 +181,7 @@ Future<void> handleDsDevToolsPrompts(HttpRequest req) async {
       }
       final list = readDsInjectPrompts().where((p) => p.id != id).toList();
       if (!saveDsInjectPrompts(list)) {
-        await errJson(res, 500, '删除失败');
+        await errJson(res, 500, '削除に失敗しました');
         return;
       }
       await jsonResponse(res, 200, {'success': true});
@@ -202,7 +202,7 @@ Future<void> handleDsDevToolsBatchDelete(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await errJson(res, 400, '无效请求体');
+    await errJson(res, 400, '無効なリクエストボディです');
     return;
   }
   final ids = asList(body['ids']).map((e) => '$e').toSet();
@@ -221,7 +221,7 @@ Future<void> handleDsDevToolsBatchDelete(HttpRequest req) async {
     keep.add(p);
   }
   if (!saveDsInjectPrompts(keep)) {
-    await errJson(res, 500, '删除失败');
+    await errJson(res, 500, '削除に失敗しました');
     return;
   }
   await jsonResponse(res, 200, {'success': true, 'deleted': deleted});

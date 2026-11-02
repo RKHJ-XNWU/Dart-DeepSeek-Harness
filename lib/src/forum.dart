@@ -209,7 +209,7 @@ bool deleteForumPostFile(String id) {
     }
     return false;
   } catch (e) {
-    logp('❌ 删除帖子失败: $e');
+    logp('❌ 投稿の削除に失敗しました: $e');
     return false;
   }
 }
@@ -236,7 +236,7 @@ int clearAllForumPosts() {
       f.deleteSync();
       n++;
     } catch (e) {
-      logp('❌ 清空帖子失败: $e');
+      logp('❌ 投稿のクリアに失敗しました: $e');
     }
   }
   return n;
@@ -272,7 +272,7 @@ Future<void> handleForumPosts(HttpRequest req) async {
         // 正文最大 500 万字，UTF-8 下最多约 20MB，放宽到 64MB 防滥用
         body = await readJsonBody(req, limit: 64 * 1024 * 1024);
       } catch (_) {
-        await dsJSONErr(res, 400, '无效请求体');
+        await dsJSONErr(res, 400, '無効なリクエストボディです');
         return;
       }
       final existingId = trimOr(mStr(body, 'id'), '');
@@ -281,11 +281,11 @@ Future<void> handleForumPosts(HttpRequest req) async {
       final author = trimOr(mStr(body, 'author'), '匿名');
 
       if (title.isEmpty) {
-        await dsJSONErr(res, 400, '标题不能为空');
+        await dsJSONErr(res, 400, 'タイトルは必須です');
         return;
       }
       if (runeLen(title) > FORUM_MAX_TITLE_RUNES) {
-        await dsJSONErr(res, 400, '标题最多 $FORUM_MAX_TITLE_RUNES 字，当前 ${runeLen(title)} 字');
+        await dsJSONErr(res, 400, 'タイトルは最大 $FORUM_MAX_TITLE_RUNES 文字までです（現在 ${runeLen(title)} 文字）');
         return;
       }
       if (runeLen(content) > FORUM_MAX_CONTENT_RUNES) {
@@ -306,7 +306,7 @@ Future<void> handleForumPosts(HttpRequest req) async {
           updatedAt: rfc3339(now),
         );
         if (!saveForumPost(p)) {
-          await dsJSONErr(res, 500, '保存失败');
+          await dsJSONErr(res, 500, '保存に失敗しました');
           return;
         }
         await dsJSONOk(res, 200, {'success': true, 'post': p.toJson()});
@@ -320,7 +320,7 @@ Future<void> handleForumPosts(HttpRequest req) async {
       }
       final existing = getForumPost(sid);
       if (existing == null) {
-        await dsJSONErr(res, 404, '帖子不存在或文件异常');
+        await dsJSONErr(res, 404, '投稿が存在しないか、ファイルに異常があります');
         return;
       }
       final p = ForumPost(
@@ -336,7 +336,7 @@ Future<void> handleForumPosts(HttpRequest req) async {
         isDeleted: false,
       );
       if (!saveForumPost(p)) {
-        await dsJSONErr(res, 500, '保存失败');
+        await dsJSONErr(res, 500, '保存に失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {'success': true, 'post': p.toJson()});
@@ -363,7 +363,7 @@ Future<void> handleForumPostDetail(HttpRequest req) async {
   }
   final p = getForumPost(id);
   if (p == null) {
-    await dsJSONErr(res, 404, '帖子不存在或文件异常');
+    await dsJSONErr(res, 404, '投稿が存在しないか、ファイルに異常があります');
     return;
   }
   await dsJSONOk(res, 200, {'success': true, 'post': p.toJson()});
@@ -383,7 +383,7 @@ Future<void> handleForumAction(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final id = sanitizeId(mStr(body, 'id'));
@@ -396,7 +396,7 @@ Future<void> handleForumAction(HttpRequest req) async {
 
   final p = getForumPost(id);
   if (p == null) {
-    await dsJSONErr(res, 404, '帖子不存在或文件异常');
+    await dsJSONErr(res, 404, '投稿が存在しないか、ファイルに異常があります');
     return;
   }
 
@@ -432,7 +432,7 @@ Future<void> handleForumAction(HttpRequest req) async {
     isDeleted: false,
   );
   if (!saveForumPost(updated)) {
-    await dsJSONErr(res, 500, '保存失败');
+    await dsJSONErr(res, 500, '保存に失敗しました');
     return;
   }
   // 返回与列表一致的元数据（含摘要）——直接用内存中的 updated 构造，
@@ -476,12 +476,12 @@ Future<void> handleForumDelete(HttpRequest req) async {
     try {
       body = await readJsonBody(req);
     } catch (_) {
-      await dsJSONErr(res, 400, '无效请求体');
+      await dsJSONErr(res, 400, '無効なリクエストボディです');
       return;
     }
     final ids = asList(body['ids']).map((e) => '$e').toList();
     if (ids.isEmpty) {
-      await dsJSONErr(res, 400, '缺少要删除的帖子');
+      await dsJSONErr(res, 400, '削除する投稿が指定されていません');
       return;
     }
     final n = deleteForumPosts(ids);

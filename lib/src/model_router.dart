@@ -9,8 +9,8 @@
 //
 // 本模块提供三层能力：
 //   1) 能力判定 modelSupportsVision()：内置 DeepSeek 型号表 + 常见第三方
-//      视觉型号模式 + 用户自定义白/黑名单（配置文件里可覆盖）；
-//   2) 路由决策 resolveModelRoute()：纯函数，输入「用户所选模型 + 本轮是否
+//      视觉型号模式 + ユーザー自定义白/黑名单（配置文件里可覆盖）；
+//   2) 路由决策 resolveModelRoute()：纯函数，输入「ユーザー所选模型 + 本轮是否
 //      含图片」，输出「主请求实际模型 / 图片提取用模型 / 决策原因」；
 //   3) 配置与可观测性：设置持久化到 data/deepseek_chat/model_router.sts，
 //      路由记录进内存环（最多 40 条），并暴露 /api/ds-chat/model-router。
@@ -76,7 +76,7 @@ class ModelRouteSettings {
 
   /// 含图时是否把「主请求」也切到视觉模型。
   /// true  = 整轮都交给视觉模型（默认，行为最接近「自动切到 flash」）
-  /// false = 只用视觉模型提取图片文字，正文仍由用户所选模型作答
+  /// false = 只用视觉模型提取图片文字，正文仍由ユーザー所选模型作答
   final bool routeMain;
 
   /// 视觉兜底模型（图片提取 + 主请求路由目标）
@@ -194,7 +194,7 @@ bool saveModelRouteSettings(ModelRouteSettings s) {
     Process.runSync('chmod', ['600', modelRouterFile]);
     return true;
   } catch (e) {
-    logp('❌ 保存模型路由配置失败: $e');
+    logp('❌ モデルルーティング設定の保存に失敗しました: $e');
     return false;
   }
 }
@@ -207,7 +207,7 @@ bool modelSupportsVision(String model, {ModelRouteSettings? settings}) {
   if (m.isEmpty) return false;
   final s = settings ?? getModelRouteSettings();
 
-  // 1) 用户显式声明优先（黑名单 > 白名单 > 内置）
+  // 1) ユーザー显式声明优先（黑名单 > 白名单 > 内置）
   for (final t in s.extraText) {
     if (_norm(t) == m) return false;
   }
@@ -233,7 +233,7 @@ String _resolveVisionModel(ModelRouteSettings s) {
   final want = s.visionModel.trim();
   if (want.isEmpty) return MR_DEFAULT_VISION_MODEL;
   if (modelSupportsVision(want, settings: s)) return want;
-  logp('⚠️ 配置的视觉模型「$want」未通过能力判定，改用 $MR_DEFAULT_VISION_MODEL');
+  logp('⚠️ 設定されたビジョンモデル「$want」が能力判定に通らなかったため、$MR_DEFAULT_VISION_MODEL を使用します');
   return MR_DEFAULT_VISION_MODEL;
 }
 
@@ -241,7 +241,7 @@ String _resolveVisionModel(ModelRouteSettings s) {
 // 路由决策（纯函数）
 // ------------------------------------------------------------
 class ModelRouteDecision {
-  /// 用户/前端所选的模型
+  /// ユーザー/前端所选的模型
   final String requested;
 
   /// 主请求实际使用的模型
@@ -429,7 +429,7 @@ Future<void> handleDsChatModelRouter(HttpRequest req) async {
       try {
         body = await readJsonBody(req);
       } catch (_) {
-        await dsJSONErr(res, 400, '无效请求体');
+        await dsJSONErr(res, 400, '無効なリクエストボディです');
         return;
       }
       final old = getModelRouteSettings();
@@ -458,10 +458,10 @@ Future<void> handleDsChatModelRouter(HttpRequest req) async {
         extraText: listArg('extraText', old.extraText),
       );
       if (!saveModelRouteSettings(next)) {
-        await dsJSONErr(res, 500, '保存失败');
+        await dsJSONErr(res, 500, '保存に失敗しました');
         return;
       }
-      logp('✅ 模型自动路由配置已更新: enabled=${next.enabled} '
+      logp('✅ モデル自動ルーティング設定を更新しました: enabled=${next.enabled}'
           'routeMain=${next.routeMain} vision=${next.visionModel}');
       await dsJSONOk(res, 200, {
         'success': true,

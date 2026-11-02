@@ -1,10 +1,10 @@
 // ============================================================
-// dsc-forum.js —— 论坛帖子模块前端
-//   1) 主顶栏「⋯」菜单 → 「论坛 · 帖子广场」入口
-//   2) 全屏论坛页：帖子列表 + 发帖 + 批量选择/删除 + 全部删除
-//   3) 帖子卡片「⋯」菜单：置顶 / 加精 / 屏蔽 / 删除
-//   4) 详情页完整滚动阅读正文；屏蔽帖正文以占位展示
-//   5) 删除 / 批量删除 / 全部删除 二次确认
+// dsc-forum.js —— フォーラム投稿モジュールのフロントエンド
+//   1) メイン上部バー「⋯」メニュー → 「フォーラム · 投稿広場」入口
+// 2) 全画面のフォーラムページ：投稿一覧 + 投稿 + 一括選択/削除 + すべて削除
+//   3) 投稿カード「⋯」メニュー：ピン留め / 注目 / 非表示 / 削除
+// 4) 詳細ページで本文をスクロールして全文閲覧。非表示の投稿は本文をプレースホルダ表示
+//   5) 削除 / 一括削除 / すべて削除 二次確認
 // ============================================================
 (function () {
   'use strict';
@@ -37,7 +37,7 @@
     if (d.getFullYear() === now.getFullYear() &&
         d.getMonth() === now.getMonth() &&
         d.getDate() === now.getDate()) {
-      return '今天 ' + hm;
+      return '今日 ' + hm;
     }
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + hm;
   }
@@ -52,7 +52,7 @@
     setTimeout(function () { el.remove(); }, 2600);
   }
 
-  // ============ 确认弹层（复用 #dscConfirmOverlay） ============
+  // ============ 確認ダイアログ（#dscConfirmOverlay を再利用） ============
   function confirmDialog(title, msg, okText) {
     return new Promise(function (resolve) {
       var overlay = $('dscConfirmOverlay');
@@ -64,7 +64,7 @@
       }
       $('dscConfirmTitle').textContent = title;
       $('dscConfirmMsg').textContent = msg;
-      okBtn.textContent = okText || '确定';
+      okBtn.textContent = okText || 'OK';
       overlay.classList.add('open');
 
       function cleanup(result) {
@@ -83,15 +83,15 @@
     });
   }
 
-  // 二次确认（删除类操作）
+  // 二次確認（削除系の操作）
   async function confirmDelete(title, msg) {
-    var first = await confirmDialog(title, msg, '删除');
+    var first = await confirmDialog(title, msg, '削除');
     if (!first) return false;
-    var second = await confirmDialog('⚠️ 二次确认', '此操作不可恢复，确定要继续吗？', '确认删除');
+    var second = await confirmDialog('⚠️ 再確認', 'この操作は元に戻せません。続行しますか？', '確認削除');
     return second;
   }
 
-  // ============ 状态 ============
+  // ============ 状態 ============
   var state = {
     posts: [],
     broken: 0,
@@ -107,7 +107,7 @@
     editingAuthor: ''
   };
 
-  // ============ 通用悬浮操作菜单 ============
+  // ============ 汎用フローティング操作メニュー ============
   var popmenu = null;
 
   function closePopmenu() {
@@ -165,7 +165,7 @@
     if (moreBtn) moreBtn.classList.remove('more-active');
   }
 
-  // ============ 打开 / 关闭论坛 ============
+  // ============ フォーラムを開く / 閉じる ============
   function openForum() {
     closeMoreMenu();
     closePopmenu();
@@ -186,7 +186,7 @@
   // ============ 列表 ============
   function renderLoading() {
     var listEl = $('dscForumList');
-    if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>加载中…</div>';
+    if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>読み込み中…</div>';
   }
 
   function renderList() {
@@ -197,14 +197,14 @@
     if (state.broken > 0) {
       var hint = document.createElement('div');
       hint.className = 'dsc-forum-hint';
-      hint.textContent = '⚠️ 有 ' + state.broken + ' 个帖子文件异常，已隔离跳过，其余帖子正常展示。';
+      hint.textContent = '⚠️ ' + state.broken + ' 件の投稿ファイルに異常があり、隔離してスキップしました。残りの投稿は正常に表示されます。';
       listEl.appendChild(hint);
     }
 
     if (!state.posts.length) {
       var empty = document.createElement('div');
       empty.className = 'dsc-forum-empty';
-      empty.innerHTML = '<span class="emoji">💬</span>还没有帖子，点击右上角「⋯」发帖';
+      empty.innerHTML = '<span class="emoji">💬</span>まだ投稿がありません。右上の「⋯」から投稿できます';
       listEl.appendChild(empty);
       return;
     }
@@ -213,7 +213,7 @@
       listEl.appendChild(buildCard(p));
     });
 
-    // 「加载更多」占位
+    // 「さらに読み込む」プレースホルダ
     var lm = document.createElement('div');
     lm.className = 'dsc-forum-loadmore';
     lm.id = 'dscForumLoadMore';
@@ -248,13 +248,13 @@
 
     var title = document.createElement('span');
     title.className = 'dsc-forum-card-title';
-    title.textContent = p.title || '（无标题）';
+    title.textContent = p.title || '（無題）';
 
     titleRow.appendChild(title);
 
-    if (p.isPinned) titleRow.appendChild(makeTag('pin', '置顶'));
-    if (p.isFeatured) titleRow.appendChild(makeTag('feature', '精华'));
-    if (p.isBlocked) titleRow.appendChild(makeTag('block', '已屏蔽'));
+    if (p.isPinned) titleRow.appendChild(makeTag('pin', 'ピン留め'));
+    if (p.isFeatured) titleRow.appendChild(makeTag('feature', '注目'));
+    if (p.isBlocked) titleRow.appendChild(makeTag('block', '非表示中'));
 
     var moreBtn = document.createElement('button');
     moreBtn.className = 'dsc-forum-card-more';
@@ -276,11 +276,11 @@
     var summary = document.createElement('div');
     summary.className = 'dsc-forum-card-summary' + (p.isBlocked ? ' blocked' : '');
     if (p.isBlocked) {
-      summary.textContent = '🚫 该帖子已被屏蔽';
+      summary.textContent = '🚫 この投稿は非表示です';
     } else if (p.summary) {
       summary.textContent = p.summary;
     } else {
-      summary.textContent = '（无正文）';
+      summary.textContent = '（本文なし）';
     }
 
     main.appendChild(titleRow);
@@ -300,7 +300,7 @@
     return t;
   }
 
-  // 首屏：重置列表并从 offset=0 加载
+  // 初回表示：リストをリセットし offset=0 から読み込む
   async function loadList() {
     state.posts = [];
     state.broken = 0;
@@ -311,7 +311,7 @@
     await loadMore();
   }
 
-  // 追加加载下一页
+  // 次ページを追加読み込み
   async function loadMore() {
     if (state.loading || (state.posts.length > 0 && !state.hasMore)) return;
     state.loading = true;
@@ -324,7 +324,7 @@
         { cache: 'no-store' }
       );
       var data = await res.json();
-      if (!res.ok) throw new Error(data.error || '加载失败');
+      if (!res.ok) throw new Error(data.error || '読み込みに失敗');
       var newPosts = data.posts || [];
       var existIds = {};
       state.posts.forEach(function (p) { existIds[p.id] = true; });
@@ -334,15 +334,15 @@
       state.broken = data.broken || 0;
       state.total = (typeof data.total === 'number') ? data.total : state.posts.length;
       state.hasMore = !!data.hasMore;
-      if (sub) sub.textContent = '共 ' + state.total + ' 篇帖子';
+      if (sub) sub.textContent = '全 ' + state.total + ' 件の投稿';
       renderList();
     } catch (e) {
       if (offset === 0) {
-        if (sub) sub.textContent = '加载失败';
+        if (sub) sub.textContent = '読み込みに失敗';
         var listEl = $('dscForumList');
-        if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⚠️</span>' + escHtml(e.message || '加载失败') + '</div>';
+        if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⚠️</span>' + escHtml(e.message || '読み込みに失敗') + '</div>';
       } else {
-        showToast('加载更多失败', 'error');
+        showToast('追加読み込みに失敗', 'error');
       }
     } finally {
       state.loading = false;
@@ -350,7 +350,7 @@
     }
   }
 
-  // 刷新「加载更多」区域的状态
+  // 「さらに読み込む」領域の状態を更新
   function updateLoadMoreUI() {
     var lm = $('dscForumLoadMore');
     if (!lm) return;
@@ -361,25 +361,25 @@
     }
     lm.style.display = '';
     if (state.loading) {
-      lm.textContent = '加载中…';
+      lm.textContent = '読み込み中…';
       lm.classList.add('loading');
     } else if (state.hasMore) {
-      lm.textContent = '加载更多（已显示 ' + state.posts.length + ' / ' + state.total + '）';
+      lm.textContent = 'さらに読み込む（表示中 ' + state.posts.length + ' / ' + state.total + '）';
       lm.classList.remove('loading');
     } else {
-      lm.textContent = '—— 已加载全部 ' + state.total + ' 篇 ——';
+      lm.textContent = '—— 全 ' + state.total + ' 件を読み込みました ——';
       lm.classList.remove('loading');
     }
   }
 
-  // ============ 详情 ============
+  // ============ 詳細 ============
   async function openDetail(id) {
     closePopmenu();
     var overlay = $('dscForumDetailOverlay');
     var body = $('dscForumDetailBody');
-    $('dscForumDetailTitle').textContent = '帖子详情';
+    $('dscForumDetailTitle').textContent = '投稿の詳細';
     $('dscForumDetailMeta').textContent = '';
-    if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>加载中…</div>';
+    if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>読み込み中…</div>';
     if (overlay) overlay.classList.add('open');
     state.currentId = id;
     state.detailPost = null;
@@ -387,11 +387,11 @@
     try {
       var res = await fetch('/api/forum/posts/detail?id=' + encodeURIComponent(id), { cache: 'no-store' });
       var data = await res.json();
-      if (!res.ok) throw new Error(data.error || '加载失败');
+      if (!res.ok) throw new Error(data.error || '読み込みに失敗');
       state.detailPost = data.post;
       renderDetail(data.post);
     } catch (e) {
-      if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⚠️</span>' + escHtml(e.message || '加载失败') + '</div>';
+      if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⚠️</span>' + escHtml(e.message || '読み込みに失敗') + '</div>';
     }
   }
 
@@ -399,30 +399,30 @@
     var body = $('dscForumDetailBody');
     var titleEl = $('dscForumDetailTitle');
     var metaEl = $('dscForumDetailMeta');
-    if (titleEl) titleEl.textContent = '帖子详情';
+    if (titleEl) titleEl.textContent = '投稿の詳細';
     if (metaEl) metaEl.textContent = (post.author || '匿名') + ' · ' + fmtTime(post.updatedAt || post.createdAt);
     if (!body) return;
     body.innerHTML = '';
 
-    // 完整标题（可换行展示，不省略）
+    // タイトル全体（折り返し表示可、省略しない）
     var titleBlock = document.createElement('div');
     titleBlock.className = 'dsc-forum-detail-title';
-    titleBlock.textContent = post.title || '（无标题）';
+    titleBlock.textContent = post.title || '（無題）';
     body.appendChild(titleBlock);
 
-    // 作者 / 时间 / 状态标签
+    // 作者 / 日時 / 状態タグ
     var meta = document.createElement('div');
     meta.className = 'dsc-forum-detail-meta';
     meta.appendChild(document.createTextNode((post.author || '匿名') + ' · ' + fmtTime(post.updatedAt || post.createdAt)));
-    if (post.isPinned) meta.appendChild(makeTag('pin', '置顶'));
-    if (post.isFeatured) meta.appendChild(makeTag('feature', '精华'));
-    if (post.isBlocked) meta.appendChild(makeTag('block', '已屏蔽'));
+    if (post.isPinned) meta.appendChild(makeTag('pin', 'ピン留め'));
+    if (post.isFeatured) meta.appendChild(makeTag('feature', '注目'));
+    if (post.isBlocked) meta.appendChild(makeTag('block', '非表示中'));
     body.appendChild(meta);
 
     if (post.isBlocked) {
       var blocked = document.createElement('div');
       blocked.className = 'dsc-forum-detail-blocked';
-      blocked.innerHTML = '<span class="emoji">🚫</span>该帖子已被屏蔽，正文不可见';
+      blocked.innerHTML = '<span class="emoji">🚫</span>この投稿は非表示のため、本文は見られません';
       body.appendChild(blocked);
       return;
     }
@@ -430,12 +430,12 @@
     if (!post.content) {
       var empty = document.createElement('div');
       empty.className = 'dsc-forum-empty';
-      empty.textContent = '（无正文）';
+      empty.textContent = '（本文なし）';
       body.appendChild(empty);
       return;
     }
 
-    // 分段渲染长正文：每段 ≤ DETAIL_CHUNK 字符，且不切断代理对
+    // 長い本文を分割描画：各段 ≤ DETAIL_CHUNK 文字、かつサロゲートペアを分断しない
     appendContentChunks(body, post.content);
   }
 
@@ -463,12 +463,12 @@
     state.detailPost = null;
   }
 
-  // ============ 发帖 ============
+  // ============ 投稿する ============
   function setComposeMode(isEdit) {
     var titleEl = $('dscForumComposeTitle');
     var submitBtn = $('dscForumComposeSubmitBtn');
-    if (titleEl) titleEl.textContent = isEdit ? '✏️ 编辑帖子' : '✍️ 发帖';
-    if (submitBtn) submitBtn.textContent = isEdit ? '保存' : '发布';
+    if (titleEl) titleEl.textContent = isEdit ? '✏️ 投稿を編集' : '✍️ 投稿する';
+    if (submitBtn) submitBtn.textContent = isEdit ? '保存' : '公開';
   }
 
   function openCompose() {
@@ -490,7 +490,7 @@
     }, 80);
   }
 
-  // 编辑已有帖子：拉取完整正文后填充到发帖表单
+  // 既存の投稿を編集：本文全体を取得して投稿フォームに流し込む
   async function openEdit(post) {
     if (!post || !post.id) return;
     closePopmenu();
@@ -501,7 +501,7 @@
         var data = await res.json();
         if (res.ok && data.post) full = data.post;
       } catch (e) {
-        console.error('[FORUM] 编辑加载失败', e);
+        console.error('[FORUM] 編集データの読み込みに失敗', e);
       }
     }
     state.editingId = full.id;
@@ -530,11 +530,11 @@
   async function submitCompose() {
     var title = $('dscForumTitleInput').value.trim();
     var content = $('dscForumContentInput').value;
-    if (!title) { showToast('标题不能为空', 'error'); return; }
+    if (!title) { showToast('タイトルを入力してください', 'error'); return; }
     var tl = runeLen(title);
     var cl = runeLen(content);
-    if (tl > MAX_TITLE) { showToast('标题最多 ' + MAX_TITLE + ' 字，当前 ' + tl + ' 字', 'error'); return; }
-    if (cl > MAX_CONTENT) { showToast('正文最多 ' + MAX_CONTENT + ' 字，当前 ' + cl + ' 字', 'error'); return; }
+    if (tl > MAX_TITLE) { showToast('タイトルは最大 ' + MAX_TITLE + ' 文字、現在 ' + tl + ' 字', 'error'); return; }
+    if (cl > MAX_CONTENT) { showToast('本文は最大 ' + MAX_CONTENT + ' 文字、現在 ' + cl + ' 字', 'error'); return; }
 
     var payload = { title: title, content: content, author: state.editingAuthor || '匿名' };
     if (state.editingId) payload.id = state.editingId;
@@ -546,11 +546,11 @@
         body: JSON.stringify(payload)
       });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '发布失败', 'error'); return; }
-      showToast(state.editingId ? '✅ 已保存修改' : '✅ 发布成功', 'success');
+      if (!res.ok) { showToast(data.error || '公開に失敗', 'error'); return; }
+      showToast(state.editingId ? '✅ 変更を保存しました' : '✅ 公開しました', 'success');
       closeCompose();
       loadList();
-      // 若正在查看同一帖子的详情，同步刷新
+      // 同じ投稿の詳細を表示中なら同時に更新
       if (state.currentId && state.editingId === state.currentId) {
         try {
           var fresh = await fetch('/api/forum/posts/detail?id=' + encodeURIComponent(state.currentId), { cache: 'no-store' });
@@ -561,7 +561,7 @@
       state.editingId = null;
       state.editingAuthor = '';
     } catch (e) {
-      showToast('发布失败：' + (e.message || e), 'error');
+      showToast('公開に失敗：' + (e.message || e), 'error');
     }
   }
 
@@ -574,10 +574,10 @@
         body: JSON.stringify({ id: id, action: action, value: value })
       });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '操作失败', 'error'); return; }
-      showToast('操作成功', 'success');
+      if (!res.ok) { showToast(data.error || '操作に失敗', 'error'); return; }
+      showToast('操作に成功しました', 'success');
       await loadList();
-      // 详情页同步刷新
+      // 詳細ページの同時更新
       if (state.currentId === id && $('dscForumDetailOverlay').classList.contains('open')) {
         var p = data.post;
         if (p) {
@@ -588,51 +588,51 @@
         }
       }
     } catch (e) {
-      showToast('操作失败', 'error');
+      showToast('操作に失敗', 'error');
     }
   }
 
   function togglePin(post) {
     var target = !post.isPinned;
-    confirmDialog('📌 ' + (target ? '置顶' : '取消置顶'),
-      '确定要' + (target ? '置顶' : '取消置顶') + '这篇帖子吗？', target ? '置顶' : '取消置顶')
+    confirmDialog('📌 ' + (target ? 'ピン留め' : 'ピン留めを解除'),
+      'OK要' + (target ? 'ピン留め' : 'ピン留めを解除') + 'この投稿ですか？', target ? 'ピン留め' : 'ピン留めを解除')
       .then(function (ok) { if (ok) doAction(post.id, 'pin', target); });
   }
 
   function toggleFeature(post) {
     var target = !post.isFeatured;
-    confirmDialog('💎 ' + (target ? '加精' : '取消加精'),
-      '确定要' + (target ? '加精' : '取消加精') + '这篇帖子吗？', target ? '加精' : '取消加精')
+    confirmDialog('💎 ' + (target ? '注目' : '注目を解除'),
+      'OK要' + (target ? '注目' : '注目を解除') + 'この投稿ですか？', target ? '注目' : '注目を解除')
       .then(function (ok) { if (ok) doAction(post.id, 'feature', target); });
   }
 
   function toggleBlock(post) {
     var target = !post.isBlocked;
-    confirmDialog('🚫 ' + (target ? '屏蔽' : '取消屏蔽'),
-      '确定要' + (target ? '屏蔽' : '取消屏蔽') + '这篇帖子吗？', target ? '屏蔽' : '取消屏蔽')
+    confirmDialog('🚫 ' + (target ? '非表示' : '非表示を解除'),
+      'OK要' + (target ? '非表示' : '非表示を解除') + 'この投稿ですか？', target ? '非表示' : '非表示を解除')
       .then(function (ok) { if (ok) doAction(post.id, 'block', target); });
   }
 
   function deleteSingle(post) {
-    confirmDelete('🗑️ 删除帖子', '确定要删除《' + (post.title || post.id) + '》吗？删除后不可恢复。')
+    confirmDelete('🗑️ 投稿を削除', '「' + (post.title || post.id) + '」を削除しますか？削除後は元に戻せません。')
       .then(async function (ok) {
         if (!ok) return;
         try {
           var res = await fetch('/api/forum/posts/delete?id=' + encodeURIComponent(post.id), { method: 'DELETE' });
           var data = await res.json();
-          if (!res.ok) { showToast(data.error || '删除失败', 'error'); return; }
-          showToast('已删除', 'success');
+          if (!res.ok) { showToast(data.error || '削除に失敗しました', 'error'); return; }
+          showToast('削除しました', 'success');
           if (state.currentId === post.id) closeDetail();
           delete state.selected[post.id];
           loadList();
-        } catch (e) { showToast('删除失败', 'error'); }
+        } catch (e) { showToast('削除に失敗しました', 'error'); }
       });
   }
 
   async function batchDelete() {
     var ids = Object.keys(state.selected);
-    if (!ids.length) { showToast('请先勾选要删除的帖子', 'error'); return; }
-    var ok = await confirmDelete('🗑️ 批量删除', '确定要删除选中的 ' + ids.length + ' 篇帖子吗？删除后不可恢复。');
+    if (!ids.length) { showToast('削除する投稿を先に選択してください', 'error'); return; }
+    var ok = await confirmDelete('🗑️ 一括削除', '選択した ' + ids.length + ' 件の投稿を削除しますか？削除後は元に戻せません。');
     if (!ok) return;
     try {
       var res = await fetch('/api/forum/posts/delete', {
@@ -641,29 +641,29 @@
         body: JSON.stringify({ ids: ids })
       });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '删除失败', 'error'); return; }
-      showToast('已删除 ' + (data.deleted || ids.length) + ' 篇帖子', 'success');
+      if (!res.ok) { showToast(data.error || '削除に失敗しました', 'error'); return; }
+      showToast('削除しました：' + (data.deleted || ids.length) + ' 件の投稿', 'success');
       state.selected = {};
       setBatchMode(false);
       loadList();
-    } catch (e) { showToast('删除失败', 'error'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   }
 
   async function clearAllPosts() {
     var n = state.posts.length;
-    if (!n) { showToast('当前没有帖子', 'info'); return; }
-    var ok = await confirmDelete('💣 全部删除',
-      '确定要删除全部 ' + n + ' 篇帖子吗？此操作不可恢复！');
+    if (!n) { showToast('現在投稿はありません', 'info'); return; }
+    var ok = await confirmDelete('💣 すべて削除',
+      'すべての ' + n + ' 件の投稿を削除しますか？この操作は元に戻せません！');
     if (!ok) return;
     try {
       var res = await fetch('/api/forum/posts/clear', { method: 'POST' });
       var data = await res.json();
-      if (!res.ok) { showToast(data.error || '删除失败', 'error'); return; }
-      showToast('已删除全部帖子', 'success');
+      if (!res.ok) { showToast(data.error || '削除に失敗しました', 'error'); return; }
+      showToast('すべての投稿を削除しました', 'success');
       state.selected = {};
       setBatchMode(false);
       loadList();
-    } catch (e) { showToast('删除失败', 'error'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   }
 
   // ============ 批量模式 ============
@@ -678,7 +678,7 @@
   function updateBatchUI() {
     var sel = Object.keys(state.selected);
     var count = $('dscForumBatchCount');
-    if (count) count.textContent = '已选 ' + sel.length;
+    if (count) count.textContent = '選択 ' + sel.length;
     var delBtn = $('dscForumBatchDelBtn');
     if (delBtn) delBtn.disabled = sel.length === 0;
     var all = $('dscForumSelectAll');
@@ -699,24 +699,24 @@
     updateBatchUI();
   }
 
-  // ============ 论坛页头部「⋯」菜单项 ============
+  // ============ フォーラムページ上部「⋯」メニュー項目 ============
   function forumMenuItems() {
     var selCount = Object.keys(state.selected).length;
     return [
-      { icon: '✍️', label: '发帖', action: openCompose },
-      { icon: '☑️', label: state.batchMode ? '退出批量选择' : '批量选择', action: function () { setBatchMode(!state.batchMode); } },
-      { icon: '🗑️', label: '批量删除（已选 ' + selCount + '）', danger: true, action: batchDelete },
-      { icon: '💣', label: '全部删除', danger: true, action: clearAllPosts }
+      { icon: '✍️', label: '投稿する', action: openCompose },
+      { icon: '☑️', label: state.batchMode ? '一括選択を終了' : '一括選択', action: function () { setBatchMode(!state.batchMode); } },
+      { icon: '🗑️', label: '一括削除（選択 ' + selCount + '）', danger: true, action: batchDelete },
+      { icon: '💣', label: 'すべて削除', danger: true, action: clearAllPosts }
     ];
   }
 
   function cardMenuItems(post) {
     return [
-      { icon: '✏️', label: '编辑', action: function () { openEdit(post); } },
-      { icon: '📌', label: post.isPinned ? '取消置顶' : '置顶', action: function () { togglePin(post); } },
-      { icon: '💎', label: post.isFeatured ? '取消加精' : '加精', action: function () { toggleFeature(post); } },
-      { icon: '🚫', label: post.isBlocked ? '取消屏蔽' : '屏蔽', action: function () { toggleBlock(post); } },
-      { icon: '🗑️', label: '删除', danger: true, action: function () { deleteSingle(post); } }
+      { icon: '✏️', label: '編集', action: function () { openEdit(post); } },
+      { icon: '📌', label: post.isPinned ? 'ピン留めを解除' : 'ピン留め', action: function () { togglePin(post); } },
+      { icon: '💎', label: post.isFeatured ? '注目を解除' : '注目', action: function () { toggleFeature(post); } },
+      { icon: '🚫', label: post.isBlocked ? '非表示を解除' : '非表示', action: function () { toggleBlock(post); } },
+      { icon: '🗑️', label: '削除', danger: true, action: function () { deleteSingle(post); } }
     ];
   }
 
@@ -727,19 +727,19 @@
     return state.detailPost && state.detailPost.id === id ? state.detailPost : null;
   }
 
-  // ============ 事件绑定 ============
+  // ============ イベントバインド ============
   function bind() {
-    // 主顶栏入口
+    // メイン上部バーの入口
     var entry = $('dscForumBtn');
     if (entry) entry.addEventListener('click', function (e) { e.stopPropagation(); openForum(); });
 
-    // 论坛页头部
+    // フォーラムページ上部
     var moreBtn = $('dscForumMoreBtn');
     if (moreBtn) moreBtn.addEventListener('click', function (e) { e.stopPropagation(); openPopmenu(moreBtn, forumMenuItems()); });
     var closeBtn = $('dscForumCloseBtn');
     if (closeBtn) closeBtn.addEventListener('click', closeForum);
 
-    // 批量操作条
+    // 一括操作バー
     var selectAll = $('dscForumSelectAll');
     if (selectAll) selectAll.addEventListener('change', function () {
       state.selected = {};
@@ -751,7 +751,7 @@
     var batchCancel = $('dscForumBatchCancelBtn');
     if (batchCancel) batchCancel.addEventListener('click', function () { setBatchMode(false); });
 
-    // 加载更多按钮（事件委托，节点会被重建）
+    // さらに読み込むボタン（イベント委譲、ノードは再生成される）
     var listElForMore = $('dscForumList');
     if (listElForMore) listElForMore.addEventListener('click', function (e) {
       var lm = e.target.closest ? e.target.closest('#dscForumLoadMore') : null;
@@ -761,7 +761,7 @@
       }
     });
 
-    // 列表：事件委托（卡片点击 → 详情 / 勾选 / 菜单）
+    // リスト：イベント委譲（カードのタップ → 詳細 / チェック / メニュー）
     var listEl = $('dscForumList');
     if (listEl) listEl.addEventListener('click', function (e) {
       var more = e.target.closest ? e.target.closest('.dsc-forum-card-more') : null;
@@ -790,7 +790,7 @@
       }
     });
 
-    // 详情页
+    // 詳細ページ
     var backBtn = $('dscForumDetailBackBtn');
     if (backBtn) backBtn.addEventListener('click', closeDetail);
     var detailClose = $('dscForumDetailCloseBtn');
@@ -802,13 +802,13 @@
       if (post) openPopmenu(detailMore, cardMenuItems(post));
     });
 
-    // 发帖页
+    // 投稿する页
     var composeCancel = $('dscForumComposeCancelBtn');
     if (composeCancel) composeCancel.addEventListener('click', closeCompose);
     var composeSubmit = $('dscForumComposeSubmitBtn');
     if (composeSubmit) composeSubmit.addEventListener('click', submitCompose);
 
-    // 字数统计
+    // 文字数カウント
     var titleInput = $('dscForumTitleInput');
     var contentInput = $('dscForumContentInput');
     if (titleInput) titleInput.addEventListener('input', function () {
@@ -822,7 +822,7 @@
       if (c) { c.textContent = n; c.className = n > MAX_CONTENT ? 'cnt over' : 'cnt'; }
     });
 
-    // 全局：点击空白关闭悬浮菜单
+    // 全体：空白をタップでフローティングメニューを閉じる
     document.addEventListener('click', function (e) {
       if (popmenu && !popmenu.contains(e.target)) closePopmenu();
     }, true);
@@ -832,7 +832,7 @@
       if (el) el.addEventListener('scroll', closePopmenu);
     });
 
-    // 列表滚动接近底部时自动加载更多
+    // リストのスクロールが最下部に近づくと自動で追加読み込み
     var forumBody = $('dscForumBody');
     if (forumBody) forumBody.addEventListener('scroll', function () {
       if (state.loading || !state.hasMore) return;

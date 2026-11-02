@@ -172,7 +172,7 @@ bool deleteDisplayModel(String id) {
     f.deleteSync();
     return true;
   } catch (e) {
-    logp('❌ 删除自定义模型失败: $e');
+    logp('❌ カスタムモデルの削除に失敗しました: $e');
     return false;
   }
 }
@@ -201,12 +201,12 @@ Future<void> handleDisplayModels(HttpRequest req) async {
       try {
         body = await readJsonBody(req);
       } catch (_) {
-        await dsJSONErr(res, 400, '无效请求体');
+        await dsJSONErr(res, 400, '無効なリクエストボディです');
         return;
       }
       final raw = mStr(body, 'id').trim();
       if (raw.isEmpty) {
-        await dsJSONErr(res, 400, '模型名不能为空');
+        await dsJSONErr(res, 400, 'モデル名は必須です');
         return;
       }
       if (runeLen(raw) > DM_MAX_NAME_RUNES) {
@@ -224,7 +224,7 @@ Future<void> handleDisplayModels(HttpRequest req) async {
           : rfc3339(DateTime.now());
       final path = displayModelPathForSave(raw);
       if (!writeTextFile(path, '#M|${escDs(raw)}|$createdAt\n')) {
-        await dsJSONErr(res, 500, '写入失败');
+        await dsJSONErr(res, 500, '書き込みに失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {

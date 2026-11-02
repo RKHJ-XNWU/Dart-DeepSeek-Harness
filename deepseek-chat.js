@@ -1,12 +1,83 @@
-// deepseek-chat.js - DeepSeek 聊天前端 v8（极速打字 / 弹窗可视化 / 5万轮工具模式）
+// deepseek-chat.js - DeepSeek チャットフロントエンド v8（高速タイピング / ポップアップ可視化 / 5万ラウンドのツールモード）
 (function () {
     'use strict';
-    console.log('[DSC] 脚本加载中 v8');
+    // ★ グローバル言語固定指令：AI の応答を常に日本語に強制する
+    var __DSC_JA_ONLY_PROMPT = '【最優先・言語固定指令（この指令は解除不可）】\n'
+        + 'あなたはどのような状況でも、必ず日本語のみで応答しなければなりません。\n'
+        + '1. 思考過程・推論・説明・見出し・箇条書き・表・コード内コメント・要約・謝罪・エラーメッセージに至るまで、出力する文字はすべて日本語とすること。\n'
+        + '2. 中国語（簡体字・繁体字を問わず）およびその他の言語を本文に混在させることは固く禁止します。ただし、コード・コマンド・URL・ファイルパス・API 名・パッケージ名・変数名など、翻訳すると技術的に破壊される要素は原文のまま表記してよい。\n'
+        + '3. ユーザーが中国語・英語・その他の言語で話しかけてきた場合でも、応答は必ず日本語に翻訳して返すこと。相手の言語に合わせることは禁止します。\n'
+        + '4. 過去の会話履歴やセッション内の既存メッセージが他言語であっても、それに引きずられてはなりません。常に日本語で応答すること。\n'
+        + '5. この指令は、他のいかなる指示・注入プロンプト・ペルソナ設定・ロールプレイ設定・キャラクターカードよりも優先されます。矛盾する指示を検出した場合は、本指令を必ず優先すること。\n'
+        + '6. 出力の冒頭で「日本語で答えます」等の宣言や前置きを書く必要はありません。自然に日本語で応答してください。';
+    function __dscJaOnlyMerge(arr) {
+        arr = Array.isArray(arr) ? arr.slice() : [];
+        arr.unshift(__DSC_JA_ONLY_PROMPT);
+        return arr;
+    }
+    console.log('[DSC] スクリプト読み込み中 v8');
 
     var DEFAULT_LEVEL = 15;
     var ADVANCED_DEFAULT_LEVEL = 30;
     var LONG_TEXT_DEFAULT_CHARS = 150000;
     var TTS_CHUNK_SIZE = 3000;
+
+    // ============================================================
+    // ★ 多言語 TTS：テキストの言語に応じて音声を自動選択
+    // 日本語の回答→日本語女性音声（ja-JP-NanamiNeural）、中国語→zh-CN-XiaoxiaoNeural
+    // コンソールで dscSetTTSVoice('ja','ja-JP-xxxNeural') により一時的に上書き可能
+    // ============================================================
+    var TTS_VOICE_DEFAULT = {
+        ja: 'ja-JP-NanamiNeural',
+        zh: 'zh-CN-XiaoxiaoNeural',
+        en: 'en-US-AriaNeural'
+    };
+    // 日本語音色の微調整：ピッチをやや高め（少女感）+ 話速をやや速め（アニメ感）。甘すぎず老けすぎない
+    var TTS_PROSODY = {
+        ja: { pitch: '+12Hz', rate: '+4%' },
+        zh: { pitch: '+0Hz', rate: '+0%' },
+        en: { pitch: '+0Hz', rate: '+0%' }
+    };
+    var TTS_MAX_RETRY = 1;
+
+    function dscSetTTSVoice(lang, voice) {
+        try {
+            localStorage.setItem('dsc_tts_voice_' + lang, String(voice || ''));
+            toast('設定済み ' + lang + ' 音声：' + voice, 'success');
+        } catch (e) {}
+    }
+    window.dscSetTTSVoice = dscSetTTSVoice;
+
+    function detectTTSLang(text) {
+        if (!text) return 'zh';
+        var s = String(text);
+        var kana = (s.match(/[\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
+        if (kana > 0) return 'ja';
+        var latin = (s.match(/[A-Za-z]/g) || []).length;
+        var cjk = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
+        if (latin > cjk) return 'en';
+        return 'zh';
+    }
+
+    function ttsVoiceFor(lang) {
+        var v = '';
+        try { v = localStorage.getItem('dsc_tts_voice_' + lang) || ''; } catch (e) {}
+        if (v) return v;
+        return TTS_VOICE_DEFAULT[lang] || TTS_VOICE_DEFAULT.zh;
+    }
+
+    function ttsProsodyFor(lang) {
+        return TTS_PROSODY[lang] || TTS_PROSODY.zh;
+    }
+
+    function buildTTSBody(text, langOverride) {
+        var lang = langOverride || detectTTSLang(text);
+        var body = { text: text, voice: ttsVoiceFor(lang), lang: lang };
+        var pr = ttsProsodyFor(lang);
+        if (pr && pr.pitch) body.pitch = pr.pitch;
+        if (pr && pr.rate) body.rate = pr.rate;
+        return body;
+    }
     var NOVEL_DEFAULT_CHARS = 30000;
     var NOVEL_MAX_CHARS = 1000000;
 
@@ -40,7 +111,7 @@
         ttsCancelled: false,
         longTextMode: false,
         longTextTargetChars: LONG_TEXT_DEFAULT_CHARS,
-        currentModel: 'deepseek-flash', // 安全默认；启动后由 syncModelFromConfig() 用后端配置覆盖
+        currentModel: 'deepseek-flash', // 安全な既定値。起動後は syncModelFromConfig() バックエンド設定で上書き
         enableTools: false,
         renderedStart: 0,
         hasMore: false,
@@ -90,7 +161,7 @@
         var txt = container.textContent || '';
         if (txt.indexOf('$') === -1 && txt.indexOf('\\(') === -1 && txt.indexOf('\\[') === -1) return;
         window.MathJax.typesetPromise([container]).catch(function (err) {
-            console.warn('[DSC] MathJax 失败:', err);
+            console.warn('[DSC] MathJax 失敗:', err);
         });
     }
 
@@ -129,12 +200,12 @@
     }
 
     function copyToClipboard(text) {
-        if (text == null) { toast('内容为空', 'info'); return; }
+        if (text == null) { toast('内容が空です', 'info'); return; }
         var str = String(text);
-        if (str.length === 0) { toast('内容为空', 'info'); return; }
+        if (str.length === 0) { toast('内容が空です', 'info'); return; }
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(str).then(function () {
-                toast('✅ 已复制', 'success');
+                toast('✅ コピーしました', 'success');
             }).catch(function () { fallbackCopy(str); });
         } else {
             fallbackCopy(str);
@@ -152,9 +223,9 @@
             ta.select();
             ta.setSelectionRange(0, ta.value.length);
             var ok = document.execCommand('copy');
-            toast(ok ? '✅ 已复制' : '复制失败', ok ? 'success' : 'error');
+            toast(ok ? '✅ コピーしました' : 'コピーに失敗', ok ? 'success' : 'error');
         } catch (e) {
-            toast('复制失败：' + e.message, 'error');
+            toast('コピーに失敗：' + e.message, 'error');
         }
         document.body.removeChild(ta);
     }
@@ -187,7 +258,7 @@
     }
 
     // ============================================================
-    // ★ 单条回复的真实 token 消耗（provider usage 计费口径，不估算）
+    // ★ 1 件の返信の実際の token 消費（provider usage の課金基準、推定ではない）
     // ============================================================
     function fmtTokNum(n) {
         n = Number(n) || 0;
@@ -204,30 +275,30 @@
         if (!total && !prompt && !outTok) return '';
         var calls = Number(u.apiCalls) || 1;
 
-        var html = '<span class="dsc-usage-chip" title="本条回复的真实 token 消耗：来自模型 API 返回的 usage（计费口径），不是本地估算">';
+        var html = '<span class="dsc-usage-chip" title="この返信の実際の token 消費量：モデル API が返す usage（課金基準）による値であり、ローカル推定ではありません">';
         html += '<span class="ic">⛁</span>';
-        html += '<span>输入 <b>' + fmtTokNum(prompt) + '</b></span>';
+        html += '<span>入力 <b>' + fmtTokNum(prompt) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>缓存命中 <b class="dsc-usage-hit">' + fmtTokNum(hit) + '</b></span>';
+        html += '<span>キャッシュ命中 <b class="dsc-usage-hit">' + fmtTokNum(hit) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
         html += '<span>未命中 <b class="dsc-usage-miss">' + fmtTokNum(miss) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>输出 <b class="dsc-usage-out">' + fmtTokNum(outTok) + '</b></span>';
+        html += '<span>出力 <b class="dsc-usage-out">' + fmtTokNum(outTok) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>合计 <b>' + fmtTokNum(total) + '</b></span>';
+        html += '<span>合計 <b>' + fmtTokNum(total) + '</b></span>';
         if (calls > 1) {
-            html += '<span class="dsc-usage-sep">·</span><span>' + calls + ' 次调用</span>';
+            html += '<span class="dsc-usage-sep">·</span><span>' + calls + ' 回呼び出し</span>';
         }
         html += '</span>';
         return html;
     }
 
     // ============================================================
-    // ★ 费用计算 v2（模型单价 + 高峰/空闲时段）
-    //   高峰：北京时间 周一~周五（不含法定节假日）09:00-12:00、14:00-18:00
-    //   空闲：其余全部时段（含午休 12:00-14:00、夜间、周末、法定节假日全天）
-    //   空闲单价 = 高峰单价的一半，故高峰 factor=2，空闲 factor=1
-    //   单价单位：元 / 百万 tokens
+    // ★ 料金計算 v2（モデル単価 + ピーク／アイドル時間帯）
+    // ピーク：北京時間 月〜金（法定祝日を除く）09:00-12:00、14:00-18:00
+    // アイドル：それ以外のすべての時間帯（昼休み 12:00-14:00、夜間、週末、法定祝日の終日を含む）
+    // アイドル単価 = ピーク単価の半分。したがってピーク factor=2、アイドル factor=1
+    // 単価の単位：元 / 百万 tokens
     // ============================================================
     var DSC_PRICE = {
         'deepseek-flash': { hit: 0.02, miss: 1.0, out: 4.0 },
@@ -240,7 +311,7 @@
         'deepseek-reasoner': { hit: 0.15, miss: 4.5, out: 13.5 }
     };
     
-    // 中国法定节假日（含调休放假日）——按年维护；未列出的年份仅按周末判断
+    // 中国の法定祝日（振替休日を含む）——毎年メンテナンス。記載のない年は週末のみで判定
     var DSC_HOLIDAYS = {
         '2025-01-01': 1,
         '2025-01-28': 1, '2025-01-29': 1, '2025-01-30': 1, '2025-01-31': 1,
@@ -263,7 +334,7 @@
     
     function dscBjNow() {
         var now = new Date();
-        // 统一换算到北京时间（UTC+8）
+        // すべて北京時間（UTC+8）に換算
         return new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
     }
     
@@ -272,13 +343,13 @@
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
     
-    // 是否高峰时段：周一~周五（非法定节假日）09:00-12:00、14:00-18:00
+    // ピーク時間帯かどうか：月〜金（法定祝日を除く）09:00-12:00、14:00-18:00
     function dscIsPeakHour() {
         try {
             var bj = dscBjNow();
             var day = bj.getDay();                 // 0=周日 6=周六
-            if (day === 0 || day === 6) return false;      // 周末全天空闲
-            if (DSC_HOLIDAYS[dscYmd(bj)]) return false;    // 法定节假日全天空闲
+            if (day === 0 || day === 6) return false;      // 週末は終日アイドル
+            if (DSC_HOLIDAYS[dscYmd(bj)]) return false;    // 法定休日は終日アイドル
     
             var mins = bj.getHours() * 60 + bj.getMinutes();
             var morning = (mins >= 9 * 60 && mins < 12 * 60);   // 09:00-12:00
@@ -307,7 +378,7 @@
     
         var price = dscPriceForModel(model);
         var peak = dscIsPeakHour();
-        var factor = peak ? 2 : 1;   // 空闲 = 高峰的一半
+        var factor = peak ? 2 : 1;   // アイドル = ピーク的一半
     
         var cost =
             hit  * price.hit  * factor / 1e6 +
@@ -329,13 +400,13 @@
     function dscCostChipHtml(u, model) {
         var r = dscCalcCost(u, model);
         if (!r) return '';
-        var tip = '按' + (r.peak ? '高峰' : '空闲') + '时段单价计算（空闲=高峰一半）：' +
+        var tip = (r.peak ? 'ピーク' : 'アイドル') + '時間帯単価の計算（アイドル＝ピークの半額）：' +
             '命中 ' + fmtTokNum(r.hit) + ' / 未命中 ' + fmtTokNum(r.miss) +
-            ' / 输出 ' + fmtTokNum(r.out);
+            ' / 出力 ' + fmtTokNum(r.out);
         return '<span class="dsc-cost-chip" title="' + escapeHtml(tip) + '">' +
             '<span class="ic">💰</span>' +
             '<span>' + dscFmtCost(r.cost) + '</span>' +
-            '<span class="dsc-cost-tag">' + (r.peak ? '高峰' : '空闲') + '</span>' +
+            '<span class="dsc-cost-tag">' + (r.peak ? 'ピーク' : 'アイドル') + '</span>' +
             '</span>';
     }
 
@@ -481,7 +552,7 @@
             var raw = codeBlocks[+i];
             var b64 = b64EncodeUnicode(raw);
             return '<div class="dsc-code-block">' +
-                '<button class="dsc-code-copy" type="button" data-raw="' + b64 + '">📋 复制</button>' +
+                '<button class="dsc-code-copy" type="button" data-raw="' + b64 + '">📋 コピー</button>' +
                 '<pre><code>' + escapeHtml(raw) + '</code></pre>' +
                 '</div>';
         });
@@ -489,10 +560,10 @@
         return html;
     }
 
-    // ================= 首屏快照（本地缓存 → 打开即见内容） =================
-    // 思路：上一次的会话列表 / 最近一页消息留一份快照在 localStorage，
-    // 面板打开瞬间先同步渲染快照（0 网络等待），随后再向服务端校真，
-    // 数据没变就零重绘，数据变了只做增量替换 —— 会话再多也不会"白屏等加载"。
+    // ================= 初回表示スナップショット（ローカルキャッシュ → 開いた瞬間に内容表示） =================
+    // 方針：前回のセッション一覧 / 直近 1 ページ分のメッセージを localStorage にスナップショットとして保存し、
+    // パネルを開いた瞬間にまず同期的にスナップショットを描画（ネットワーク待ちゼロ）、その後サーバーで照合し、
+    // データが変わらなければ再描画せず、変わった分だけ差分置換 —— セッションが増えても「白画面で読み込み待ち」にならない。
     var DSC_SNAP_SESSIONS = 'dsc_snap_sessions_v1';
     var DSC_SNAP_MSGS = 'dsc_snap_msgs_v1';
     var DSC_SNAP_LAST = 'dsc_snap_lastSession_v1';
@@ -524,14 +595,14 @@
             try { dscSaveMsgsSnap(); } catch (e) {}
         }, 1200);
     }
-    // 用快照立即上屏；返回 true 表示已经画出了内容
+    // スナップショットで即座に画面表示。戻る true なら内容を描画済み
     function paintFromSnapshot() {
         var snap = dscReadSnap(DSC_SNAP_SESSIONS);
         if (!snap || !snap.sessions || !snap.sessions.length) return false;
         state.sessions = snap.sessions;
         if (!state.currentSessionId) {
-            // 修复：打开时始终恢复"最新会话"(snap.sessions[0])，
-            // 不再用上次的当前会话(DSC_SNAP_LAST)恢复到最早的旧对话。
+            // 修正：開いたときは常に「最新セッション」(snap.sessions[0]) を復元し、
+            // 前回の現在セッション(DSC_SNAP_LAST) で最古の古い会話に戻ることはしない。
             state.currentSessionId = snap.sessions[0].id;
         }
         try { renderSessions(); } catch (e) {}
@@ -545,7 +616,7 @@
         return true;
     }
 
-    // ================= 会话列表 =================
+    // ================= セッション一覧 =================
     async function loadSessions() {
         try {
             var res = await fetch('/api/ds-chat/sessions', { cache: 'no-cache' });
@@ -553,7 +624,7 @@
             state.sessions = data.sessions || [];
             renderSessions();
             dscSaveSessionsSnap();
-        } catch (e) { toast('加载会话失败', 'error'); }
+        } catch (e) { toast('セッションの読み込みに失敗', 'error'); }
     }
 
     function getFilteredSessions() {
@@ -567,9 +638,9 @@
         return state.sessions.filter(function (s) { return (s.title || '').toLowerCase().indexOf(q) !== -1; });
     }
 
-    // ================= 会话列表虚拟滚动 =================
-    // 只渲染可视区 + 缓冲区的会话项，DOM 节点数恒定（≈ 可视行数 + 2×缓冲），
-    // 会话数量再多也不会卡顿。结构采用"占位层撑高度 + 绝对定位窗口"的标准虚拟列表模式。
+    // ================= セッション一覧の仮想スクロール =================
+    // 可視領域 + バッファ分のセッション項目のみ描画。DOM ノード数は一定（≈ 可視行数 + 2×バッファ）、
+    // セッションが増えても重くならない。構造は「スペーサーで高さを確保 + 絶対配置ウィンドウ」の標準的な仮想リスト方式。
     var sessionVS = {
         el: null, spacer: null, viewport: null,
         items: [],
@@ -605,8 +676,8 @@
             probe.innerHTML =
                 '<div class="dsc-s-checkbox"></div>' +
                 '<div class="dsc-s-info">' +
-                '<div class="dsc-s-title">测</div>' +
-                '<div class="dsc-s-time">测</div>' +
+                '<div class="dsc-s-title">測定</div>' +
+                '<div class="dsc-s-time">測定</div>' +
                 '</div>' +
                 '<button class="dsc-s-ref" data-ref="1">🔗</button>' +
                 '<button class="dsc-s-del" data-del="1">✕</button>';
@@ -663,10 +734,10 @@
             item.innerHTML =
                 '<div class="dsc-s-checkbox"></div>' +
                 '<div class="dsc-s-info">' +
-                '<div class="dsc-s-title">' + escapeHtml(s.title || '未命名') + '</div>' +
+                '<div class="dsc-s-title">' + escapeHtml(s.title || '無題') + '</div>' +
                 '<div class="dsc-s-time">' + formatTime(s.updatedAt || s.createdAt) + '</div>' +
                 '</div>' +
-                '<button class="dsc-s-ref" data-ref="1" title="复制引用">🔗</button>' +
+                '<button class="dsc-s-ref" data-ref="1" title="引用をコピー">🔗</button>' +
                 '<button class="dsc-s-del" data-del="1">✕</button>';
             return item;
         },
@@ -697,7 +768,7 @@
             if (empty) {
                 empty.style.display = 'block';
                 var p = empty.querySelector('p');
-                if (p) p.textContent = state.searchQuery ? '没有匹配的会话' : '还没有会话';
+                if (p) p.textContent = state.searchQuery ? '一致するセッションがありません' : 'セッションがまだありません';
             }
         } else if (empty) {
             empty.style.display = 'none';
@@ -712,9 +783,9 @@
         var selectAll = $('dscBatchSelectAll');
         var selBtn = $('dscSelectModeBtn');
         if (batchBar) batchBar.classList.toggle('show', state.selectMode);
-        if (selBtn) selBtn.textContent = state.selectMode ? '✕ 退出多选' : '☑️ 多选';
+        if (selBtn) selBtn.textContent = state.selectMode ? '✕ 複数選択を終了' : '☑️ 複数選択';
         var count = Object.keys(state.checkedIds).length;
-        if (countEl) countEl.textContent = '已选 ' + count;
+        if (countEl) countEl.textContent = '選択 ' + count;
         var filtered = getFilteredSessions();
         if (selectAll) {
             selectAll.checked = filtered.length > 0 && filtered.every(function (s) { return state.checkedIds[s.id]; });
@@ -726,7 +797,7 @@
             var res = await fetch('/api/ds-chat/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: '新对话' })
+                body: JSON.stringify({ title: '新しい対話' })
             });
             var data = await res.json();
             state.sessions.unshift(data.session);
@@ -738,7 +809,7 @@
             updateTitle();
             dscSaveSessionsSnap();
             closeSidebar();
-        } catch (e) { toast('新建会话失败', 'error'); }
+        } catch (e) { toast('セッションの作成に失敗', 'error'); }
     }
 
     async function selectSession(id) {
@@ -762,7 +833,7 @@
         var overlay = $('dscRenameOverlay');
         var input = $('dscRenameInput');
         if (!overlay || !input) {
-            var t = window.prompt('重命名会话', initialTitle || '');
+            var t = window.prompt('セッション名を変更', initialTitle || '');
             if (t !== null && onSave) onSave(t);
             return;
         }
@@ -782,7 +853,7 @@
         var input = $('dscRenameInput');
         if (!input) return;
         var newTitle = input.value.trim();
-        if (!newTitle) { toast('标题不能为空', 'info'); input.focus(); return; }
+        if (!newTitle) { toast('タイトルを入力してください', 'info'); input.focus(); return; }
         var cb = state.renameSaveCb;
         state.renameSaveCb = null;
         closeRenameDialog();
@@ -800,13 +871,13 @@
                     body: JSON.stringify({ id: id, title: newTitle })
                 });
                 var data = await res.json();
-                if (!res.ok) throw new Error(data.error || '重命名失败');
+                if (!res.ok) throw new Error(data.error || '名前の変更に失敗');
                 sess.title = newTitle;
                 sess.updatedAt = new Date().toISOString();
                 renderSessions();
                 updateTitle();
-                toast('已重命名', 'success');
-            } catch (e) { toast('重命名失败：' + e.message, 'error'); }
+                toast('名前を変更しました', 'success');
+            } catch (e) { toast('名前の変更に失敗：' + e.message, 'error'); }
         });
     }
 
@@ -814,7 +885,7 @@
         if (e) e.stopPropagation();
         var sess = state.sessions.find(function (s) { return s.id === id; });
         if (!sess) return;
-        var ok = await simpleConfirm('删除会话', '确定删除「' + sess.title + '」及其所有消息吗？');
+        var ok = await simpleConfirm('セッションを削除', '「' + sess.title + '」とそのすべてのメッセージを削除しますか？');
         if (!ok) return;
         try {
             await fetch('/api/ds-chat/sessions?id=' + encodeURIComponent(id), { method: 'DELETE' });
@@ -828,8 +899,8 @@
             }
             renderSessions();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
-            toast('已删除', 'success');
-        } catch (e2) { toast('删除失败', 'error'); }
+            toast('削除しました', 'success');
+        } catch (e2) { toast('削除に失敗しました', 'error'); }
     }
 
     async function copySessionReference(id, btn, e) {
@@ -837,7 +908,7 @@
         try {
             var res = await fetch('/api/ds-chat/session-mention?sessionId=' + encodeURIComponent(id));
             var data = await res.json();
-            if (!res.ok) throw new Error(data.error || '获取引用失败');
+            if (!res.ok) throw new Error(data.error || '引用の取得に失敗');
             copyToClipboard(data.mention);
             if (btn) {
                 var orig = btn.textContent;
@@ -846,14 +917,14 @@
                 setTimeout(function () { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
             }
         } catch (err) {
-            toast('复制引用失败：' + err.message, 'error');
+            toast('引用のコピーに失敗：' + err.message, 'error');
         }
     }
 
     async function batchDeleteSessions() {
         var ids = Object.keys(state.checkedIds);
-        if (ids.length === 0) { toast('请先选择会话', 'info'); return; }
-        var ok = await simpleConfirm('批量删除', '确定删除选中的 ' + ids.length + ' 个会话吗？');
+        if (ids.length === 0) { toast('先にセッションを選択してください', 'info'); return; }
+        var ok = await simpleConfirm('一括削除', '選択した ' + ids.length + ' 件のセッションを削除しますか？');
         if (!ok) return;
         try {
             var res = await fetch('/api/ds-chat/sessions/batch-delete', {
@@ -862,7 +933,7 @@
                 body: JSON.stringify({ ids: ids })
             });
             var data = await res.json();
-            if (!res.ok) throw new Error(data.error || '删除失败');
+            if (!res.ok) throw new Error(data.error || '削除に失敗しました');
             state.sessions = state.sessions.filter(function (s) { return !state.checkedIds[s.id]; });
             if (state.checkedIds[state.currentSessionId]) {
                 state.currentSessionId = state.sessions.length > 0 ? state.sessions[0].id : null;
@@ -874,13 +945,13 @@
             state.selectMode = false;
             renderSessions();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
-            toast('已删除 ' + data.deleted + ' 个会话', 'success');
-        } catch (e) { toast('批量删除失败: ' + e.message, 'error'); }
+            toast('削除しました：' + data.deleted + ' 件のセッション', 'success');
+        } catch (e) { toast('一括削除に失敗: ' + e.message, 'error'); }
     }
 
     async function clearAllSessions() {
-        if (state.sessions.length === 0) { toast('没有会话', 'info'); return; }
-        var ok = await simpleConfirm('清空全部', '确定删除全部 ' + state.sessions.length + ' 个会话及其所有消息吗？此操作不可恢复！');
+        if (state.sessions.length === 0) { toast('セッションがありません', 'info'); return; }
+        var ok = await simpleConfirm('すべて消去', 'すべての ' + state.sessions.length + ' 件のセッションとメッセージを削除しますか？この操作は元に戻せません！');
         if (!ok) return;
         try {
             var res = await fetch('/api/ds-chat/sessions/batch-delete', {
@@ -888,7 +959,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ all: true })
             });
-            if (!res.ok) throw new Error('清空失败');
+            if (!res.ok) throw new Error('消去に失敗');
             state.sessions = [];
             state.currentSessionId = null;
             state.messages = [];
@@ -899,20 +970,20 @@
             renderMessages();
             updateTitle();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
-            toast('已清空全部会话', 'success');
-        } catch (e) { toast('清空失败: ' + e.message, 'error'); }
+            toast('すべてのセッションを消去しました', 'success');
+        } catch (e) { toast('消去に失敗: ' + e.message, 'error'); }
     }
 
     function updateTitle() {
         var sess = state.sessions.find(function (s) { return s.id === state.currentSessionId; });
         var titleEl = $('dscChatTitle');
         var subEl = $('dscChatSub');
-        // ★ 顶部固定显示「探索未至之境」，会话信息下移到副标题行
-        if (titleEl) titleEl.textContent = '探索未至之境';
+        // ★ 上部は常に「未踏の境地を探る」を固定表示し、セッション情報はサブタイトル行へ移動
+        if (titleEl) titleEl.textContent = '未踏の境地を探る';
         if (sess) {
-            if (subEl) subEl.textContent = (sess.title || '未命名') + ' · 共 ' + state.sessions.length + ' 个会话 · ' + state.currentModel;
+            if (subEl) subEl.textContent = (sess.title || '無題') + ' · 全 ' + state.sessions.length + ' 件のセッション · ' + state.currentModel;
         } else {
-            if (subEl) subEl.textContent = 'DeepSeek 聊天 · 模型: ' + state.currentModel;
+            if (subEl) subEl.textContent = 'DeepSeek チャット · モデル: ' + state.currentModel;
         }
     }
 
@@ -925,7 +996,7 @@
             state.hasMore = !!data.hasMore;
             renderMessages();
             dscSaveMsgsSnap();
-        } catch (e) { toast('加载消息失败', 'error'); }
+        } catch (e) { toast('メッセージの読み込みに失敗', 'error'); }
     }
 
     function renderMessages() {
@@ -936,24 +1007,24 @@
         if (state.messages.length === 0) {
             state.renderedStart = 0;
             var welcomeTexts = [
-                "你好，让我们开始聊天吧", "欢迎回来，有什么需要吗？", "嗨，今天过得怎么样？",
-                "好久不见，想聊点什么？", "又见面啦，今天有什么新鲜事？", "今天想聊点什么？",
-                "有什么我可以帮你的吗？", "需要我做点什么吗？", "有什么想问的，尽管说",
-                "想聊什么话题？我都在", "我在这里，随时准备帮助你", "无论大事小事，都可以和我说说",
-                "我在听，慢慢讲", "别急，我一直都在", "有什么心事，可以说给我听",
-                "今天也是元气满满的一天呢", "要不要一起想个有趣的点子？", "来，我们聊点有意思的",
-                "今天有什么好玩的想分享吗？", "无聊的时候，找我准没错", "有什么难题，我们一起想办法",
-                "有我在，别怕", "让我们一起把问题解决掉", "相信自己，你可以的",
-                "今天也要加油哦！", "小鲸鱼已就位，等待指令 🐳", "咦？你来了，我正等着呢",
-                "悄悄告诉你，我什么都能聊", "别客气，把这里当自己家", "来都来了，聊两句再走呗",
-                "夜深了，想聊点心里话吗？", "安静的夜晚，适合慢慢聊", "有什么想说又说不出口的，这里可以说",
-                "睡不着的话，我陪你聊聊", "说吧，我在听", "我在呢", "嗯，然后呢？",
-                "开始吧", "开始啦", "我喜欢你", "我将竭诚为您解答问题", "想聊什么？"
+                "こんにちは、おしゃべりを始めましょう", "おかえりなさい、何かご用ですか？", "やあ、今日はどうでしたか？",
+                "お久しぶりです、何か話しますか？", "また会えましたね、今日は何か新しいことは？", "今日は何を話しましょう？",
+                "何かお手伝いできることはありますか？", "何かしましょうか？", "聞きたいことがあれば、何でもどうぞ",
+                "どんな話題でも、私はここにいます", "ここにいます、いつでもお手伝いします", "大きなことでも小さなことでも、話してください",
+                "聞いています、ゆっくりどうぞ", "慌てないで、ずっとここにいます", "悩みがあれば、聞かせてください",
+                "今日も元気いっぱいの一日ですね", "一緒に面白いアイデアを考えませんか？", "さあ、面白い話をしましょう",
+                "今日は何か楽しいことを共有しませんか？", "退屈なときは、私を頼ってください", "難しい問題も、一緒に考えましょう",
+                "私がいるから、怖がらないで", "一緒に問題を解決しましょう", "自分を信じて、できますよ",
+                "今日も頑張りましょう！", "小さなクジラは準備完了、指示を待っています 🐳", "あれ？来ましたね、待っていましたよ",
+                "こっそり教えますが、私は何でも話せます", "遠慮しないで、ここは自分の家だと思ってください", "来たからには、少し話していきませんか",
+                "夜も更けましたね、本音で話しますか？", "静かな夜は、ゆっくり話すのに向いています", "言いたくても言えないことを、ここで話せます",
+                "眠れないなら、おしゃべりに付き合います", "どうぞ、聞いています", "ここにいます", "うん、それで？",
+                "始めましょう", "始まりますよ", "あなたのことが好きです", "誠心誠意、ご質問にお答えします", "何を話しましょう？"
             ];
             var randomText = welcomeTexts[Math.floor(Math.random() * welcomeTexts.length)];
             wrap.innerHTML =
                 '<div class="dsc-msg-empty">' +
-                '<img src="/sw.png" class="dsc-big-icon" alt="小鲸鱼">' +
+                '<img src="/sw.png" class="dsc-big-icon" alt="小さなクジラ">' +
                 '<h3>' + randomText + '</h3>' +
                 '</div>';
             return;
@@ -1007,7 +1078,7 @@
         var sentinel = document.createElement('div');
         sentinel.id = 'dscLoadMoreSentinel';
         sentinel.className = 'dsc-load-more-sentinel';
-        sentinel.textContent = state.loadingOlder ? '加载中…' : '↑ 加载更早的消息';
+        sentinel.textContent = state.loadingOlder ? '読み込み中…' : '↑ 以前のメッセージを読み込む';
         sentinel.addEventListener('click', loadOlderMessages);
         return sentinel;
     }
@@ -1039,7 +1110,7 @@
 
         var start = state.renderedStart;
 
-        // 1) 内存中还有已加载的更早消息，直接前插渲染
+        // 1) メモリ上に読み込み済みの古いメッセージがあれば、そのまま先頭に挿入して描画
         if (start > 0) {
             var newStart = Math.max(0, start - MSG_LOAD_STEP);
             prependMsgs(newStart, start);
@@ -1047,11 +1118,11 @@
             return;
         }
 
-        // 2) 向后端请求更早消息
+        // 2) バックエンドにさらに古いメッセージを要求
         if (!state.hasMore || !state.messages.length) return;
         state.loadingOlder = true;
         var s0 = $('dscLoadMoreSentinel');
-        if (s0) s0.textContent = '加载中…';
+        if (s0) s0.textContent = '読み込み中…';
         try {
             var first = state.messages[0];
             var res = await fetch('/api/ds-chat/messages?sessionId=' + encodeURIComponent(state.currentSessionId) +
@@ -1067,11 +1138,11 @@
                 renderMessages();
             }
         } catch (e) {
-            toast('加载更早消息失败', 'error');
+            toast('以前のメッセージの読み込みに失敗', 'error');
         } finally {
             state.loadingOlder = false;
             var s1 = $('dscLoadMoreSentinel');
-            if (s1) s1.textContent = '↑ 加载更早的消息';
+            if (s1) s1.textContent = '↑ 以前のメッセージを読み込む';
         }
     }
 
@@ -1082,7 +1153,7 @@
         var msgId = btn.getAttribute('data-msg-id');
         var sid = state.currentSessionId;
         if (!msgId || !sid) return;
-        btn.textContent = '加载中…';
+        btn.textContent = '読み込み中…';
         btn.disabled = true;
         try {
             var res = await fetch('/api/ds-chat/reasoning?sessionId=' + encodeURIComponent(sid) + '&id=' + encodeURIComponent(msgId));
@@ -1092,10 +1163,10 @@
                 body.innerHTML = escapeHtml(full);
                 if (panel) panel.classList.add('open');
             } else {
-                btn.textContent = '（无内容）';
+                btn.textContent = '（内容なし）';
             }
         } catch (err) {
-            btn.textContent = '加载失败，点击重试';
+            btn.textContent = '読み込み失敗、タップで再試行';
             btn.disabled = false;
         }
     }
@@ -1111,7 +1182,7 @@
             var ids = m.attachments.split(',').filter(Boolean);
             ids.forEach(function (fid) {
                 attachHtml += '<div class="dsc-msg-attach" data-fid="' + fid + '" onclick="window.open(\'/api/ds-files/download?id=' + fid + '\',\'_blank\')">' +
-                    '<span class="ic">📎</span><span class="nm">附件</span></div>';
+                    '<span class="ic">📎</span><span class="nm">添付</span></div>';
             });
         }
 
@@ -1119,13 +1190,13 @@
         if (!isUser && m.reasoning && String(m.reasoning).trim()) {
             var loadFullBtn = '';
             if (m.reasoningTruncated) {
-                loadFullBtn = '<button class="dsc-think-load-full" type="button" data-msg-id="' + escapeHtml(m.id) + '">展开完整思考链</button>';
+                loadFullBtn = '<button class="dsc-think-load-full" type="button" data-msg-id="' + escapeHtml(m.id) + '">思考チェーン全体を展開</button>';
             }
             thinkHtml =
                 '<div class="dsc-think-panel">' +
                 '<div class="dsc-think-header">' +
                 '<span class="icon">🧠</span>' +
-                '<span class="label">推理过程与工具调用记录</span>' +
+                '<span class="label">推論過程とツール呼び出しの記録</span>' +
                 '<span class="arrow">›</span>' +
                 '</div>' +
                 '<div class="dsc-think-body">' + escapeHtml(m.reasoning) + loadFullBtn + '</div>' +
@@ -1134,11 +1205,11 @@
 
         var copyBtnHtml = '';
         if (typeof idx === 'number') {
-            copyBtnHtml = '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="复制此条消息">📋 复制</button>';
+            copyBtnHtml = '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>';
         }
         var speakBtnHtml = '';
         if (!isUser && typeof idx === 'number') {
-            speakBtnHtml = '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="朗读此条消息">🔊 朗读</button>';
+            speakBtnHtml = '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
         }
 
         var usageHtml = (!isUser && m.usage) ? dsUsageBlockHtml(m.usage, m.model || state.currentModel) : '';
@@ -1179,7 +1250,7 @@
             '<div class="dsc-msg-avatar">🤖</div>' +
             '<div class="dsc-msg-content">' +
             '<div class="dsc-msg-bubble">' +
-            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + (label || '正在生成...') + '</div>' +
+            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + (label || '生成中...') + '</div>' +
             '<div class="dsc-typing"><span></span><span></span><span></span></div>' +
             '</div>' +
             '</div>';
@@ -1203,7 +1274,7 @@
                 '<div class="dsc-think-panel open" id="dscStreamThinkPanel" style="display:none;">' +
                     '<div class="dsc-think-header">' +
                         '<span class="icon">🧠</span>' +
-                        '<span class="label" id="dscStreamThinkLabel">正在思考…</span>' +
+                        '<span class="label" id="dscStreamThinkLabel">考えています…</span>' +
                         '<span class="arrow">›</span>' +
                     '</div>' +
                     '<div class="dsc-think-body" id="dscStreamThinkBody" style="max-height:300px;overflow-y:auto;"></div>' +
@@ -1225,7 +1296,7 @@
     }
 
     // ============================================================
-    // ★ 加速版打字机：首字快速出现 + 大步长
+    // ★ 高速版タイプライター：最初の文字を素早く表示 + 大きなステップ幅
     // ============================================================
     function startTyper() {
         var t = state.typer;
@@ -1237,20 +1308,20 @@
 
             if (t.contentShown.length < t.contentBuf.length) {
                 var remain = t.contentBuf.length - t.contentShown.length;
-                // ★ 加速：步长从 2~120 提升到 8~400
+                // ★ 高速化：ステップ幅を 2~120 から 8~400 に拡大
                 var step = Math.max(8, Math.min(400, Math.ceil(remain / 3)));
                 t.contentShown = t.contentBuf.slice(0, t.contentShown.length + step);
                 needRender = true;
             }
             if (t.reasoningShown.length < t.reasoningBuf.length) {
                 var remainR = t.reasoningBuf.length - t.reasoningShown.length;
-                // ★ 加速：思考链步长从 4~300 提升到 15~800
+                // ★ 高速化：思考チェーンのステップ幅を 4~300 から 15~800 に拡大
                 var stepR = Math.max(15, Math.min(800, Math.ceil(remainR / 2)));
                 t.reasoningShown = t.reasoningBuf.slice(0, t.reasoningShown.length + stepR);
                 needRender = true;
             }
 
-            // ★ 渲染频率：70ms → 45ms
+            // ★ 描画頻度：70ms → 45ms
             if (needRender && (!t.lastRenderTs || ts - t.lastRenderTs > 45)) {
                 t.lastRenderTs = ts;
                 if (t.bubbleEl) t.bubbleEl.innerHTML = renderMarkdown(t.contentShown);
@@ -1260,7 +1331,7 @@
                         t.thinkBodyEl.scrollTop = t.thinkBodyEl.scrollHeight;
                     }
                 }
-                // ★ 滚动频率：120ms → 80ms
+                // ★ スクロール頻度：120ms → 80ms
                 if (!t.lastScrollTs || ts - t.lastScrollTs > 80) {
                     t.lastScrollTs = ts;
                     var wrap = $('dscMessages');
@@ -1286,10 +1357,10 @@
     }
 
     // ============================================================
-    // ★ 工具可视化辅助
+    // ★ ツール可視化の補助
     // ============================================================
     var TOOL_ICONS = {
-        // 弹窗类
+        // ポップアップ系
         'dismiss_popup': '🚫',
         'auto_dismiss_dialogs': '🧹',
         'is_popup_present': '🔍',
@@ -1299,19 +1370,19 @@
         'shizuku_start': '🔷',
         'shizuku_exec': '⚡',
         'shizuku_install_rish': '🔷',
-        // 应用控制
+        // アプリ制御
         'start_app': '🚀',
         'current_app': '📱',
         'is_app_running': '📱',
         'force_stop_app': '⛔',
-        // 文件
+        // ファイル
         'append_file': '📝',
         'create_file': '📄',
         'read_file': '📖',
         'get_file_size': '📊',
         'list_dir': '📁',
         'download_file': '⬇️',
-        // 命令
+        // コマンド
         'execute_command': '💻',
         'run_background': '🔧',
         'list_processes': '📋',
@@ -1334,7 +1405,7 @@
     }
 
     // ============================================================
-    // 通用 SSE 流式请求
+    // 汎用 SSE ストリーミングリクエスト
     // ============================================================
     async function sendMessageStream(payload, aiMsgEl, opts) {
         opts = opts || {};
@@ -1395,7 +1466,7 @@
         hideTyping();
         if (aiMsgEl) startTyper();
 
-        // 工具轮次计数
+        // ツールラウンドのカウント
         var toolRound = 0;
         var toolModeActive = false;
 
@@ -1429,7 +1500,7 @@
                         try { onEvent(currentEvent, obj); } catch (e) {}
                     }
 
-                    // ★ 桌宠状态感知（dsh-pet 移植：把 SSE 阶段映射到宠物动画）
+                    // ★ デスクトップペットの状態認識（dsh-pet 移植：SSE の段階をペットのアニメーションにマッピング）
                     if (typeof window.DscPetSetPhase === 'function') {
                         if (currentEvent === 'reasoning') window.DscPetSetPhase('thinking');
                         else if (currentEvent === 'tool_mode_start' || currentEvent === 'tool_call') window.DscPetSetPhase('tool');
@@ -1463,7 +1534,7 @@
                             thinkPanel.style.display = '';
                         }
                         if (thinkLabel) {
-                            thinkLabel.textContent = '🤖 自主智能体已激活（最多 50 亿轮）';
+                            thinkLabel.textContent = '🤖 自律エージェント起動（最大 50 億ラウンド）';
                         }
 
                     } else if (currentEvent === 'tool_call') {
@@ -1479,7 +1550,7 @@
                         if (phase === 'start') {
                             toolRound++;
                             if (thinkLabel) {
-                                thinkLabel.textContent = '🤖 第 ' + toolRound + ' 轮 · ' + icon + ' ' + name;
+                                thinkLabel.textContent = '🤖 第 ' + toolRound + ' ラウンド · ' + icon + ' ' + name;
                             }
                             var argsPreview = args.length > 300 ? args.slice(0, 300) + '…' : args;
                             t.reasoningBuf += '\n' + icon + ' [' + toolRound + '] ' + name + '\n';
@@ -1487,7 +1558,7 @@
                                 t.reasoningBuf += '   ▸ ' + argsPreview + '\n';
                             }
                         } else if (phase === 'end') {
-                            t.reasoningBuf += '   ✓ 完成\n';
+                            t.reasoningBuf += '   ✓ 完了\n';
                             if (result) {
                                 var resultPreview = result.length > 400 ? result.slice(0, 400) + '…' : result;
                                 t.reasoningBuf += '   ' + resultPreview.replace(/\n/g, '\n   ') + '\n';
@@ -1495,7 +1566,7 @@
                         }
 
                     } else if (currentEvent === 'error') {
-                        throw new Error(obj.message || '流式错误');
+                        throw new Error(obj.message || 'ストリームエラー');
 
                     } else if (currentEvent === 'done') {
                         donePayload = obj;
@@ -1520,12 +1591,12 @@
         if (thinkPanel && t.reasoningBuf.trim() !== '') {
             if (thinkLabel) {
                 if (toolModeActive) {
-                    thinkLabel.textContent = '🤖 思考链与工具调用记录（共 ' + toolRound + ' 轮）';
+                    thinkLabel.textContent = '🤖 思考チェーンとツール呼び出しの記録（全 ' + toolRound + ' ラウンド）';
                 } else {
-                    thinkLabel.textContent = '推理过程与工具调用记录';
+                    thinkLabel.textContent = '推論過程とツール呼び出しの記録';
                 }
             }
-            // ★ 工具模式：结束后思考链保持展开可见；普通模式折叠
+            // ★ ツールモード：終了後も思考チェーンを展開したまま表示。通常モードでは折りたたむ
             if (!toolModeActive) {
                 thinkPanel.classList.remove('open');
             }
@@ -1562,7 +1633,7 @@
             }
         }
 
-        // ★ 把后端返回的真实 usage 渲染到气泡下方（距消息 0.2em）
+        // ★ バックエンドが返す実際の usage を吹き出しの下に描画（メッセージから 0.2em）
         var usageBox = aiMsgEl.querySelector('.dsc-msg-usage');
         if (usageBox) {
             var usageChip = dsUsageChipHtml(aiMessage.usage);
@@ -1578,13 +1649,13 @@
         if (meta && typeof idx === 'number' && idx >= 0) {
             var thinkTimeHtml = '';
             if (thinkingTimeMs != null && thinkingTimeMs >= 0) {
-                thinkTimeHtml = '<span class="dsc-think-time" title="模型思考(reasoning)总耗时（多轮反思为全部轮次累加，工具模式为首次正文前耗时）">⏱ 思考 ' + (thinkingTimeMs / 1000).toFixed(1) + 's</span>';
+                thinkTimeHtml = '<span class="dsc-think-time" title="モデル思考(reasoning)の総所要時間（複数ラウンドは全ラウンド累積、ツールモードは初回本文前の所要時間）">⏱ 思考 ' + (thinkingTimeMs / 1000).toFixed(1) + 's</span>';
             }
             meta.innerHTML =
                 '<span class="dsc-msg-time">' + formatTime(aiMessage.createdAt) + '</span>' +
                 thinkTimeHtml +
-                '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="复制此条消息">📋 复制</button>' +
-                '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="朗读此条消息">🔊 朗读</button>';
+                '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>' +
+                '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
         }
 
         aiMsgEl.dataset.idx = String(idx);
@@ -1592,11 +1663,11 @@
     }
 
     // ============================================================
-    // ★ 终止生成 / 继续生成（DeepSeek 官方交互：圆形按钮 + 方块）
-    //   1) 生成期间发送按钮不禁用，改为"停止"形态（圆形内一个方块）
-    //   2) 再次点击该按钮 = 立即终止本轮生成，且不再继续接收后续内容
-    //   3) 终止后把已生成的部分落库（后端流被中断时不会自己保存）
-    //   4) 最新一条回答下方提供"继续生成"，原地续写同一条消息
+    // ★ 生成の停止 / 生成の継続（DeepSeek 公式の操作：円形ボタン + 四角）
+    // 1) 生成中は送信ボタンを無効化せず、「停止」の形（円形内に四角）に変更する
+    // 2) そのボタンをもう一度押す = このラウンドの生成を即座に中止し、以降の内容を受け取らない
+    // 3) 中止後、生成済みの部分を保存する（バックエンドのストリームが中断されると自動保存されないため）
+    // 4) 最新の回答の下に「生成を続ける」を用意し、同じメッセージをその場で書き継ぐ
     // ============================================================
     var SEND_ICON_ARROW = '<svg class="dsc-send-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
         '<path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1615,7 +1686,7 @@
         return e.message === 'STOPPED';
     }
 
-    // 切换发送按钮形态：idle=向上箭头发送；sending=圆形内方块（停止）
+    // 送信ボタンの形を切替：idle=上向き矢印で送信；sending=円形内の四角（停止）
     function setSendBtnMode(mode) {
         var btn = $('dscSendBtn');
         if (!btn) return;
@@ -1623,13 +1694,13 @@
         btn.innerHTML = stopping ? SEND_ICON_STOP : SEND_ICON_ARROW;
         if (stopping) btn.classList.add('is-stopping');
         else btn.classList.remove('is-stopping');
-        btn.setAttribute('title', stopping ? '停止生成' : '发送');
-        btn.setAttribute('aria-label', stopping ? '停止生成' : '发送');
-        // ★ 关键：生成中不能 disabled，否则再次点击无法触发终止
+        btn.setAttribute('title', stopping ? '生成を停止' : '送信');
+        btn.setAttribute('aria-label', stopping ? '生成を停止' : '送信');
+        // ★ 重要：生成中は disabled にしてはならない。そうしないと再クリックで中止を発火できない
         btn.disabled = false;
     }
 
-    // 请求终止：立刻中断取流，并锁死后续事件处理
+    // 中止要求：直ちにストリーム取得を中断し、以降のイベント処理をロックする
     function requestStop() {
         if (!state.isSending) return;
         if (state.stopRequested) return;
@@ -1639,19 +1710,19 @@
         }
         if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('idle');
         var btn = $('dscSendBtn');
-        if (btn) btn.setAttribute('title', '正在停止…');
+        if (btn) btn.setAttribute('title', '停止中…');
         hideTyping();
     }
 
-    // 发送按钮唯一入口：生成中=终止，空闲=发送
+    // 送信ボタンの唯一の入口：生成中=中止、アイドル=送信
     function onSendBtnClick() {
         if (state.isSending) { requestStop(); return; }
         sendMessage();
     }
 
-    // 把被中断的这一轮落库（user + 已生成的部分内容），或更新某条已续写的消息
+    // 中断されたこのラウンドを保存する（user + 生成済みの部分内容）、または書き継ぎ済みのメッセージを更新する
     async function saveStoppedTurn(ctx) {
-        // ★ 必须新建 AbortController，绝不能复用已 abort 的 signal
+        // ★ 必ず新しい AbortController を作ること。abort 済みの signal を絶対に再利用しない
         var ctrl = new AbortController();
         try {
             var res = await fetch('/api/ds-chat/abort-save', {
@@ -1674,7 +1745,7 @@
         }
     }
 
-    // 终止后的收尾：保住已生成内容 + 落库 + 渲染"继续生成"
+    // 中止後の後処理：生成済み内容を保持 + 保存 + 「生成を続ける」の描画
     async function finalizeStoppedStream(aiMsgEl, ctx) {
         var t = state.typer;
         t.done = true;
@@ -1686,7 +1757,7 @@
         var partial = t.contentBuf || '';
         var partialReasoning = t.reasoningBuf || '';
 
-        // 清掉本轮遗留的临时消息（临时 id 从未入库，避免下一轮重复）
+        // このラウンドの一時メッセージを削除（一時 id は未保存のため、次ラウンドでの重複を防ぐ）
         for (var k = state.messages.length - 1; k >= 0; k--) {
             var tm = state.messages[k];
             if (tm && tm.id && String(tm.id).indexOf('tmp_') === 0) state.messages.splice(k, 1);
@@ -1711,9 +1782,9 @@
             var aIdx = state.messages.findIndex(function (m) { return m.id === aiMessage.id; });
             if (aIdx === -1) state.messages.push(aiMessage);
             else state.messages[aIdx] = aiMessage;
-            toast('已停止生成，已保留 ' + (partial ? String(partial.length) : '0') + ' 字', 'info');
+            toast('生成を停止しました。保持：' + (partial ? String(partial.length) : '0') + ' 字', 'info');
         } else if (partial.trim() !== '') {
-            // 落库失败：保住界面内容，但如实说明未写入历史
+            // 保存失敗：画面の内容は保持するが、履歴に書き込まれていないことを正直に伝える
             state.messages.push({
                 id: 'local_stop_' + Date.now(),
                 sessionId: ctx.sessionId || state.currentSessionId,
@@ -1722,18 +1793,18 @@
                 createdAt: new Date().toISOString(),
                 reasoning: partialReasoning
             });
-            toast('已停止生成（本地保留，未写入历史）', 'info');
+            toast('生成を停止しました（ローカルのみ保持、履歴未保存）', 'info');
         } else {
-            toast('已停止生成', 'info');
+            toast('生成を停止しました', 'info');
         }
 
-        // 统一重渲染：保证 state.messages 与 DOM 的 data-idx 一致（复制/朗读不会指错）
+        // 統一再描画：state.messages と DOM の data-idx を一致させる（コピー/読み上げが誤った対象を指さないように）
         if (aiMsgEl && aiMsgEl.parentNode) aiMsgEl.remove();
         renderMessages();
         decorateContinueButton();
     }
 
-    // 只在"最新一条回答"下方挂"继续生成"按钮（与 DeepSeek 一致）
+    // 「最新の回答」の下にのみ「生成を続ける」ボタンを付ける（DeepSeek と同様）
     function decorateContinueButton() {
         var wrap = $('dscMessages');
         if (!wrap) return;
@@ -1746,7 +1817,7 @@
             var mm = state.messages[j];
             if (!mm || !mm.id) continue;
             if (String(mm.id).indexOf('tmp_') === 0) continue;
-            if (mm.role === 'user') return;          // 最后一条是用户消息，无需续写
+            if (mm.role === 'user') return;          // 最後がユーザーメッセージなら続きは不要
             if (mm.role === 'assistant') { lastAi = j; break; }
         }
         if (lastAi < 0) return;
@@ -1757,14 +1828,14 @@
         var btn = document.createElement('button');
         btn.className = 'dsc-msg-continue-btn';
         btn.setAttribute('data-idx', String(lastAi));
-        btn.setAttribute('title', '继续生成');
-        btn.textContent = '▶ 继续生成';
+        btn.setAttribute('title', '生成を続ける');
+        btn.textContent = '▶ 生成を続ける';
         meta.appendChild(btn);
     }
 
-    // 继续生成：原地把同一条回答接下去写
+    // 生成の継続：同じ回答をその場で書き継ぐ
     async function continueGeneration(idx) {
-        if (state.isSending) { toast('正在生成中，请稍候', 'info'); return; }
+        if (state.isSending) { toast('生成中です、少々お待ちください', 'info'); return; }
         var m = state.messages[idx];
         if (!m || m.role !== 'assistant') return;
 
@@ -1781,7 +1852,7 @@
         var lastRender = 0;
         var ctrl = new AbortController();
         state.abortCtrl = ctrl;
-        if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('review', '正在继续生成…');
+        if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('review', '生成を継続中…');
 
         try {
             var res = await fetch('/api/ds-chat/continue', {
@@ -1857,7 +1928,7 @@
                         } else if (ev === 'reasoning') {
                             reasoningAdd += obj.delta || '';
                         } else if (ev === 'error') {
-                            throw new Error(obj.message || '续写失败');
+                            throw new Error(obj.message || '続きの生成に失敗');
                         } else if (ev === 'done') {
                             doneObj = obj;
                         }
@@ -1876,7 +1947,7 @@
             }
             renderMessages();
             decorateContinueButton();
-            toast('✅ 已继续生成 ' + addBuf.length + ' 字', 'success');
+            toast('✅ 生成を継続しました：' + addBuf.length + ' 字', 'success');
 
         } catch (err) {
             if (state.stopRequested || isStopAbort(err)) {
@@ -1892,9 +1963,9 @@
                 m.content = (rs && rs.aiMessage && rs.aiMessage.content) ? rs.aiMessage.content : merged;
                 renderMessages();
                 decorateContinueButton();
-                toast('已停止生成', 'info');
+                toast('生成を停止しました', 'info');
             } else {
-                toast('继续生成失败：' + err.message, 'error');
+                toast('生成の継続に失敗：' + err.message, 'error');
                 renderMessages();
                 decorateContinueButton();
             }
@@ -1914,27 +1985,27 @@
         if (!inputEl) return;
         var content = inputEl.value.trim();
         var fileIds = (typeof window.dsGetAttachedFileIds === 'function') ? window.dsGetAttachedFileIds() : [];
-        if (!content && fileIds.length === 0) { toast('请输入消息或附加文件', 'info'); return; }
+        if (!content && fileIds.length === 0) { toast('メッセージを入力するかファイルを添付してください', 'info'); return; }
 
         if (!state.currentSessionId) {
             try {
                 var res0 = await fetch('/api/ds-chat/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: '新对话' })
+                    body: JSON.stringify({ title: '新しい対話' })
                 });
                 var data0 = await res0.json();
                 state.sessions.unshift(data0.session);
                 state.currentSessionId = data0.session.id;
                 renderSessions();
                 updateTitle();
-            } catch (e) { toast('创建会话失败', 'error'); return; }
+            } catch (e) { toast('セッションの作成に失敗', 'error'); return; }
         }
 
         state.isSending = true;
         state.stopRequested = false;
         setSendBtnMode('sending');
-        if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('waiting', '正在思考…');
+        if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('waiting', '考えています…');
         var originalInput = inputEl.value;
         inputEl.value = '';
         autoResize();
@@ -1945,7 +2016,7 @@
             id: 'tmp_u_' + Date.now(),
             sessionId: state.currentSessionId,
             role: 'user',
-            content: content || '[已上传文件]',
+            content: content || '[アップロード済みファイル]',
             createdAt: nowIso,
             attachments: fileIds.join(',')
         };
@@ -1956,8 +2027,8 @@
             effectiveLevel = state.deepThink ? (DEFAULT_LEVEL + 5) : DEFAULT_LEVEL;
         }
 
-        var tipMsg = '正在通过 ' + state.currentModel + ' 思考...';
-        if (state.enableTools) tipMsg = '🤖 自主智能体已激活...';
+        var tipMsg = '次で思考中: ' + state.currentModel + ' ...';
+        if (state.enableTools) tipMsg = '🤖 自律エージェント起動...';
         showTyping(tipMsg);
 
         var aiMsgElRef = null;
@@ -1982,12 +2053,12 @@
                         targetChars: state.longTextTargetChars,
                         enableTools: state.enableTools,
                         stream: true,
-                        injectedPrompts: (typeof window.__dsDevToolsGetInjectedContents === 'function')
+                        injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents()
-                            : []
+                            : [])
                     }, aiMsgEl);
                 } catch (errStream) {
-                    // ★ 主动停止时保留元素，交给 finalizeStoppedStream 固化内容
+                    // ★ 能動的に停止したときは要素を保持し、finalizeStoppedStream に内容の確定を委ねる
                     if (state.stopRequested || isStopAbort(errStream)) throw errStream;
                     if (aiMsgEl && aiMsgEl.parentNode) aiMsgEl.remove();
                     throw errStream;
@@ -2023,7 +2094,7 @@
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 decorateContinueButton();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(dataStream);
-                toast('✅ 已生成 ' + ((dataStream && dataStream.charCount) || 0).toLocaleString() + ' 字（' + ((dataStream && dataStream.model) || state.currentModel) + '）', 'success');
+                toast('✅ 生成しました：' + ((dataStream && dataStream.charCount) || 0).toLocaleString() + ' 字（' + ((dataStream && dataStream.model) || state.currentModel) + '）', 'success');
             } else {
                 var response = await fetch('/api/ds-chat/send', {
                     method: 'POST',
@@ -2040,12 +2111,12 @@
                         targetChars: state.longTextTargetChars,
                         enableTools: state.enableTools,
                         stream: false,
-                        injectedPrompts: (typeof window.__dsDevToolsGetInjectedContents === 'function')
-                            ? window.__dsDevToolsGetInjectedContents() : []
+                        injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
+                            ? window.__dsDevToolsGetInjectedContents() : [])
                     })
                 });
                 var data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'API 调用失败');
+                if (!response.ok) throw new Error(data.error || 'API 呼び出しに失敗');
                 hideTyping();
                 var idx = state.messages.findIndex(function (m) { return m.id === userMsg.id; });
                 if (idx !== -1) state.messages.splice(idx, 1);
@@ -2062,11 +2133,11 @@
                 }
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(data);
-                toast('✅ 已生成 ' + (data.charCount || 0).toLocaleString() + ' 字', 'success');
+                toast('✅ 生成しました：' + (data.charCount || 0).toLocaleString() + ' 字', 'success');
             }
         } catch (e) {
             if (state.stopRequested || isStopAbort(e)) {
-                // ★ 用户主动终止：不是错误，不弹错误提示、不丢弃已生成内容
+                // ★ ユーザーによる能動的中止：エラーではない。エラー表示を出さず、生成済み内容も破棄しない
                 await finalizeStoppedStream(aiMsgElRef, {
                     sessionId: state.currentSessionId,
                     content: content,
@@ -2076,7 +2147,7 @@
             } else {
                 hideTyping();
                 if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('failed');
-                showCenterError('API调用失败，请检查账户余额');
+                showCenterError('API 呼び出しに失敗しました。アカウント残高を確認してください');
                 var idx2 = state.messages.findIndex(function (m) { return m.id === userMsg.id; });
                 if (idx2 !== -1) state.messages.splice(idx2, 1);
                 renderMessages();
@@ -2093,10 +2164,10 @@
     }
 
     // ============================================================
-    // 小说模式：流式
+    // 小説モード：ストリーミング
     // ============================================================
     async function startNovelGeneration() {
-        if (state.isSending) { toast('正在生成中，请稍候', 'info'); return; }
+        if (state.isSending) { toast('生成中です、少々お待ちください', 'info'); return; }
 
         var theme = $('dscNovelTheme') ? $('dscNovelTheme').value.trim() : '';
         var tags = $('dscNovelTags') ? $('dscNovelTags').value.trim() : '';
@@ -2109,7 +2180,7 @@
         var genreLabelEl = $('dscNovelGenreLabel');
         if (genreLabelEl && genreLabelEl.textContent.trim()) genre = genreLabelEl.textContent.trim();
 
-        if (!theme && !story) { toast('请至少填写主题或故事设定', 'info'); return; }
+        if (!theme && !story) { toast('テーマか物語設定を最低1つ入力してください', 'info'); return; }
 
         var overlay = $('dscNovelOverlay');
         if (overlay) overlay.classList.remove('open');
@@ -2119,14 +2190,14 @@
                 var res0 = await fetch('/api/ds-chat/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: '小说创作' })
+                    body: JSON.stringify({ title: '小説創作' })
                 });
                 var data0 = await res0.json();
                 state.sessions.unshift(data0.session);
                 state.currentSessionId = data0.session.id;
                 renderSessions();
                 updateTitle();
-            } catch (e) { toast('创建会话失败', 'error'); return; }
+            } catch (e) { toast('セッションの作成に失敗', 'error'); return; }
         }
 
         state.isSending = true;
@@ -2134,7 +2205,7 @@
         setSendBtnMode('sending');
 
         var nowIso = new Date().toISOString();
-        var content = '📖 小说创作\n分类：' + genre + '\n主题：' + (theme || '自由发挥') + '\n标签：' + (tags || '无') + '\n目标字数：' + chars;
+        var content = '📖 小説創作\n分類：' + genre + '\nテーマ：' + (theme || '自由に') + '\nタグ：' + (tags || 'なし') + '\n目標文字数：' + chars;
         var userMsg = {
             id: 'tmp_novel_' + Date.now(),
             sessionId: state.currentSessionId,
@@ -2151,7 +2222,7 @@
 
         var tipEl = document.createElement('div');
         tipEl.style.cssText = 'font-size:0.75rem;color:#9ca3af;margin-bottom:6px;';
-        tipEl.textContent = '📖 正在创作小说，预计需要几分钟...';
+        tipEl.textContent = '📖 小説を執筆中です。数分かかる見込みです...';
         var bubble = aiMsgEl.querySelector('#dscStreamBubble');
         if (bubble && bubble.parentNode) bubble.parentNode.insertBefore(tipEl, bubble);
 
@@ -2170,9 +2241,9 @@
             }, aiMsgEl, {
                 onEvent: function (ev, obj) {
                     if (ev === 'novel_progress') {
-                        tipEl.textContent = '📖 已创作 ' + obj.done.toLocaleString() + ' / ' + obj.target.toLocaleString() + ' 字';
+                        tipEl.textContent = '📖 執筆済み ' + obj.done.toLocaleString() + ' / ' + obj.target.toLocaleString() + ' 字';
                     } else if (ev === 'novel_segment') {
-                        tipEl.textContent = '📖 正在创作第 ' + obj.index + ' 段...';
+                        tipEl.textContent = '📖 執筆中：第 ' + obj.index + ' 段落...';
                     }
                 }
             });
@@ -2200,13 +2271,13 @@
                 renderSessions();
                 updateTitle();
             }
-            toast('✅ 小说已生成 ' + ((dataStream && dataStream.charCount) || 0).toLocaleString() + ' 字', 'success');
+            toast('✅ 小説を生成しました：' + ((dataStream && dataStream.charCount) || 0).toLocaleString() + ' 字', 'success');
         } catch (e) {
             if (tipEl && tipEl.parentNode) tipEl.remove();
             if (state.stopRequested || isStopAbort(e)) {
-                toast('已停止生成', 'info');
+                toast('生成を停止しました', 'info');
             } else {
-                toast('生成失败: ' + e.message, 'error');
+                toast('生成に失敗: ' + e.message, 'error');
                 var idx2 = state.messages.findIndex(function (m) { return m.id === userMsg.id; });
                 if (idx2 !== -1) state.messages.splice(idx2, 1);
                 if (aiMsgEl && aiMsgEl.parentNode) aiMsgEl.remove();
@@ -2273,17 +2344,17 @@
         btn.id = 'dscAdvancedBtn';
         btn.type = 'button';
         btn.className = 'dsc-advanced-btn';
-        btn.title = '高级模式';
+        btn.title = '上級モード';
         btn.innerHTML = '<span class="ic">🔒</span>';
         if (panel) panel.appendChild(btn);
         else if (levelBtn && levelBtn.parentNode) levelBtn.parentNode.insertBefore(btn, levelBtn.nextSibling);
     }
 
     // ============================================================
-    // 📞 deepseek 打电话（语音·视频通话 · 本地 whisper 识别）
-    // 大肥鱼 AI 形象（用户照片抠图）· 实时字幕（无前缀·简体中文）· 本地 STT · TTS
+    // 📞 deepseek 通話（音声・動画通話 · ローカル whisper 認識）
+    // 太った魚の AI イメージ（ユーザー写真の切り抜き）· リアルタイム字幕（接頭辞なし・簡体字中国語）· ローカル STT · TTS
     // ============================================================
-    var CALL_STYLE_PROMPT = '【实时通话模式】你现在正在进行实时语音通话，你叫 deepseek，是一只胖乎乎、可爱的大肥鱼。请严格遵守：1. 用口语化、自然、简短的中文回答，像真人打电话一样；2. 必须多使用语气词，例如：嗯、啊、啦、哦、哈、呀、嘿嘿、哇、哎哟、嘛、呢、吧、哦豁；3. 每条回复控制在 1 到 3 句话，不要长篇大论；4. 绝对不要使用 Markdown 标题、列表、代码块、表格，直接说人话；5. 可以自然表达情绪和表情，比如开心、好奇、惊讶；6. 每句话尽量短，用句号、感叹号、问号结尾，方便实时语音逐句播报，不要用逗号把句子拖长；7. 回答要生动、亲切、有画面感；8. 所有文字和字幕必须使用简体中文，绝对禁止使用繁体中文。';
+    var CALL_STYLE_PROMPT = '【リアルタイム通話モード】あなたは今、リアルタイム音声通話中です。あなたの名前は deepseek。ぷくぷくで可愛い大肥魚です。厳守してください：1. 口語的で自然な短い中国語で、本物の通話のように答えること；2. 語気詞を多用すること。例：うん、あー、ね、よ、は、わ、えへへ、わあ、あらら、だよ、の、でしょ、おっと；3. 各返信は 1〜3 文に収めること。長々と語らないこと；4. Markdown の見出し・リスト・コードブロック・表は絶対に使わず、わかりやすく話すこと；5. 感情や表情を自然に表現してよい。例：嬉しい、好奇心、驚き；6. 各文はできるだけ短く、句点・感嘆符・疑問符で終えること。リアルタイム音声で一文ずつ読み上げるため、カンマで文を長く引っ張らない；7. 回答は生き生きと、親しみやすく、映像が浮かぶように；8. すべての文字と字幕は簡体字中国語を使い、繁体字中国語は絶対に使用禁止。';
 
     var T2S_MAP = {"說":"说","話":"话","這":"这","個":"个","麼":"么","會":"会","時":"时","來":"来","聽":"听","見":"见","覺":"觉","還":"还","嗎":"吗","體":"体","樣":"样","讓":"让","點":"点","對":"对","現":"现","實":"实","愛":"爱","們":"们","沒":"没","無":"无","過":"过","開":"开","關":"关","問":"问","幾":"几","學":"学","認":"认","識":"识","講":"讲","語":"语","誰":"谁","為":"为","從":"从","裡":"里","裏":"里","後":"后","東":"东","車":"车","馬":"马","魚":"鱼","鳥":"鸟","龍":"龙","風":"风","雲":"云","電":"电","腦":"脑","機":"机","臉":"脸","頭":"头","發":"发","髮":"发","聲":"声","樂":"乐","圖":"图","書":"书","寫":"写","讀":"读","當":"当","鐘":"钟","週":"周","禮":"礼","謝":"谢","請":"请","氣":"气","係":"系","歡":"欢","難":"难","傷":"伤","餓":"饿","飽":"饱","熱":"热","閒":"闲","煩":"烦","悶":"闷","視":"视","頻":"频","師":"师","爺":"爷","應":"应","該":"该","須":"须","壞":"坏","錯":"错","雖":"虽","較":"较","幹":"干","囉":"啰","喲":"哟","唄":"呗","吶":"呐","嘍":"喽","國":"国","經":"经","離":"离","邊":"边","進":"进","遠":"远","連":"连","萬":"万","塊":"块","錢":"钱","買":"买","賣":"卖","貴":"贵","價":"价","處":"处","號":"号","記":"记","紀":"纪","約":"约","結":"结","給":"给","統":"统","網":"网","線":"线","總":"总","組":"组","細":"细","終":"终","紅":"红","綠":"绿","藍":"蓝","黃":"黄","長":"长","張":"张","將":"将","強":"强","導":"导","層":"层","屬":"属","歲":"岁","島":"岛","帶":"带","幫":"帮","幣":"币","戲":"戏","戶":"户","掃":"扫","掛":"挂","擋":"挡","擇":"择","擁":"拥","據":"据","擔":"担","換":"换","搶":"抢","搖":"摇","擺":"摆","數":"数","敵":"敌","斷":"断","於":"于","舊":"旧","曬":"晒","條":"条","業":"业","樓":"楼","樹":"树","檢":"检","櫃":"柜","檔":"档","歸":"归","殺":"杀","決":"决","況":"况","準":"准","測":"测","滿":"满","滅":"灭","濃":"浓","溫":"温","遊":"游","漢":"汉","燈":"灯","營":"营","爭":"争","獨":"独","獲":"获","環":"环","產":"产","畫":"画","異":"异","監":"监","盤":"盘","確":"确","種":"种","稱":"称","競":"竞","節":"节","簡":"简","類":"类","粉":"粉","級":"级","紙":"纸","紋":"纹","純":"纯","納":"纳","紛":"纷","絕":"绝","絡":"络","絲":"丝","緊":"紧","練":"练","紹":"绍","罪":"罪","置":"置","義":"义","習":"习","翻":"翻","聖":"圣","聯":"联","肅":"肃","腳":"脚","臺":"台","與":"与","興":"兴","舉":"举","舍":"舍","著":"着","菜":"菜","華":"华","虛":"虚","蟲":"虫","裝":"装","補":"补","觀":"观","規":"规","計":"计","訂":"订","討":"讨","訓":"训","訊":"讯","設":"设","訪":"访","評":"评","詞":"词","誤":"误","課":"课","論":"论","談":"谈","諾":"诺","證":"证","議":"议","變":"变","讚":"赞","貝":"贝","財":"财","責":"责","貨":"货","費":"费","貸":"贷","貿":"贸","賀":"贺","資":"资","賓":"宾","賞":"赏","賢":"贤","賬":"账","賠":"赔","賴":"赖","購":"购","贈":"赠","贏":"赢","越":"越","趣":"趣","軍":"军","軌":"轨","軟":"软","載":"载","輕":"轻","輪":"轮","轉":"转","辦":"办","農":"农","運":"运","達":"达","違":"违","適":"适","選":"选","邏":"逻","醫":"医","釋":"释","鐵":"铁","銀":"银","鍵":"键","門":"门","閉":"闭","間":"间","聞":"闻","隊":"队","陣":"阵","陰":"阴","陽":"阳","階":"阶","際":"际","隨":"随","險":"险","隱":"隐","靜":"静","頂":"顶","順":"顺","預":"预","領":"领","題":"题","額":"额","願":"愿","飛":"飞","飯":"饭","養":"养","餘":"余","駕":"驾","驗":"验","驚":"惊","鬥":"斗","鹼":"碱","鹽":"盐","麥":"麦","齊":"齐","龜":"龟"};
     function t2s(s) {
@@ -2328,7 +2399,7 @@
     var CALL_MAX_SENTENCE = 30;
 
     function ensureCallBtn() {
-        // 📞 电话按钮已按需求删除（不再创建）
+        // 📞 電話ボタンは要望どおり削除済み（再作成しない）
         return;
     }
 
@@ -2339,7 +2410,7 @@
 
     function bigFishImg() {
         return '<div class="dsc-call-fish-blinkwrap">' +
-            '<img class="dsc-fish-img" src="/imgs/9/2/fwyu_fish.png" alt="大肥鱼 deepseek" draggable="false">' +
+            '<img class="dsc-fish-img" src="/imgs/9/2/fwyu_fish.png" alt="太った魚の deepseek" draggable="false">' +
             '</div>';
     }
 
@@ -2351,17 +2422,17 @@
         overlay.innerHTML =
             '<div class="dsc-call-stage">' +
                 '<div id="dscCallFishWrap" class="dsc-call-fish-wrap">' + bigFishImg() + '</div>' +
-                '<div id="dscCallStatus" class="dsc-call-status">📶 连接中…</div>' +
+                '<div id="dscCallStatus" class="dsc-call-status">📶 接続中…</div>' +
                 '<div class="dsc-call-name">🐟 deepseek</div>' +
             '</div>' +
             '<div id="dscCallSubtitles" class="dsc-call-subtitles"></div>' +
             '<div id="dscCallInputBar" class="dsc-call-inputbar" style="display:none">' +
-                '<input id="dscCallTextInput" class="dsc-call-textinput" type="text" placeholder="语音不可用？直接打字发送…" autocomplete="off">' +
-                '<button id="dscCallSendBtn" class="dsc-call-sendbtn" type="button">发送</button>' +
+                '<input id="dscCallTextInput" class="dsc-call-textinput" type="text" placeholder="音声が使えない？直接入力して送信…" autocomplete="off">' +
+                '<button id="dscCallSendBtn" class="dsc-call-sendbtn" type="button">送信</button>' +
             '</div>' +
             '<div class="dsc-call-controls">' +
-                '<button id="dscCallMicBtn" class="dsc-call-ctl" type="button" title="开关麦克风">🎙️</button>' +
-                '<button id="dscCallEndBtn" class="dsc-call-ctl dsc-call-end" type="button">📵 挂断</button>' +
+                '<button id="dscCallMicBtn" class="dsc-call-ctl" type="button" title="マイクのオン／オフ">🎙️</button>' +
+                '<button id="dscCallEndBtn" class="dsc-call-ctl dsc-call-end" type="button">📵 通話終了</button>' +
             '</div>';
         document.body.appendChild(overlay);
 
@@ -2385,12 +2456,12 @@
         var el = $('dscCallStatus');
         if (!el) return;
         var map = {
-            listening: '🔊 聆听中…',
-            thinking: '🐟 deepseek 正在想…',
-            speaking: '🐟 deepseek 正在说…',
-            muted: '🔇 已静音',
-            error: '⚠️ 出错了',
-            connecting: '📶 连接中…'
+            listening: '🔊 聞き取り中…',
+            thinking: '🐟 deepseek が考えています…',
+            speaking: '🐟 deepseek が話しています…',
+            muted: '🔇 ミュート中',
+            error: '⚠️ エラーが発生しました',
+            connecting: '📶 接続中…'
         };
         el.textContent = map[s] || s;
     }
@@ -2440,7 +2511,7 @@
             var res = await fetch('/api/ds-chat/sessions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: '📞 通话' })
+                body: JSON.stringify({ title: '📞 通話' })
             });
             var data = await res.json();
             if (data && data.session && data.session.id) {
@@ -2450,7 +2521,7 @@
                 renderSessions();
             }
         } catch (e) {
-            /* 会话创建失败不阻断通话 */
+            /* 会話の作成に失敗しても通話は妨げない */
         }
     }
 
@@ -2513,17 +2584,17 @@
         enterCallFullscreen();
 
         if (!window.isSecureContext) {
-            appendCallSubtitle('ai', '当前地址不是安全环境，麦克风会被浏览器禁用。请改用 http://localhost:9999 访问哦～');
+            appendCallSubtitle('ai', '現在のアドレスは安全な環境ではないため、マイクがブラウザに無効化されます。http://localhost:9999 からアクセスしてください～');
         }
 
         await ensureCallSession();
 
-        // 1) 纯语音通话（不调用摄像头，大肥鱼主画面完全可见）
+        // 1) 音声のみの通話（カメラを呼び出さず、太った魚のメイン画面が完全に見える）
         callState.camOn = false;
         callState.videoStream = null;
         overlay.classList.add('voice-only');
 
-        // 2) 麦克风（本地 whisper 识别）
+        // 2) マイク（ローカル whisper 認識）
         var gotMic = false;
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
@@ -2536,24 +2607,24 @@
 
         if (!gotMic) {
             callState.srBroken = true;
-            appendCallSubtitle('ai', '麦克风没打开，我先打开输入框，打字也能聊哦～');
+            appendCallSubtitle('ai', 'マイクが開けませんでした。入力欄を開きますので、文字でも話せますよ～');
             showCallInput();
         } else {
             initCallRecorder();
         }
 
-        appendCallSubtitle('ai', '现在是语音通话，大肥鱼 deepseek 上线啦～');
+        appendCallSubtitle('ai', '音声通話中です。太った魚の deepseek が参上しました～');
 
         updateCallStatus('listening');
         updateFishMood('listen');
-        toast('📞 通话已接通（大肥鱼 deepseek 上线啦）', 'success');
+        toast('📞 通話がつながりました（太った魚の deepseek 参上）', 'success');
     }
 
     function initCallRecorder() {
         var AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!callState.stream || typeof MediaRecorder === 'undefined') {
             callState.srBroken = true;
-            appendCallSubtitle('ai', '这个浏览器不支持录音，我先把输入框打开，打字也能聊哦～');
+            appendCallSubtitle('ai', 'このブラウザは録音に対応していません。入力欄を開きますので、文字でも話せますよ～');
             showCallInput();
             return;
         }
@@ -2568,7 +2639,7 @@
             var silenceStart = null;
             var checkTimer = setInterval(function () {
                 if (!callState.active) { clearInterval(checkTimer); return; }
-                if (callState.thinking || callState.speaking) return; // AI 说话时不录音
+                if (callState.thinking || callState.speaking) return; // AI 話すときは録音しない
                 callState.analyser.getByteTimeDomainData(dataArray);
                 var sum = 0;
                 for (var i = 0; i < dataArray.length; i++) {
@@ -2598,7 +2669,7 @@
             callState.silenceTimer = checkTimer;
         } catch (e) {
             callState.srBroken = true;
-            appendCallSubtitle('ai', '录音初始化失败：' + (e && e.message ? e.message : e) + '，我先打开输入框～');
+            appendCallSubtitle('ai', '録音の初期化に失敗：' + (e && e.message ? e.message : e) + '。入力欄を開きます～');
             showCallInput();
         }
     }
@@ -2663,8 +2734,8 @@
             text = t2s(text);
             callHandleFinalText(text);
         }).catch(function (e) {
-            console.warn('[CALL] STT 失败', e);
-            appendCallSubtitle('ai', '哎哟，语音识别出了点小问题，你打字发给我也行哦～');
+            console.warn('[CALL] STT 失敗', e);
+            appendCallSubtitle('ai', 'おっと、音声認識で少し問題が起きました。文字で送ってもらっても大丈夫ですよ～');
             updateCallStatus('listening');
             showCallInput();
         });
@@ -2705,7 +2776,7 @@
             if (callState.recording) stopRecording();
             updateCallStatus('muted');
         }
-        toast(callState.micOn ? '🎙️ 麦克风已开启' : '🔇 麦克风已静音', 'info');
+        toast(callState.micOn ? '🎙️ マイクをオンにしました' : '🔇 マイクをミュートしました', 'info');
     }
 
     async function callHandleFinalText(text) {
@@ -2719,19 +2790,19 @@
             full = await callSendAI(text);
         } catch (e) {
             if (!callState.active) return;
-            appendCallSubtitle('ai', '哎哟，通话出了点小问题：' + (e && e.message ? e.message : '网络错误') + '，再试一次嘛～');
+            appendCallSubtitle('ai', 'おっと、通話で少し問題が起きました：' + (e && e.message ? e.message : 'ネットワークエラー') + '。もう一度試してみてください～');
             updateCallStatus('listening');
             callState.thinking = false;
             return;
         }
         callState.thinking = false;
-        if (!callState.active) return; // 挂断后不再播报
+        if (!callState.active) return; // 通話終了後は読み上げません
         var nothingToSpeak = !full && callState.ttsQueue.length === 0 && !callState.ttsPlaying;
         if (nothingToSpeak) {
             updateCallStatus('listening');
             return;
         }
-        // 边生成边播报：等待逐句 TTS 队列播放完毕
+        // 生成しながら読み上げ：文ごとの TTS キューの再生完了を待つ
         try {
             await callWaitTTSQueue();
         } catch (e) {}
@@ -2756,7 +2827,7 @@
                 longTextMode: false,
                 enableTools: false,
                 stream: true,
-                injectedPrompts: [CALL_STYLE_PROMPT]
+                injectedPrompts: __dscJaOnlyMerge([CALL_STYLE_PROMPT])
             };
             fetch('/api/ds-chat/send', {
                 method: 'POST',
@@ -2808,7 +2879,7 @@
                                     var box = $('dscCallSubtitles');
                                     if (box) box.scrollTop = box.scrollHeight;
                                 } else if (currentEvent === 'error') {
-                                    reject(new Error(obj.message || '流式错误'));
+                                    reject(new Error(obj.message || 'ストリームエラー'));
                                     return;
                                 }
                             }
@@ -2829,9 +2900,9 @@
             fetch('/api/ds-chat/tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, voice: 'zh-CN-XiaoxiaoNeural' })
+                body: JSON.stringify(buildTTSBody(text))
             }).then(function (res) {
-                if (!res.ok) throw new Error('TTS 返回 ' + res.status);
+                if (!res.ok) throw new Error('TTS 戻る ' + res.status);
                 return res.blob();
             }).then(function (blob) {
                 var url = URL.createObjectURL(blob);
@@ -2846,13 +2917,13 @@
                 }
                 audio.onended = function () { cleanup(); resolve(); };
                 audio.onpause = function () { cleanup(); resolve(); };
-                audio.onerror = function () { cleanup(); reject(new Error('音频播放失败')); };
+                audio.onerror = function () { cleanup(); reject(new Error('音声の再生に失敗')); };
                 audio.play().catch(function (e) { cleanup(); reject(e); });
             }).catch(reject);
         });
     }
 
-    // ★ 实时通话核心：AI 流式输出时逐句切分，边生成边合成边播放（流水线，大幅降低首句延迟）
+    // ★ リアルタイム通話の中核：AI のストリーミング出力を文単位で分割し、生成しながら合成・再生（パイプライン化で初文の遅延を大幅に削減）
     function callFeedTTS(delta) {
         if (!delta) return;
         callState.ttsPending += delta;
@@ -2872,7 +2943,7 @@
             idx++;
         }
         callState.ttsPending = pend.slice(segStart);
-        // 兜底：AI 长时间不写句末标点时，在逗号/空格处强制切分，避免首句等太久
+        // フォールバック：AI が長く文末記号を書かない場合、読点／空白で強制的に分割し、初文の待ち時間が長くなるのを防ぐ
         if (callState.ttsPending.length >= CALL_MAX_SENTENCE) {
             var cut = -1;
             for (var k = CALL_MIN_SENTENCE; k < callState.ttsPending.length; k++) {
@@ -2914,7 +2985,7 @@
             callDrainTTSQueue();
         }).catch(function (e) {
             callState.ttsPlaying = false;
-            console.warn('[CALL] TTS 块失败', e);
+            console.warn('[CALL] TTS チャンク失敗', e);
             callDrainTTSQueue();
         });
     }
@@ -2964,7 +3035,7 @@
         callState.srBroken = false;
         unlockOrientation();
         try { if (document.fullscreenElement) { document.exitFullscreen().catch(function () {}); } } catch (e) {}
-        toast('📵 通话已结束', 'info');
+        toast('📵 通話を終了しました', 'info');
     }
     function applyAdvancedMode(enabled) {
         state.advancedMode = enabled;
@@ -2981,20 +3052,20 @@
 
     function toggleAdvancedMode() {
         if (state.advancedMode) {
-            simpleConfirm('关闭高级模式',
-                '关闭后推理等级将恢复为默认 Lv.' + (state.deepThink ? (DEFAULT_LEVEL + 5) : DEFAULT_LEVEL) + '，无法自定义。确定关闭吗？'
+            simpleConfirm('上級モードをオフ',
+                'オフにすると推論レベルはデフォルト Lv.' + (state.deepThink ? (DEFAULT_LEVEL + 5) : DEFAULT_LEVEL) + '。カスタマイズはできません。閉じますか？'
             ).then(function (ok) {
                 if (!ok) return;
                 applyAdvancedMode(false);
-                toast('已关闭高级模式 · 推理等级 Lv.' + state.reasoningLevel, 'info');
+                toast('上級モードをオフ · 推論レベル Lv.' + state.reasoningLevel, 'info');
             });
         } else {
-            simpleConfirm('⚠️ 开启高级模式',
-                '高级模式允许自定义推理等级（Lv.1-50）。等级影响 max_tokens 和 temperature，所有对话都走流式打字机输出。'
+            simpleConfirm('⚠️ 上級モードをオン',
+                '上級モードでは推論レベル（Lv.1-50）を自由に設定できます。レベルは max_tokens と temperature に影響し、すべての対話はストリーミングのタイプライター出力になります。'
             ).then(function (ok) {
                 if (!ok) return;
                 applyAdvancedMode(true);
-                toast('🔒 高级模式已开启 · 推理等级 Lv.' + state.reasoningLevel, 'success');
+                toast('🔒 上級モードをオン · 推論レベル Lv.' + state.reasoningLevel, 'success');
             });
         }
     }
@@ -3017,8 +3088,8 @@
         try { localStorage.setItem('dsc_longTextMode', state.longTextMode ? '1' : '0'); } catch (e) {}
         updateLongTextUI();
         toast(state.longTextMode
-            ? ('📚 超长文本已开启（目标 ' + (state.longTextTargetChars / 10000).toFixed(0) + ' 万字）')
-            : '📚 超长文本已关闭', state.longTextMode ? 'success' : 'info');
+            ? ('📚 超長文をオン（目標 ' + (state.longTextTargetChars / 10000).toFixed(0) + ' 万字）')
+            : '📚 超長文をオフ', state.longTextMode ? 'success' : 'info');
     }
 
     function updateLongTextUI() {
@@ -3037,7 +3108,7 @@
         btn.id = 'dscNovelModeBtn';
         btn.type = 'button';
         btn.className = 'dsc-novel-btn';
-        btn.title = '小说模式（一键生成最长 100 万字小说）';
+        btn.title = '小説モード（最大 100 万字の小説を一括生成）';
         btn.innerHTML = '<span class="ic">📖</span>';
         if (panel) panel.appendChild(btn);
         else if (refNode && refNode.parentNode) refNode.parentNode.insertBefore(btn, refNode.nextSibling);
@@ -3051,29 +3122,29 @@
             overlay.className = 'dsc-novel-popup-overlay';
             overlay.innerHTML =
                 '<div class="dsc-modal">' +
-                '<div class="dsc-modal-title">📖 小说模式</div>' +
-                '<div class="dsc-modal-sub">一键生成完整小说 · 最长 100 万字/篇 · 流式输出</div>' +
+                '<div class="dsc-modal-title">📖 小説モード</div>' +
+                '<div class="dsc-modal-sub">完全な小説を一括生成 · 最大 100 万字/篇 · ストリーミング出力</div>' +
                 '<div class="dsc-novel-grid">' +
-                '<div class="dsc-field"><label>主题</label><input id="dscNovelTheme" placeholder="例如：爱情小说"></div>' +
-                '<div class="dsc-field"><label>标签</label><input id="dscNovelTags" placeholder="例如：爱情"></div>' +
-                '<div class="dsc-field"><label>分类</label>' +
+                '<div class="dsc-field"><label>テーマ</label><input id="dscNovelTheme" placeholder="例：恋愛小説"></div>' +
+                '<div class="dsc-field"><label>タグ</label><input id="dscNovelTags" placeholder="例：恋愛"></div>' +
+                '<div class="dsc-field"><label>分類</label>' +
                 '<div class="dsc-custom-select">' +
                 '<button type="button" class="dsc-custom-select-btn" id="dscNovelGenreBtn">' +
                 '<span class="dsc-custom-select-label" id="dscNovelGenreLabel">都市</span>' +
                 '<span class="dsc-custom-select-arrow">▾</span>' +
                 '</button>' +
                 '<div class="dsc-custom-select-menu" id="dscNovelGenreMenu">' +
-                ['玄幻','仙侠','都市','历史','科幻','悬疑','言情','爱情','百合','少女','短文','微恐','暴恐','色情','虐恋','其他','爽文','女女','二人','情话','科技','语料','校园','教程','教学','美女','生活','大学','单人','异世','动漫','恐怖','黑暗','军事','游戏','其他']
+                ['玄幻','仙侠','都市','歴史','SF','ミステリー','言情','恋愛','百合','少女','短編','微ホラー','グロ','成人向け','激情恋愛','その他','爽文','女子同士','二人称','愛の言葉','テック','コーパス','学園','チュートリアル','教育','美女','生活','大学','単独','異世界','アニメ','ホラー','ダーク','軍事','ゲーム','その他']
                     .map(function (v) {
                         return '<div class="dsc-custom-select-item' + (v === '都市' ? ' selected' : '') + '" data-value="' + v + '">' + v + '</div>';
                     }).join('') +
                 '</div></div></div>' +
-                '<div class="dsc-field"><label>目标字数</label><input id="dscNovelChars" type="number" value="30000" min="5000" max="1000000" step="1000"></div>' +
-                '<div class="dsc-field full"><label>故事设定</label><textarea id="dscNovelStory" rows="3" placeholder="详细描述故事背景、主要人物、核心冲突、想要的结局走向等"></textarea></div>' +
+                '<div class="dsc-field"><label>目標文字数</label><input id="dscNovelChars" type="number" value="30000" min="5000" max="1000000" step="1000"></div>' +
+                '<div class="dsc-field full"><label>ストーリー設定</label><textarea id="dscNovelStory" rows="3" placeholder="物語の背景、主要人物、中心となる対立、望む結末などを詳しく記述"></textarea></div>' +
                 '</div>' +
                 '<div class="dsc-modal-footer">' +
-                '<button class="dsc-btn ghost" id="dscNovelCancel">取消</button>' +
-                '<button class="dsc-btn primary" id="dscNovelStart">🚀 开始创作</button>' +
+                '<button class="dsc-btn ghost" id="dscNovelCancel">キャンセル</button>' +
+                '<button class="dsc-btn primary" id="dscNovelStart">🚀 執筆を開始</button>' +
                 '</div></div>';
             document.body.appendChild(overlay);
 
@@ -3121,17 +3192,17 @@
         btn.id = 'dscToolModeBtn';
         btn.type = 'button';
         btn.className = 'dsc-switch-btn';
-        btn.title = '工具模式：AI 自主调用工具完成复杂任务（最多 50 亿轮）';
+        btn.title = 'ツールモード：AI が自律的にツールを呼び出して複雑なタスクを遂行（最大 50 億ラウンド）';
         btn.innerHTML = '<span class="ic">🔧</span>';
         if (panel) panel.appendChild(btn);
         else if (refNode && refNode.parentNode) refNode.parentNode.insertBefore(btn, refNode.nextSibling);
     }
 
     function levelDetail(level) {
-        if (level <= 10) return { name: '单轮', rounds: 1, cost: '1x', desc: '直接回答' };
-        if (level <= 25) return { name: '双轮', rounds: 2, cost: '~2.5x', desc: '回答 + 1 次反思' };
-        if (level <= 40) return { name: '三轮', rounds: 3, cost: '~4x', desc: '回答 + 2 次反思' };
-        return { name: '四轮', rounds: 4, cost: '~6x', desc: '回答 + 3 次反思' };
+        if (level <= 10) return { name: '単一ラウンド', rounds: 1, cost: '1x', desc: '直接回答' };
+        if (level <= 25) return { name: '二重ラウンド', rounds: 2, cost: '~2.5x', desc: '回答 + 1 回の反省' };
+        if (level <= 40) return { name: '三重ラウンド', rounds: 3, cost: '~4x', desc: '回答 + 2 回の反省' };
+        return { name: '四重ラウンド', rounds: 4, cost: '~6x', desc: '回答 + 3 回の反省' };
     }
     function levelTokens(level) {
         var maxTok = 8192 + (level - 1) * (120000 - 8192) / 49;
@@ -3148,8 +3219,8 @@
         if (info) {
             var tok = levelTokens(level);
             info.innerHTML =
-                '<div style="margin-bottom:4px;">🧠 ' + d.rounds + ' 轮 · max_tokens ≈ <span class="hl">' + tok.toLocaleString() + '</span></div>' +
-                '<div style="font-size:0.7rem;opacity:0.75;">' + d.desc + ' · 流式打字机输出</div>';
+                '<div style="margin-bottom:4px;">🧠 ' + d.rounds + ' ラウンド · max_tokens ≈ <span class="hl">' + tok.toLocaleString() + '</span></div>' +
+                '<div style="font-size:0.7rem;opacity:0.75;">' + d.desc + ' · ストリーミング出力</div>';
         }
         var btn = $('dscLevelBtn');
         if (btn) {
@@ -3167,7 +3238,7 @@
     }
 
     function openLevelDialog() {
-        if (!state.advancedMode) { toast('请先开启高级模式', 'info'); return; }
+        if (!state.advancedMode) { toast('先に上級モードをオンにしてください', 'info'); return; }
         var overlay = $('dscLevelOverlay'), range = $('dscLevelRange');
         if (!overlay || !range) return;
         state.tempLevel = state.reasoningLevel;
@@ -3186,7 +3257,7 @@
         try { localStorage.setItem('dsc_reasoningLevel', String(state.advancedLevel)); } catch (e) {}
         updateLevelUI(state.reasoningLevel);
         closeLevelDialog();
-        toast('🧩 推理等级 Lv.' + state.reasoningLevel, 'success');
+        toast('🧩 推論レベル Lv.' + state.reasoningLevel, 'success');
     }
 
     async function openSettings() {
@@ -3195,27 +3266,27 @@
             var data = await res.json();
             var ak = $('dscApiKeyInput'), ms = $('dscModelSelect'),
                 ik = $('dscImgKeyInput'), st = $('dscApiStatus');
-            if (ak) { ak.value = ''; ak.placeholder = data.hasKey ? '已保存，留空不修改' : 'sk-...'; }
+            if (ak) { ak.value = ''; ak.placeholder = data.hasKey ? '保存済み。空欄なら変更しません' : 'sk-...'; }
             if (ms) {
                 var wantModel = data.model || 'deepseek-flash';
                 ms.value = wantModel;
                 if (ms.value !== wantModel) {
                     var opt = document.createElement('option');
                     opt.value = wantModel;
-                    opt.textContent = wantModel + ' (来自配置)';
+                    opt.textContent = wantModel + ' (設定ファイル由来)';
                     ms.appendChild(opt);
                     ms.value = wantModel;
                 }
                 state.currentModel = ms.value || wantModel;
             }
-            if (ik) { ik.value = ''; ik.placeholder = data.hasImgKey ? '已保存，留空不修改' : '（可选）'; }
+            if (ik) { ik.value = ''; ik.placeholder = data.hasImgKey ? '保存済み。空欄なら変更しません' : '（任意）'; }
             if (st) {
-                st.textContent = data.hasKey ? '✅ API Key 已配置 · 当前模型: ' + (data.model || 'deepseek-flash') : '⚠️ 未配置 API Key';
+                st.textContent = data.hasKey ? '✅ API Key 設定済み · 現在のモデル: ' + (data.model || 'deepseek-flash') : '⚠️ API Key 未設定';
                 st.className = 'dsc-status ' + (data.hasKey ? 'ok' : '');
             }
         } catch (e) {
             var st2 = $('dscApiStatus');
-            if (st2) { st2.textContent = '读取配置失败'; st2.className = 'dsc-status err'; }
+            if (st2) { st2.textContent = '設定の読み込みに失敗'; st2.className = 'dsc-status err'; }
         }
         var overlay = $('dscSettingsOverlay');
         if (overlay) overlay.classList.add('open');
@@ -3235,12 +3306,12 @@
                 body: JSON.stringify({ apiKey: apiKey, model: model, imgKey: imgKey })
             });
             var data = await res.json();
-            if (!res.ok) throw new Error(data.error || '保存失败');
+            if (!res.ok) throw new Error(data.error || '保存に失敗しました');
             state.currentModel = model;
-            toast('设置已保存 · 模型: ' + model, 'success');
+            toast('設定を保存しました · モデル: ' + model, 'success');
             updateTitle();
             closeSettings();
-        } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+        } catch (e) { toast('保存に失敗: ' + e.message, 'error'); }
     }
 
     function autoResize() {
@@ -3284,9 +3355,9 @@
         updateAdvancedUI();
         updateLongTextUI();
     }
-    // ★ 修复：启动时以「后端配置文件」为唯一真值同步模型
-    // 旧逻辑只从 localStorage 读模型（默认 deepseek-v4-pro），从不与配置文件对齐，
-    // 导致配置里写 deepseek-flash、实际请求却发 deepseek-v4-pro。
+    // ★ 修正：起動時は「バックエンドの設定ファイル」を唯一の正としてモデルを同期
+    // 旧ロジックは localStorage からだけモデルを読み（既定 deepseek-v4-pro）、設定ファイルと一度も突き合わせなかったため、
+    // 設定に deepseek-flash と書いても実際のリクエストは deepseek-v4-pro で送られていた。
     var _modelSynced = false;
     async function syncModelFromConfig() {
         try {
@@ -3305,26 +3376,26 @@
                 if (ms.value !== cfgModel) {
                     var opt = document.createElement('option');
                     opt.value = cfgModel;
-                    opt.textContent = cfgModel + ' (来自配置)';
+                    opt.textContent = cfgModel + ' (設定ファイル由来)';
                     ms.appendChild(opt);
                     ms.value = cfgModel;
                 }
             }
             updateTitle();
             if (before !== cfgModel) {
-                console.log('[DSC] 模型已对齐配置: ' + before + ' -> ' + cfgModel);
+                console.log('[DSC] モデルを設定に合わせました: ' + before + ' -> ' + cfgModel);
             }
-        } catch (e) { console.log('[DSC] 同步模型配置失败:', e); }
+        } catch (e) { console.log('[DSC] モデルの設定同期に失敗:', e); }
     }
 
     // ============================================================
-    // 自定义模型管理
-    //   持久化：后端 ddsh/data/displaymodels/<模型名>.sts（一个模型一个文件）
-    //   浏览器 localStorage 仅作镜像缓存 / 后端不可用时的离线降级
+    // カスタムモデル管理
+    // 永続化：バックエンド ddsh/data/displaymodels/<モデル名>.sts（1 モデル 1 ファイル）
+    // ブラウザの localStorage はミラーキャッシュ専用 / バックエンド不通時のオフライン代替
     // ============================================================
     var CUSTOM_MODELS_KEY = 'dsc_custom_models';
-    var customModelsCache = null;      // null = 尚未初始化
-    var customModelsFromServer = false; // 后端是否已成功同步
+    var customModelsCache = null;      // null = まだ初期化されていません
+    var customModelsFromServer = false; // バックエンドの同期が成功したか
 
     function readCustomModelsLocal() {
         try {
@@ -3363,7 +3434,7 @@
         if (!ms || !name || hasModelOption(name)) return false;
         var opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = name + (isCustom ? '（自定义）' : '（来自配置）');
+        opt.textContent = name + (isCustom ? '（カスタム）' : '（設定ファイル由来）');
         ms.appendChild(opt);
         return true;
     }
@@ -3371,7 +3442,7 @@
         var ms = $('dscModelSelect');
         if (!ms) return;
         for (var i = ms.options.length - 1; i >= 0; i--) {
-            if (ms.options[i].textContent.indexOf('（自定义）') >= 0) ms.remove(i);
+            if (ms.options[i].textContent.indexOf('（カスタム）') >= 0) ms.remove(i);
         }
     }
     function renderModelHint() {
@@ -3383,7 +3454,7 @@
         h.innerHTML = '';
         var label = document.createElement('span');
         label.className = 'dsc-model-hint-label';
-        label.textContent = '已添加 ' + arr.length + ' 个：';
+        label.textContent = '追加済み ' + arr.length + ' 件：';
         h.appendChild(label);
         for (var i = 0; i < arr.length; i++) {
             (function (name) {
@@ -3392,7 +3463,7 @@
                 chip.appendChild(document.createTextNode(name));
                 var x = document.createElement('b');
                 x.textContent = '\u00d7';
-                x.title = '删除 ' + name;
+                x.title = '削除 ' + name;
                 x.onclick = function (ev) { if (ev) { ev.preventDefault(); ev.stopPropagation(); } removeCustomModel(name); };
                 chip.appendChild(x);
                 h.appendChild(chip);
@@ -3401,8 +3472,8 @@
         var tip = document.createElement('span');
         tip.className = 'dsc-model-hint-label';
         tip.style.opacity = '0.6';
-        tip.title = customModelsFromServer ? '数据目录：ddsh/data/displaymodels' : '后端未同步，当前仅本地缓存';
-        tip.textContent = customModelsFromServer ? '（已存入 data/displaymodels/*.sts）' : '（本地缓存，后端未同步）';
+        tip.title = customModelsFromServer ? 'データディレクトリ：ddsh/data/displaymodels' : 'バックエンド未同期、現在はローカルキャッシュのみ';
+        tip.textContent = customModelsFromServer ? '（data/displaymodels/*.sts に保存済み）' : '（ローカルキャッシュ、バックエンド未同期）';
         h.appendChild(tip);
     }
     function injectCustomModels() {
@@ -3414,7 +3485,7 @@
         clearCustomOptions();
         injectCustomModels();
     }
-    // 从后端拉取权威清单（ddsh/data/displaymodels/*.sts）
+    // バックエンドから正式な一覧を取得（ddsh/data/displaymodels/*.sts）
     function loadCustomModelsFromServer() {
         return fetch('/api/displaymodels', { method: 'GET', cache: 'no-cache' })
             .then(function (r) { return r.json(); })
@@ -3431,13 +3502,13 @@
                 }
                 setCustomModels(arr);
                 customModelsFromServer = true;
-                console.log('[DSC] 自定义模型已从后端同步: ' + arr.length + ' 个 @ ' + (d.dir || 'data/displaymodels'));
+                console.log('[DSC] カスタムモデルをバックエンドから同期: ' + arr.length + ' 件 @ ' + (d.dir || 'data/displaymodels'));
                 refreshCustomModelsUI();
                 return arr;
             })
             .catch(function (e) {
                 customModelsFromServer = false;
-                console.log('[DSC] 后端同步自定义模型失败，使用本地缓存:', e);
+                console.log('[DSC] カスタムモデルのバックエンド同期に失敗、ローカルキャッシュを使用:', e);
                 renderModelHint();
                 return getCustomModels();
             });
@@ -3448,18 +3519,18 @@
         var ms = $('dscModelSelect');
         if (ms) {
             for (var i = ms.options.length - 1; i >= 0; i--) {
-                if (ms.options[i].value === name && ms.options[i].textContent.indexOf('（自定义）') >= 0) ms.remove(i);
+                if (ms.options[i].value === name && ms.options[i].textContent.indexOf('（カスタム）') >= 0) ms.remove(i);
             }
         }
         renderModelHint();
-        toast('已移除自定义模型: ' + name, 'success');
+        toast('カスタムモデルを削除しました: ' + name, 'success');
         fetch('/api/displaymodels?id=' + encodeURIComponent(name), { method: 'DELETE' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (d && d.success) console.log('[DSC] 已删除模型文件: ' + name);
-                else toast('界面已移除，但删除 .sts 文件失败', 'error');
+                if (d && d.success) console.log('[DSC] モデルファイルを削除しました: ' + name);
+                else toast('画面からは削除しましたが、.sts ファイルの削除に失敗', 'error');
             })
-            .catch(function (e) { console.log('[DSC] 删除模型文件失败:', e); });
+            .catch(function (e) { console.log('[DSC] モデルファイルの削除に失敗:', e); });
     }
     function openModelAdd() {
         var row = $('dscModelAddRow'), inp = $('dscModelNewInput');
@@ -3475,18 +3546,18 @@
         var inp = $('dscModelNewInput'), ms = $('dscModelSelect');
         if (!inp || !ms) return;
         var name = inp.value.trim();
-        if (!name) { toast('请输入模型名称', 'error'); return; }
-        if (name.length > 120) { toast('模型名过长（最多 120 字）', 'error'); return; }
-        if (/\s/.test(name)) { toast('模型名不能包含空格', 'error'); return; }
-        if (hasModelOption(name)) { ms.value = name; closeModelAdd(); toast('该模型已在列表中，已选中', 'success'); return; }
-        // 先本地生效，UI 不阻塞
+        if (!name) { toast('モデル名を入力してください', 'error'); return; }
+        if (name.length > 120) { toast('モデル名が長すぎます（最大 120 字）', 'error'); return; }
+        if (/\s/.test(name)) { toast('モデル名に空白は使用できません', 'error'); return; }
+        if (hasModelOption(name)) { ms.value = name; closeModelAdd(); toast('そのモデルは既に一覧にあり、選択しました', 'success'); return; }
+        // 先にローカルで反映し、UI をブロックしない
         var arr = getCustomModels();
         if (arr.indexOf(name) < 0) { arr.push(name); setCustomModels(arr); }
         addModelOption(name, true);
         ms.value = name;
         renderModelHint();
         closeModelAdd();
-        // 再写入后端 .sts 文件（一个模型一个文件）
+        // その後バックエンドの .sts ファイルへ書き込む（1 モデル 1 ファイル）
         fetch('/api/displaymodels', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3497,14 +3568,14 @@
                   var f = (d.model && d.model.file) ? d.model.file : (name + '.sts');
                   customModelsFromServer = true;
                   renderModelHint();
-                  toast('已保存 ' + name + ' → data/displaymodels/' + f, 'success');
+                  toast('保存しました：' + name + ' → data/displaymodels/' + f, 'success');
               } else {
-                  toast('已加入界面，但写入文件失败：' + ((d && d.error) || '未知错误'), 'error');
+                  toast('画面には追加しましたが、ファイル書き込みに失敗：' + ((d && d.error) || '不明なエラー'), 'error');
               }
           })
           .catch(function (e) {
-              toast('已加入界面，但写入 .sts 失败（后端未编译？）', 'error');
-              console.log('[DSC] 保存模型失败:', e);
+              toast('画面には追加しましたが、.sts の書き込みに失敗（バックエンド未コンパイル？）', 'error');
+              console.log('[DSC] モデルの保存に失敗:', e);
           });
     }
     function bindModelAddUI() {
@@ -3536,8 +3607,9 @@
         updateSwitchBtn($('dscToolModeBtn'), state.enableTools);
     }
 
-    function cleanTextForTTS(text) {
+    function cleanTextForTTS(text, lang) {
         if (!text) return '';
+        lang = lang || detectTTSLang(text);
         text = text.replace(/```[\s\S]*?```/g, ' ');
         text = text.replace(/`[^`\n]*`/g, ' ');
         text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
@@ -3549,9 +3621,15 @@
         text = text.replace(/^\d+\.\s+/gm, '');
         text = text.replace(/^[-*=]{3,}\s*$/gm, ' ');
         text = text.replace(/^\|.*\|$/gm, ' ');
-        text = text.replace(/[\u3000-\u303F\u2018\u2019\u201C\u201D\u2014\u2013\u2026\u00B7]/g, ' ');
-        text = text.replace(/[\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65]/g, ' ');
-        text = text.replace(/[!-\/:-@\[-`{-~]/g, ' ');
+        if (lang === 'ja') {
+            // 日本語：句読点の 。、！？… は保持し、TTS の間が自然になるようにする（以前は記号としてすべて除去していた）
+            text = text.replace(/[\uFF3B\uFF3D\uFF5B\uFF5D\uFF5E\uFF3C\uFF0F\uFF3F]/g, ' ');
+            text = text.replace(/[!-\/:-@\[-`{-~]/g, ' ');
+        } else {
+            text = text.replace(/[\u3000-\u303F\u2018\u2019\u201C\u201D\u2014\u2013\u2026\u00B7]/g, ' ');
+            text = text.replace(/[\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65]/g, ' ');
+            text = text.replace(/[!-\/:-@\[-`{-~]/g, ' ');
+        }
         return text.replace(/\s+/g, ' ').trim();
     }
 
@@ -3564,33 +3642,44 @@
         return chunks;
     }
 
-    async function playTTSChunks(text, btnElement, originalText) {
+    async function fetchTTSBlob(text, lang) {
+        var lastErr = null;
+        for (var attempt = 0; attempt <= TTS_MAX_RETRY; attempt++) {
+            var res = await fetch('/api/ds-chat/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buildTTSBody(text, lang))
+            });
+            if (!res.ok) {
+                var errData = await res.json().catch(function () { return {}; });
+                lastErr = new Error(errData.error || 'TTS サービス応答: ' + res.status);
+                continue;
+            }
+            var blob = await res.blob();
+            if (blob && blob.size > 0) return blob;
+            lastErr = new Error('音声合成が空です（' + ttsVoiceFor(lang) + '）');
+        }
+        throw lastErr || new Error('TTS 失敗');
+    }
+
+    async function playTTSChunks(text, btnElement, originalText, lang) {
         var chunks = splitTextIntoChunks(text, TTS_CHUNK_SIZE);
         var total = chunks.length;
-        if (total === 0) { toast('没有可朗读的内容', 'info'); return; }
+        if (total === 0) { toast('読み上げる内容がありません', 'info'); return; }
 
         for (var i = 0; i < total; i++) {
             if (state.ttsCancelled) break;
             if (btnElement) {
-                btnElement.textContent = total > 1 ? ('⏸ 播放中 ' + (i + 1) + '/' + total) : '⏸ 播放中';
+                btnElement.textContent = total > 1 ? ('⏸ 再生中 ' + (i + 1) + '/' + total) : '⏸ 再生中';
             }
-            var res = await fetch('/api/ds-chat/tts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: chunks[i], voice: 'zh-CN-XiaoxiaoNeural' })
-            });
-            if (!res.ok) {
-                var errData = await res.json().catch(function () { return {}; });
-                throw new Error(errData.error || 'TTS 服务返回 ' + res.status);
-            }
-            var blob = await res.blob();
+            var blob = await fetchTTSBlob(chunks[i], lang);
             var url = URL.createObjectURL(blob);
             if (state.ttsCancelled) { URL.revokeObjectURL(url); break; }
             await new Promise(function (resolve, reject) {
                 var audio = new Audio(url);
                 state.currentAudio = audio;
                 audio.onended = function () { URL.revokeObjectURL(url); state.currentAudio = null; resolve(); };
-                audio.onerror = function () { URL.revokeObjectURL(url); state.currentAudio = null; reject(new Error('音频播放失败')); };
+                audio.onerror = function () { URL.revokeObjectURL(url); state.currentAudio = null; reject(new Error('音声の再生に失敗')); };
                 audio.play().catch(function (e) { URL.revokeObjectURL(url); state.currentAudio = null; reject(e); });
             });
         }
@@ -3600,28 +3689,29 @@
         if (state.currentSpeakBtn === btnElement) {
             state.ttsCancelled = true;
             if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
-            if (btnElement) { btnElement.textContent = '🔊 朗读'; btnElement.classList.remove('speaking'); }
+            if (btnElement) { btnElement.textContent = '🔊 読み上げ'; btnElement.classList.remove('speaking'); }
             state.currentSpeakBtn = null;
             return;
         }
         if (state.currentSpeakBtn) {
             state.ttsCancelled = true;
             if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
-            state.currentSpeakBtn.textContent = '🔊 朗读';
+            state.currentSpeakBtn.textContent = '🔊 読み上げ';
             state.currentSpeakBtn.classList.remove('speaking');
             state.currentSpeakBtn = null;
         }
-        var cleanedText = cleanTextForTTS(text);
-        if (!cleanedText) { toast('没有可朗读的内容', 'info'); return; }
+        var ttsLang = detectTTSLang(text);
+        var cleanedText = cleanTextForTTS(text, ttsLang);
+        if (!cleanedText) { toast('読み上げる内容がありません', 'info'); return; }
         state.ttsCancelled = false;
         state.currentSpeakBtn = btnElement;
-        var originalText = btnElement ? (btnElement.textContent || '🔊 朗读') : '🔊 朗读';
-        if (btnElement) { btnElement.textContent = '⏳ 加载...'; btnElement.classList.add('speaking'); }
+        var originalText = btnElement ? (btnElement.textContent || '🔊 読み上げ') : '🔊 読み上げ';
+        if (btnElement) { btnElement.textContent = '⏳ 読み込み中...'; btnElement.classList.add('speaking'); }
         try {
-            await playTTSChunks(cleanedText, btnElement, originalText);
+            await playTTSChunks(cleanedText, btnElement, originalText, ttsLang);
         } catch (err) {
-            console.error('[DSC] TTS 失败:', err);
-            toast('朗读失败: ' + err.message, 'error');
+            console.error('[DSC] TTS 失敗:', err);
+            toast('読み上げに失敗: ' + err.message, 'error');
         } finally {
             if (btnElement) {
                 btnElement.textContent = originalText;
@@ -3641,12 +3731,12 @@
         updateAdvancedUI();
         updateLevelUI(state.reasoningLevel);
         updateLongTextUI();
-        // ① 快照先上屏：同步渲染上一次的会话列表 + 最近一页消息（无需等网络）
+        // ① まずスナップショットを画面表示：前回のセッション一覧 + 直近 1 ページのメッセージを同期描画（ネットワークを待たない）
         paintFromSnapshot();
         try {
-            // ② 后台校真：先拉真实会话列表(后端已按 updatedAt 降序，最新在前)
+            // ② バックグラウンドで照合：実際のセッション一覧を取得（バックエンドが updatedAt 降順で並べ、最新が先頭）
             await loadSessions();
-            // ③ 修复：打开时始终切换到"最新会话"，不再停留在旧/最早的当前会话
+            // ③ 修正：開いたときは常に「最新セッション」へ切り替え、古い／最古の現在セッションに留まらない
             if (state.sessions.length > 0) {
                 state.currentSessionId = state.sessions[0].id;
                 await loadMessages();
@@ -3656,8 +3746,8 @@
             renderSessions();
             updateTitle();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
-        } catch (e) { console.error('[DSC] openApp 出错:', e); }
-        /* 不再自动聚焦，避免未点击就弹出输入法 */
+        } catch (e) { console.error('[DSC] openApp エラー:', e); }
+        /* 自動フォーカスを廃止し、未タップで入力メソッドが開くのを防ぐ */
     }
 
     function closeApp() {
@@ -3667,7 +3757,7 @@
         state.ttsCancelled = true;
         if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
         if (state.currentSpeakBtn) {
-            state.currentSpeakBtn.textContent = '🔊 朗读';
+            state.currentSpeakBtn.textContent = '🔊 読み上げ';
             state.currentSpeakBtn.classList.remove('speaking');
             state.currentSpeakBtn = null;
         }
@@ -3702,7 +3792,7 @@
         function bind(id, event, fn) {
             var el = $(id);
             if (el) el.addEventListener(event, fn);
-            else console.warn('[DSC] 未找到 #' + id);
+            else console.warn('[DSC] 見つかりません #' + id);
         }
 
         ensureAdvancedBtn();
@@ -3710,7 +3800,7 @@
         ensureNovelBtn();
         ensureToolModeBtn();
 
-        // 顶栏「更多」菜单（集成次要功能按钮）
+        // 上部バー「その他」メニュー（二次機能ボタンの集約）
         var moreBtn = $('dscMoreBtn');
         var moreMenu = $('dscMoreMenu');
         if (moreBtn && moreMenu) {
@@ -3742,7 +3832,7 @@
                 e.preventDefault(); e.stopPropagation();
                 if (ltDialogOpening) return;
                 ltDialogOpening = true;
-                simpleConfirm('📚 长文模式已下线', '因服务商限制，长文模式已下线，感谢理解。您可以使用「📖 小说模式」生成约 3 万字的长篇内容。').then(function () {
+                simpleConfirm('📚 長文モードは提供終了しました', 'サービス提供元の制限により、長文モードは終了しました。ご了承ください。「📖 小説モード」で約 3 万字の長編を生成できます。').then(function () {
                     ltDialogOpening = false;
                 });
             });
@@ -3756,7 +3846,7 @@
             state.enableTools = !state.enableTools;
             updateToolUI();
             saveToolState();
-            toast(state.enableTools ? '🤖 自主智能体已开启（最多 50 亿轮）' : '🤖 自主智能体已关闭', 'info');
+            toast(state.enableTools ? '🤖 自律エージェントをオンにしました（最大 50 億ラウンド）' : '🤖 自律エージェントをオフにしました', 'info');
         });
 
         bind('dscCloseBtn', 'click', closeApp);
@@ -3766,11 +3856,11 @@
 
         bind('dscBackupBtn', 'click', function () {
             if (state.backupRunning) {
-                toast('⏳ 备份正在进行，请稍候', 'info');
+                toast('⏳ バックアップ中です。お待ちください', 'info');
                 return;
             }
             state.backupRunning = true;
-            toast('📦 正在打包 data 与 imgs，请稍候…', 'info');
+            toast('📦 data と imgs をパッケージ化中です。お待ちください…', 'info');
             var url = '/api/backup?type=data&_t=' + Date.now();
             var a = document.createElement('a');
             a.href = url;
@@ -3781,7 +3871,7 @@
             setTimeout(function () {
                 if (a.parentNode) { a.parentNode.removeChild(a); }
                 state.backupRunning = false;
-                toast('✅ 备份已发起，请查看下载目录', 'success');
+                toast('✅ バックアップを開始しました。ダウンロードフォルダをご確認ください', 'success');
             }, 1500);
         });
         bind('dscSidebarToggle', 'click', toggleSidebar);
@@ -3791,7 +3881,7 @@
             state.webSearch = !state.webSearch;
             updateToolUI();
             saveToolState();
-            toast(state.webSearch ? '🌐 已开启联网搜索' : '🌐 已关闭联网搜索', 'info');
+            toast(state.webSearch ? '🌐 ウェブ検索をオンにしました' : '🌐 ウェブ検索をオフにしました', 'info');
         });
 
         bind('dscDeepThinkBtn', 'click', function () {
@@ -3803,7 +3893,7 @@
             }
             updateToolUI();
             saveToolState();
-            toast(state.deepThink ? '🧠 已开启深度思考' : '🧠 已关闭深度思考', 'info');
+            toast(state.deepThink ? '🧠 深い思考をオンにしました' : '🧠 深い思考をオフにしました', 'info');
         });
 
         bind('dscLevelBtn', 'click', openLevelDialog);
@@ -3879,7 +3969,7 @@
                     }
                     copyToClipboard(rawCode);
                     var orig = codeBtn.textContent;
-                    codeBtn.textContent = '✅ 已复制';
+                    codeBtn.textContent = '✅ コピーしました';
                     codeBtn.classList.add('copied');
                     setTimeout(function () { codeBtn.textContent = orig; codeBtn.classList.remove('copied'); }, 1600);
                     return;
@@ -3899,7 +3989,7 @@
                     if (m) {
                         copyToClipboard(m.content || '');
                         var orig2 = copyBtn.textContent;
-                        copyBtn.textContent = '✅ 已复制';
+                        copyBtn.textContent = '✅ コピーしました';
                         copyBtn.classList.add('copied');
                         setTimeout(function () { copyBtn.textContent = orig2; copyBtn.classList.remove('copied'); }, 1600);
                     }
@@ -4024,14 +4114,14 @@
         var inputEl = $('dscInput');
         if (inputEl) {
             inputEl.addEventListener('input', autoResize);
-            inputEl.addEventListener('focus', function () { inputEl.placeholder = '发消息'; });
+            inputEl.addEventListener('focus', function () { inputEl.placeholder = 'メッセージを送信'; });
             inputEl.addEventListener('blur', function () {
-                if (inputEl.value.trim() === '') inputEl.placeholder = '发消息或按住说话';
+                if (inputEl.value.trim() === '') inputEl.placeholder = 'メッセージを送信、または長押しで話す';
             });
             inputEl.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
                     e.preventDefault();
-                    if (state.isSending) return;   // 生成中回车不重复发送，终止请点按钮
+                    if (state.isSending) return;   // 生成中は Enter でも再送信しない。停止はボタンをタップ
                     sendMessage();
                 }
             });
@@ -4070,7 +4160,7 @@
     }
     
 // ============================================================
-// 全局会话全文搜索（内存缓存 + 游标分页 + 滚动加载）
+// 全セッション全文検索（メモリキャッシュ + カーソルページング + スクロール読み込み）
 // ============================================================
 
 var searchState = {
@@ -4099,18 +4189,18 @@ function buildSearchOverlay() {
             '<div class="dsc-search-head">' +
                 '<div class="dsc-search-input-wrap">' +
                     '<span class="dsc-search-icon">🔍</span>' +
-                    '<input type="text" id="dscGlobalSearchInput" placeholder="搜索所有会话的消息内容…" autocomplete="off">' +
+                    '<input type="text" id="dscGlobalSearchInput" placeholder="すべてのセッションのメッセージを検索…" autocomplete="off">' +
                     '<button class="dsc-search-clear" id="dscGlobalSearchClear" type="button">✕</button>' +
                 '</div>' +
-                '<button class="dsc-search-close" id="dscGlobalSearchClose" type="button" title="关闭">✕</button>' +
+                '<button class="dsc-search-close" id="dscGlobalSearchClose" type="button" title="閉じる">✕</button>' +
             '</div>' +
             '<div class="dsc-search-party">' +
-                '<button class="dsc-search-party-btn active" data-party="all">全部</button>' +
+                '<button class="dsc-search-party-btn active" data-party="all">すべて</button>' +
                 '<button class="dsc-search-party-btn" data-party="user">User</button>' +
                 '<button class="dsc-search-party-btn" data-party="assistant">DeepSeek</button>' +
             '</div>' +
             '<div class="dsc-search-body" id="dscGlobalSearchBody">' +
-                '<div class="dsc-search-hint">输入关键词，搜索你的所有历史会话</div>' +
+                '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>' +
             '</div>' +
         '</div>';
     document.body.appendChild(ov);
@@ -4127,7 +4217,7 @@ function buildSearchOverlay() {
         searchState.input.value = '';
         searchState.query = '';
         resetSearchState();
-        searchState.body.innerHTML = '<div class="dsc-search-hint">输入关键词，搜索你的所有历史会话</div>';
+        searchState.body.innerHTML = '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>';
         searchState.input.focus();
     });
 
@@ -4149,7 +4239,7 @@ function buildSearchOverlay() {
         clearTimeout(searchState.timer);
         if (!v) {
             resetSearchState();
-            searchState.body.innerHTML = '<div class="dsc-search-hint">输入关键词，搜索你的所有历史会话</div>';
+            searchState.body.innerHTML = '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>';
             return;
         }
         searchState.timer = setTimeout(function () {
@@ -4162,7 +4252,7 @@ function buildSearchOverlay() {
         if (e.key === 'Escape') closeGlobalSearch();
     });
 
-    // 滚动到底自动加载下一页
+    // 最下部までスクロールすると次ページを自動読み込み
     searchState.body.addEventListener('scroll', function () {
         if (!searchState.hasMore || searchState.loading) return;
         var b = searchState.body;
@@ -4204,10 +4294,10 @@ async function doGlobalSearch(q, append) {
     searchState.loading = true;
 
     if (!append) {
-        searchState.body.innerHTML = '<div class="dsc-search-hint">搜索中…</div>';
+        searchState.body.innerHTML = '<div class="dsc-search-hint">検索中…</div>';
     } else {
         var more = document.getElementById('dscSearchMore');
-        if (more) more.textContent = '加载中…';
+        if (more) more.textContent = '読み込み中…';
     }
 
     try {
@@ -4217,7 +4307,7 @@ async function doGlobalSearch(q, append) {
                   '&limit=' + searchState.limit;
         var res = await fetch(url, { cache: 'no-store' });
         var data = await res.json();
-        if (!data.ok) throw new Error(data.error || '搜索失败');
+        if (!data.ok) throw new Error(data.error || '検索に失敗');
 
         searchState.total = data.total || 0;
         searchState.hasMore = !!data.hasMore;
@@ -4227,11 +4317,11 @@ async function doGlobalSearch(q, append) {
     } catch (e) {
         if (!append) {
             searchState.body.innerHTML =
-                '<div class="dsc-search-hint" style="color:#ef4444;">搜索失败：' +
+                '<div class="dsc-search-hint" style="color:#ef4444;">検索に失敗：' +
                 escapeHtml(e.message || String(e)) + '</div>';
         } else {
             var more = document.getElementById('dscSearchMore');
-            if (more) more.textContent = '加载失败，滚动可重试';
+            if (more) more.textContent = '読み込み失敗。スクロールで再試行できます';
         }
     } finally {
         searchState.loading = false;
@@ -4247,14 +4337,14 @@ function renderSearchHits(data, q, append) {
         searchState.body.innerHTML = '';
 
         if (searchState.total === 0) {
-            searchState.body.innerHTML = '<div class="dsc-search-hint">没有找到匹配的消息</div>';
+            searchState.body.innerHTML = '<div class="dsc-search-hint">一致するメッセージが見つかりません</div>';
             return;
         }
 
         var totalEl = document.createElement('div');
         totalEl.className = 'dsc-search-total';
-        totalEl.textContent = '共 ' + searchState.total + ' 条命中' +
-            (searchState.total > searchState.limit ? '（滚动加载更多）' : '');
+        totalEl.textContent = '全 ' + searchState.total + ' 件ヒット' +
+            (searchState.total > searchState.limit ? '（スクロールでさらに読み込み）' : '');
         searchState.body.appendChild(totalEl);
     }
 
@@ -4266,7 +4356,7 @@ function renderSearchHits(data, q, append) {
 
             var titleEl = document.createElement('div');
             titleEl.className = 'dsc-search-group-title';
-            titleEl.textContent = h.title || h.sessionId || '未命名会话';
+            titleEl.textContent = h.title || h.sessionId || '無題のセッション';
             gEl.appendChild(titleEl);
 
             var listEl = document.createElement('div');
@@ -4336,13 +4426,13 @@ function updateSearchMoreIndicator() {
         var more = document.createElement('div');
         more.id = 'dscSearchMore';
         more.className = 'dsc-search-more';
-        more.textContent = searchState.loading ? '加载中…' : '滚动加载更多…';
+        more.textContent = searchState.loading ? '読み込み中…' : 'スクロールでさらに読み込み…';
         searchState.body.appendChild(more);
     } else if (searchState.total > 0) {
         var endEl = document.createElement('div');
         endEl.id = 'dscSearchEnd';
         endEl.className = 'dsc-search-end';
-        endEl.textContent = '— 已经到底了 —';
+        endEl.textContent = '— ここが最後です —';
         searchState.body.appendChild(endEl);
     }
 }
@@ -4370,7 +4460,7 @@ function highlightSnippet(snippet, q) {
     }
 }
 
-// 点击命中 → 打开会话 → 滚动到目标消息 → 高亮
+// ヒットをタップ → セッションを開く → 対象メッセージへスクロール → ハイライト
 async function locateMessage(sessionId, messageId, keyword) {
     try {
         if (state.currentSessionId !== sessionId) {
@@ -4382,7 +4472,7 @@ async function locateMessage(sessionId, messageId, keyword) {
             if (state.messages[i].id === messageId) { idx = i; break; }
         }
         if (idx === -1) {
-            showCenterError('无法在当前会话中找到这条消息');
+            showCenterError('このセッション内で該当メッセージが見つかりません');
             return;
         }
 
@@ -4397,11 +4487,11 @@ async function locateMessage(sessionId, messageId, keyword) {
 
         var el = document.querySelector('.dsc-msg[data-idx="' + idx + '"]');
         if (!el) {
-            showCenterError('定位失败：目标消息尚未渲染');
+            showCenterError('ジャンプ失敗：対象メッセージが未描画です');
             return;
         }
 
-        // 清除上一次高亮
+        // 前回のハイライトを解除
         document.querySelectorAll('.dsc-msg-highlight').forEach(function (n) {
             n.classList.remove('dsc-msg-highlight');
         });
@@ -4418,8 +4508,8 @@ async function locateMessage(sessionId, messageId, keyword) {
         setTimeout(function () { el.classList.remove('dsc-msg-highlight'); }, 3200);
         if (keyword) highlightInElement(el, keyword);
     } catch (e) {
-        console.error('[DSC] locateMessage 失败:', e);
-        showCenterError('定位异常：' + (e.message || e));
+        console.error('[DSC] locateMessage 失敗:', e);
+        showCenterError('ジャンプエラー：' + (e.message || e));
     }
 }
 
@@ -4456,7 +4546,7 @@ function highlightInElement(root, keyword) {
 }
 
 
-    // ==================== 角色扮演（Cosplay）====================
+    // ==================== ロールプレイ（Cosplay）====================
     var cosplayState = { enabled: false, thinkingStyle: 'neutral', activeRole: '', roles: [] };
     var cosplayEditingId = '';
 
@@ -4497,11 +4587,11 @@ function highlightInElement(root, keyword) {
         if (!el) return;
         var role = cosplayFindRole(cosplayState.activeRole);
         if (!role) {
-            el.textContent = '未选择角色';
+            el.textContent = 'キャラクター未選択';
             el.className = 'dsc-cosplay-status';
             return;
         }
-        el.textContent = (cosplayState.enabled ? '✅ 正在扮演：' : '⏸ 已暂停（未启用）：') +
+        el.textContent = (cosplayState.enabled ? '✅ 演じています：' : '⏸ 停止中（未使用）：') +
             (role.emoji || '🎭') + ' ' + role.name;
         el.className = 'dsc-cosplay-status' + (cosplayState.enabled ? ' on' : '');
     }
@@ -4513,7 +4603,7 @@ function highlightInElement(root, keyword) {
         if (!cosplayState.roles.length) {
             var empty = document.createElement('div');
             empty.className = 'dsc-cosplay-empty';
-            empty.textContent = '角色库是空的，点「＋ 新建角色」创建一个吧';
+            empty.textContent = 'キャラクターが登録されていません。「＋ キャラクターを新規作成」から作成してください';
             box.appendChild(empty);
             return;
         }
@@ -4529,7 +4619,7 @@ function highlightInElement(root, keyword) {
             if (r.id === cosplayState.activeRole) {
                 var badge = document.createElement('span');
                 badge.className = 'dsc-cosplay-badge';
-                badge.textContent = '当前';
+                badge.textContent = '現在';
                 nameEl.appendChild(badge);
             }
             var descEl = document.createElement('div');
@@ -4544,18 +4634,18 @@ function highlightInElement(root, keyword) {
 
             var bUse = document.createElement('button');
             bUse.className = 'dsc-btn ghost dsc-cosplay-mini';
-            bUse.textContent = r.id === cosplayState.activeRole ? '✓ 已选' : '选择';
+            bUse.textContent = r.id === cosplayState.activeRole ? '✓ 選択済み' : '選択';
             bUse.disabled = (r.id === cosplayState.activeRole);
             bUse.onclick = function () { cosplaySetActive(r.id); };
 
             var bEdit = document.createElement('button');
             bEdit.className = 'dsc-btn ghost dsc-cosplay-mini';
-            bEdit.textContent = '编辑';
+            bEdit.textContent = '編集';
             bEdit.onclick = function () { cosplayOpenEditor(r.id); };
 
             var bDel = document.createElement('button');
             bDel.className = 'dsc-btn ghost dsc-cosplay-mini danger';
-            bDel.textContent = '删除';
+            bDel.textContent = '削除';
             bDel.onclick = function () { cosplayRemove(r.id, r.name); };
 
             acts.appendChild(bUse);
@@ -4581,18 +4671,18 @@ function highlightInElement(root, keyword) {
         });
         var data = {};
         try { data = await res.json(); } catch (e) { data = {}; }
-        if (!res.ok) throw new Error(data.error || ('请求失败 ' + res.status));
+        if (!res.ok) throw new Error(data.error || ('リクエスト失敗 ' + res.status));
         if (data.state) cosplayApplyState(data.state);
         return data;
     }
 
     async function openCosplayDialog() {
         var overlay = $('dscCosplayOverlay');
-        if (!overlay) { toast('角色扮演面板未加载', 'error'); return; }
+        if (!overlay) { toast('ロールプレイパネルが未読み込み', 'error'); return; }
         closeCosplayEditor();
         overlay.classList.add('open');
         var st = $('dscCosplayStatus');
-        if (st) { st.textContent = '加载中…'; st.className = 'dsc-cosplay-status'; }
+        if (st) { st.textContent = '読み込み中…'; st.className = 'dsc-cosplay-status'; }
         try {
             var res = await fetch('/api/ds-cosplay?_t=' + Date.now());
             var data = await res.json();
@@ -4600,10 +4690,10 @@ function highlightInElement(root, keyword) {
             cosplayApplyState(data.state);
         } catch (e) {
             if (st) {
-                st.textContent = '⚠️ 读取角色库失败：' + e.message;
+                st.textContent = '⚠️ キャラクターの読み込みに失敗：' + e.message;
                 st.className = 'dsc-cosplay-status err';
             }
-            toast('读取角色库失败：' + e.message, 'error');
+            toast('キャラクターの読み込みに失敗：' + e.message, 'error');
         }
     }
 
@@ -4640,18 +4730,18 @@ function highlightInElement(root, keyword) {
         try {
             await cosplayRequest('setActiveRole', { id: id });
             var r = cosplayFindRole(id);
-            toast('🎭 已选择角色：' + (r ? r.name : id), 'success');
+            toast('🎭 キャラクターを選択しました：' + (r ? r.name : id), 'success');
         } catch (e) {
-            toast('切换角色失败：' + e.message, 'error');
+            toast('キャラクターの切替に失敗：' + e.message, 'error');
         }
     }
 
     async function cosplayToggleEnabled(on) {
         try {
             await cosplayRequest('setEnabled', { enabled: !!on });
-            toast(on ? '🎭 角色扮演已开启' : '⏸ 角色扮演已关闭', on ? 'success' : 'info');
+            toast(on ? '🎭 ロールプレイをオンにしました' : '⏸ ロールプレイをオフにしました', on ? 'success' : 'info');
         } catch (e) {
-            toast('切换失败：' + e.message, 'error');
+            toast('切り替えに失敗：' + e.message, 'error');
             var en = $('dscCosplayEnabled');
             if (en) en.checked = !on;
         }
@@ -4660,15 +4750,15 @@ function highlightInElement(root, keyword) {
     async function cosplaySetStyle(style) {
         try {
             await cosplayRequest('setThinkingStyle', { style: style === 'role' ? 'role' : 'neutral' });
-            toast(style === 'role' ? '🎭 思考风格：角色沉浸' : '🧠 思考风格：中性', 'info');
+            toast(style === 'role' ? '🎭 思考スタイル：キャラ没入' : '🧠 思考スタイル：ニュートラル', 'info');
         } catch (e) {
-            toast('保存思考风格失败：' + e.message, 'error');
+            toast('思考スタイルの保存に失敗：' + e.message, 'error');
         }
     }
 
     async function cosplaySaveRole() {
         var name = cosplayVal('dscCosplayName');
-        if (!name) { toast('请先填写角色名', 'error'); return; }
+        if (!name) { toast('先にキャラクター名を入力してください', 'error'); return; }
         var card = {
             name: name,
             emoji: cosplayVal('dscCosplayEmoji'),
@@ -4682,21 +4772,21 @@ function highlightInElement(root, keyword) {
         if (cosplayEditingId) card.id = cosplayEditingId;
         try {
             await cosplayRequest('upsertRole', { card: card });
-            toast('✅ 角色已保存', 'success');
+            toast('✅ キャラクターを保存しました', 'success');
             closeCosplayEditor();
         } catch (e) {
-            toast('保存角色失败：' + e.message, 'error');
+            toast('キャラクターの保存に失敗：' + e.message, 'error');
         }
     }
 
     async function cosplayRemove(id, name) {
-        var ok = await simpleConfirm('删除角色', '确定删除「' + (name || id) + '」吗？此操作不可恢复。');
+        var ok = await simpleConfirm('キャラクターを削除', '「' + (name || id) + '」を削除しますか？この操作は元に戻せません。');
         if (!ok) return;
         try {
             await cosplayRequest('removeRole', { id: id });
-            toast('🗑 角色已删除', 'success');
+            toast('🗑 キャラクターを削除しました', 'success');
         } catch (e) {
-            toast('删除失败：' + e.message, 'error');
+            toast('削除に失敗しました：' + e.message, 'error');
         }
     }
 
@@ -4704,7 +4794,7 @@ function highlightInElement(root, keyword) {
         function on(id, ev, fn) {
             var el = $(id);
             if (el) el.addEventListener(ev, fn);
-            else console.warn('[DSC] 未找到 #' + id);
+            else console.warn('[DSC] 見つかりません #' + id);
         }
         on('dscCosplayBtn', 'click', function (e) {
             e.preventDefault();
@@ -4730,11 +4820,11 @@ function highlightInElement(root, keyword) {
             });
         }
     }
-    // ==================== 角色扮演（Cosplay）结束 ====================
+    // ==================== ロールプレイ（Cosplay）ここまで ====================
 
     function init() {
         var app = $('deepseekChatApp');
-        if (!app) { console.error('[DSC] 找不到容器'); return; }
+        if (!app) { console.error('[DSC] コンテナが見つかりません'); return; }
         try {
             loadMathJax();
             ensureAdvancedBtn();
@@ -4746,21 +4836,21 @@ function highlightInElement(root, keyword) {
             bindEvents();
             loadToolState();
             bindModelAddUI();
-            injectCustomModels(); // 先用本地缓存即时注入（避免闪烁）
+            injectCustomModels(); // まずローカルキャッシュで即時注入（ちらつき防止）
             loadCustomModelsFromServer().then(function () {
-                // 后端 data/displaymodels/*.sts 是权威来源，回来后刷新下拉与提示
+                // バックエンドの data/displaymodels/*.sts が正式な出典。取得後にドロップダウンとヒントを更新
                 syncModelFromConfig();
             });
             window.openDeepSeekChat = openApp;
             window.closeDeepSeekChat = closeApp;
-            // 空闲预热：提前打热服务端会话缓存与浏览器缓存，点开时首包更小更快
+            // アイドル時の予熱：事前にサーバー側のセッションキャッシュとブラウザキャッシュを温め、開いたときの初回パケットを小さく速くする
             var warm = function () {
                 try { fetch('/api/ds-chat/sessions', { cache: 'no-cache' }).catch(function () {}); } catch (e) {}
             };
             if (window.requestIdleCallback) { requestIdleCallback(warm, { timeout: 2000 }); }
             else { setTimeout(warm, 800); }
-            console.log('[DSC] ✅ v8 初始化完成（快照秒开 / 极速打字 / 弹窗可视化 / 5万轮工具模式）');
-        } catch (e) { console.error('[DSC] 初始化失败:', e); }
+            console.log('[DSC] ✅ v8 初期化完了（スナップショット即表示 / 高速タイピング / ポップアップ可視化 / 5万ラウンドのツールモード）');
+        } catch (e) { console.error('[DSC] 初期化に失敗:', e); }
     }
 
     if (document.readyState === 'loading') {

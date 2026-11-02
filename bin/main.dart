@@ -192,11 +192,11 @@ void main(List<String> args) {
   // 就会以 255 退出码杀死整个服务。
   runZonedGuarded<void>(() {
     _serveMain(args).catchError((Object e, StackTrace st) {
-      logp('❌ 服务主流程异常: $e');
+      logp('❌ サービス本体で例外が発生しました: $e');
       if (Platform.environment['DSH_DEBUG'] == '1') stderr.writeln(st);
     });
   }, (Object e, StackTrace st) {
-    logp('⚠️ 未捕获异步异常（已忽略，服务继续运行）: $e');
+    logp('⚠️ 捕捉されない非同期例外（無視してサービスを継続します）: $e');
     if (Platform.environment['DSH_DEBUG'] == '1') stderr.writeln(st);
   });
 }
@@ -239,12 +239,12 @@ Future<void> _serveMain(List<String> args) async {
       break;
     } catch (e) {
       lastErr = e;
-      if (i == 0) logp('⚠️ 端口 $port 暂不可用，正在重试：$e');
+      if (i == 0) logp('⚠️ ポート $port が使用できません。再試行します: $e');
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
   }
   if (server == null) {
-    logp('❌ 服务器启动失败（已重试 10 次）: $lastErr');
+    logp('❌ サーバーの起動に失敗しました（10 回再試行済み）: $lastErr');
     exit(1);
   }
   // ★ 必须关闭自动 gzip 压缩：Dart 的 autoCompress 会把 SSE 响应也纳入压缩，
@@ -254,7 +254,7 @@ Future<void> _serveMain(List<String> args) async {
   server.autoCompress = false;
   server.idleTimeout = const Duration(seconds: 120);
 
-  logp('✅ 服务器已启动，访问 http://localhost:$PORT/');
+  logp('✅ サーバーが起動しました。http://localhost:$PORT/ でアクセスできます');
 
   await for (final req in server) {
     // 每个请求独立处理，单请求异常不影响服务
@@ -262,9 +262,9 @@ Future<void> _serveMain(List<String> args) async {
       try {
         await dispatch(req);
       } catch (e, st) {
-        logp('❌ 请求处理异常 ${req.method} ${req.uri.path}: $e');
+        logp('❌ リクエスト処理で例外が発生しました ${req.method} ${req.uri.path}: $e');
         try {
-          await errJson(req.response, 500, '服务器内部错误');
+          await errJson(req.response, 500, 'サーバー内部エラー');
         } catch (_) {
           try {
             await req.response.close();

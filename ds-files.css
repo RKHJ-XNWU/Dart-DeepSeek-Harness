@@ -1,4 +1,4 @@
-/* ds-files.css - DeepSeek 文件管理样式（支持所有文件类型） */
+/* ds-files.css - DeepSeek ファイル管理样式（支持所有文件类型） */
 
 .dsc-files-panel {
     position: absolute;
@@ -11,7 +11,7 @@
     border-left: 1px solid #e5e7eb;
     z-index: 20;
     transform: translateX(100%);
-    /* 关闭态：不接收点击、不参与焦点遍历，避免隐藏面板造成任何可交互区域 */
+    /* 閉状態：クリックを受けず、フォーカス走査にも参加せず、隠れたパネルが操作可能領域を作らないようにする */
     visibility: hidden;
     pointer-events: none;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s;
@@ -54,7 +54,7 @@
 }
 .dsc-files-close:hover { color: #ef4444; border-color: #fecaca; }
 
-/* 上传区 */
+/* アップロード領域 */
 .dsc-files-upload {
     padding: 12px 14px;
     border-bottom: 1px solid #ffffff;
@@ -92,7 +92,7 @@
 }
 .dsc-upload-zone input[type="file"] { display: none; }
 
-/* 分类筛选 */
+/* 分類フィルタ */
 .dsc-files-filter {
     display: flex;
     gap: 6px;
@@ -308,7 +308,7 @@
     opacity: 0.6;
 }
 
-/* 上传进度 */
+/* アップロード進捗 */
 .dsc-upload-progress {
     padding: 10px 14px;
     border-top: 1px solid #e5e7eb;
@@ -344,7 +344,7 @@
     justify-content: space-between;
 }
 
-/* 图片生成面板 */
+/* 画像生成パネル */
 .dsc-gen-panel {
     padding: 12px 14px;
     border-bottom: 1px solid #ffffff;
@@ -398,7 +398,7 @@
 }
 .dsc-gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* 附件预览条 */
+/* 添付プレビューバー */
 .dsc-attach-bar {
     display: none;
     padding: 6px 12px 0;
@@ -466,7 +466,7 @@
     white-space: nowrap;
 }
 
-/* 移动端 */
+/* モバイル */
 @media (max-width: 720px) {
     .dsc-files-panel {
         width: 100%;

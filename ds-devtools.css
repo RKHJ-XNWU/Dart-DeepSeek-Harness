@@ -1,5 +1,5 @@
 /* ============================================================
-   ds-devtools.css  ——  开发者工具（注入提示词）
+   ds-devtools.css  ——  開発者ツール（プロンプトを注入）
    ============================================================ */
 
 .dsdt-overlay {
@@ -34,7 +34,7 @@
     to   { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-/* ===== 头部 ===== */
+/* ===== ヘッダー ===== */
 .dsdt-header {
     display: flex; align-items: center; gap: 10px;
     padding: 14px 16px;
@@ -67,7 +67,7 @@
 .dsdt-close:hover { background: #fef2f2; border-color: #fecaca; color: #ef4444; }
 .dsdt-close:active { transform: scale(0.94); }
 
-/* ===== 警告条 ===== */
+/* ===== 警告バー ===== */
 .dsdt-warn {
     display: flex;
     align-items: flex-start;
@@ -85,7 +85,7 @@
 .dsdt-warn .ic { font-size: 1rem; line-height: 1.2; flex-shrink: 0; }
 .dsdt-warn b { color: #7c2d12; }
 
-/* ===== 主体 ===== */
+/* ===== 本体 ===== */
 .dsdt-body {
     flex: 1;
     overflow-y: auto;
@@ -95,7 +95,7 @@
 .dsdt-body::-webkit-scrollbar { width: 5px; }
 .dsdt-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
-/* ===== 入口按钮 ===== */
+/* ===== 入口ボタン ===== */
 .dsdt-enter-btn {
     width: 100%;
     padding: 18px 18px;
@@ -131,7 +131,7 @@
     line-height: 1.7;
 }
 
-/* ===== 已注入横幅 ===== */
+/* ===== 注入済みバナー ===== */
 .dsdt-active-banner {
     display: flex;
     align-items: center;
@@ -148,7 +148,7 @@
 .dsdt-active-banner .ic { font-size: 1rem; }
 .dsdt-active-banner b { color: #047857; }
 
-/* ===== 工具条 ===== */
+/* ===== ツールバー ===== */
 .dsdt-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -213,7 +213,7 @@
 }
 .dsdt-item:hover { background: #f5f5ff; border-color: #c7d2fe; }
 
-/* 已注入状态 */
+/* 注入済み状態 */
 .dsdt-item.injected {
     background: linear-gradient(135deg, #ecfdf5, #d1fae5);
     border-color: #10b981;
@@ -224,7 +224,7 @@
     border-color: #059669;
 }
 
-/* 多选模式勾选 */
+/* 複数選択モードのチェック */
 .dsdt-item.checked {
     background: #eef2ff;
     border-color: #a5b4fc;
@@ -330,7 +330,7 @@
 .dsdt-icon-btn.danger { color: #ef4444; }
 .dsdt-icon-btn.danger:hover { background: #fef2f2; border-color: #fecaca; }
 
-/* ===== 空状态 ===== */
+/* ===== 空状態 ===== */
 .dsdt-empty {
     text-align: center;
     padding: 42px 16px;
@@ -344,7 +344,7 @@
     margin-bottom: 10px;
 }
 
-/* ===== 编辑表单 ===== */
+/* ===== 編集フォーム ===== */
 .dsdt-field {
     display: flex;
     flex-direction: column;
@@ -385,7 +385,7 @@
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
 
-/* ===== 底部按钮 ===== */
+/* ===== 下部ボタン ===== */
 .dsdt-footer {
     display: flex;
     gap: 8px;
@@ -396,7 +396,7 @@
     flex-shrink: 0;
 }
 
-/* ===== 移动端 ===== */
+/* ===== モバイル ===== */
 @media (max-width: 520px) {
     .dsdt-overlay { padding: 10px; }
     .dsdt-modal { max-height: 90vh; border-radius: 14px; }

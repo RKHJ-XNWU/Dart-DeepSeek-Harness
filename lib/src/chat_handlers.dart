@@ -55,7 +55,7 @@ Future<void> handleDsChatConfig(HttpRequest req) async {
       try {
         body = await readJsonBody(req);
       } catch (_) {
-        await dsJSONErr(res, 400, '无效请求体');
+        await dsJSONErr(res, 400, '無効なリクエストボディです');
         return;
       }
       final old = getDsConfig();
@@ -63,7 +63,7 @@ Future<void> handleDsChatConfig(HttpRequest req) async {
       final nm = trimOr(mStr(body, 'model'), old.model);
       final nik = trimOr(mStr(body, 'imgKey'), old.imgKey);
       if (!saveDsConfig(nk, nm, nik)) {
-        await dsJSONErr(res, 500, '保存失败');
+        await dsJSONErr(res, 500, '保存に失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {'success': true});
@@ -106,15 +106,15 @@ Future<void> handleDsChatSessions(HttpRequest req) async {
         body = <String, dynamic>{};
       }
       var id = mStr(body, 'id');
-      final title = trimOr(mStr(body, 'title'), '新对话');
+      final title = trimOr(mStr(body, 'title'), '新しい会話');
       if (id.trim().isNotEmpty) {
         final sess = getDsSession(id);
         if (sess == null) {
-          await dsJSONErr(res, 404, '会话不存在');
+          await dsJSONErr(res, 404, 'セッションが存在しません');
           return;
         }
         if (!updateDsSession(id, title, rfc3339(DateTime.now()))) {
-          await dsJSONErr(res, 500, '重命名失败');
+          await dsJSONErr(res, 500, '名前の変更に失敗しました');
           return;
         }
         await dsJSONOk(res, 200, {'success': true, 'id': id, 'title': title});
@@ -129,7 +129,7 @@ Future<void> handleDsChatSessions(HttpRequest req) async {
         updatedAt: rfc3339(now),
       );
       if (!saveDsSession(sess)) {
-        await dsJSONErr(res, 500, '创建失败');
+        await dsJSONErr(res, 500, '作成に失敗しました');
         return;
       }
       await dsJSONOk(res, 200, {'success': true, 'session': sess.toJson()});
@@ -160,7 +160,7 @@ Future<void> handleDsChatSessionsBatchDelete(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final ids = asList(body['ids']).map((e) => '$e').toList();
@@ -331,7 +331,7 @@ Future<void> handleDsChatTest(HttpRequest req) async {
   if (model.isEmpty) model = DS_DEFAULT_MODEL;
   try {
     final r = await callDsChatAPI(apiKey, model, [
-      {'role': 'user', 'content': '你好'}
+      {'role': 'user', 'content': 'こんにちは'}
     ], 8192, 1.0, null);
     await dsJSONOk(
         res, 200, {'success': true, 'reply': r.content, 'model': model});
@@ -366,12 +366,12 @@ Future<void> handleDsGenerateImage(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final prompt = mStr(body, 'prompt').trim();
   if (prompt.isEmpty) {
-    await dsJSONErr(res, 400, '提示词不能为空');
+    await dsJSONErr(res, 400, 'プロンプトは必須です');
     return;
   }
   var width = intArgDefault(body, 'width', 1024);
@@ -389,12 +389,12 @@ Future<void> handleDsGenerateImage(HttpRequest req) async {
     final r = await client.getUrl(Uri.parse(imgURL));
     final resp = await r.close();
     if (resp.statusCode != 200) {
-      await dsJSONErr(res, 500, '生成服务返回 ${resp.statusCode}');
+      await dsJSONErr(res, 500, '生成サービスが ${resp.statusCode} を返しました');
       return;
     }
     imgData = await resp.fold<List<int>>([], (a, b) => a..addAll(b));
   } catch (e) {
-    await dsJSONErr(res, 500, '图片生成失败: $e');
+    await dsJSONErr(res, 500, '画像生成に失敗しました: $e');
     return;
   }
 
@@ -405,7 +405,7 @@ Future<void> handleDsGenerateImage(HttpRequest req) async {
   try {
     File(absPath).writeAsBytesSync(imgData);
   } catch (_) {
-    await dsJSONErr(res, 500, '保存失败');
+    await dsJSONErr(res, 500, '保存に失敗しました');
     return;
   }
 
@@ -443,20 +443,36 @@ Future<void> handleDsChatTTS(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final text = mStr(body, 'text').trim();
   if (text.isEmpty) {
-    await dsJSONErr(res, 400, '文本不能为空');
+    await dsJSONErr(res, 400, 'テキストは必須です');
     return;
   }
   var voice = mStr(body, 'voice');
-  if (voice.isEmpty) voice = 'zh-CN-XiaoxiaoNeural';
+  final ttsLang = mStr(body, 'lang').toLowerCase();
+  if (voice.isEmpty) {
+    voice = ttsLang == 'ja'
+        ? 'ja-JP-NanamiNeural'
+        : (ttsLang == 'en' ? 'en-US-AriaNeural' : 'zh-CN-XiaoxiaoNeural');
+  }
+  // prosody 白名单校验（防止 SSML 注入 / 非法值）
+  String safeProsody(String raw, String unit, String def) {
+    final v = raw.trim();
+    if (!v.endsWith(unit)) return def;
+    final numPart = v.substring(0, v.length - unit.length);
+    if (!RegExp(r'^[+-]\d{1,3}$').hasMatch(numPart)) return def;
+    return v;
+  }
+
+  final pitch = safeProsody(mStr(body, 'pitch'), 'Hz', '+0Hz');
+  final rate = safeProsody(mStr(body, 'rate'), '%', '+0%');
 
   final chunks = splitTextForTTS(text, DS_TTS_CHUNK_RUNES, DS_TTS_CHUNK_HARD_MAX);
   if (chunks.isEmpty) {
-    await dsJSONErr(res, 400, '文本为空');
+    await dsJSONErr(res, 400, 'テキストが空です');
     return;
   }
   final cleaned = <String>[];
@@ -465,12 +481,12 @@ Future<void> handleDsChatTTS(HttpRequest req) async {
     if (cc.trim().isNotEmpty) cleaned.add(cc);
   }
   if (cleaned.isEmpty) {
-    await dsJSONErr(res, 400, '文本为空（清理后）');
+    await dsJSONErr(res, 400, 'テキストが空です（クリーニング後）');
     return;
   }
 
   final totalRunes = runeLen(text);
-  logp('🔊 TTS 请求：$totalRunes 字，分 ${cleaned.length} 块，语音=$voice');
+  logp('🔊 TTS リクエスト: $totalRunes 文字、${cleaned.length} ブロック、音声=$voice pitch=$pitch rate=$rate');
 
   res.statusCode = 200;
   res.headers.contentType = ContentType('audio', 'mpeg');
@@ -479,20 +495,20 @@ Future<void> handleDsChatTTS(HttpRequest req) async {
 
   var okChunks = 0;
   for (var i = 0; i < cleaned.length; i++) {
-    logp('🎙️ TTS 第 ${i + 1}/${cleaned.length} 块（${runeLen(cleaned[i])} 字）');
+    logp('🎙️ TTS ${i + 1}/${cleaned.length} ブロック目（${runeLen(cleaned[i])} 文字）');
     final ok = await synthesizeEdgeTts(cleaned[i], voice, (audio) async {
       try {
         res.add(audio);
         await res.flush();
       } catch (_) {}
-    });
+    }, pitch: pitch, rate: rate);
     if (ok) {
       okChunks++;
     } else {
-      logp('❌ TTS 第 ${i + 1} 块合成失败');
+      logp('❌ TTS ${i + 1} ブロック目の合成に失敗しました');
     }
   }
-  logp('✅ TTS 完成：$okChunks/${cleaned.length} 块成功');
+  logp('✅ TTS 完了: $okChunks/${cleaned.length} ブロック成功');
   try {
     await res.close();
   } catch (_) {}
@@ -527,12 +543,12 @@ Future<void> handleDsChatSTT(HttpRequest req) async {
   try {
     audioData = await readBodyBytes(req, limit: 20 * 1024 * 1024);
   } catch (_) {
-    await dsJSONErr(res, 400, '读取音频失败');
+    await dsJSONErr(res, 400, '音声の読み込みに失敗しました');
     return;
   }
   // multipart 包装：提取二进制主体（保持 Go 的宽松行为）
   if (audioData.length < 500) {
-    await dsJSONErr(res, 400, '音频太短');
+    await dsJSONErr(res, 400, '音声が短すぎます');
     return;
   }
 
@@ -546,8 +562,8 @@ Future<void> handleDsChatSTT(HttpRequest req) async {
         'ffmpeg', ['-y', '-loglevel', 'error', '-i', inFile, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wavFile],
         timeout: const Duration(seconds: 120));
     if (ff.code != 0) {
-      logp('❌ STT 音频转换失败: ${ff.out}');
-      await dsJSONErr(res, 500, '音频转换失败');
+      logp('❌ STT 音声変換に失敗しました: ${ff.out}');
+      await dsJSONErr(res, 500, '音声変換に失敗しました');
       return;
     }
     final modelPath = '$BASE_DIR/models/ggml-base-q5_1.bin';
@@ -556,12 +572,12 @@ Future<void> handleDsChatSTT(HttpRequest req) async {
         mainBin, ['-m', modelPath, '-f', wavFile, '-l', 'zh', '-nt', '-np'],
         timeout: const Duration(seconds: 300));
     if (wh.code != 0) {
-      logp('❌ STT 识别失败: ${wh.out}');
-      await dsJSONErr(res, 500, '语音识别失败');
+      logp('❌ STT 認識に失敗しました: ${wh.out}');
+      await dsJSONErr(res, 500, '音声認識に失敗しました');
       return;
     }
     final text = cleanWhisperText(wh.out);
-    logp('🎤 STT 识别结果: $text');
+    logp('🎤 STT 認識結果: $text');
     await dsJSONOk(res, 200, {'text': text});
   } finally {
     try {
@@ -588,7 +604,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final sessionID = mStr(body, 'sessionId');
@@ -599,11 +615,11 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
   final messageID = mStr(body, 'messageId');
 
   if (sessionID.trim().isEmpty) {
-    await dsJSONErr(res, 400, '缺少会话ID');
+    await dsJSONErr(res, 400, 'セッション ID がありません');
     return;
   }
   if (!File(dsSessionPath(sessionID)).existsSync()) {
-    await dsJSONErr(res, 404, '会话不存在');
+    await dsJSONErr(res, 404, 'セッションが存在しません');
     return;
   }
 
@@ -612,7 +628,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
 
   if (messageID.trim().isNotEmpty) {
     if (aiContent.trim().isEmpty) {
-      await dsJSONErr(res, 400, '内容为空');
+      await dsJSONErr(res, 400, '内容が空です');
       return;
     }
     final upd = updateDsMessageContent(
@@ -624,11 +640,11 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
     aiMsg = upd;
   } else {
     if (content.trim().isEmpty && fileIDs.isEmpty) {
-      await dsJSONErr(res, 400, '内容不能为空');
+      await dsJSONErr(res, 400, '内容は必須です');
       return;
     }
     final now = DateTime.now();
-    final savedContent = content.isEmpty ? '[已上传文件]' : content;
+    final savedContent = content.isEmpty ? '[アップロード済みファイル]' : content;
     final u = DsMessage(
       id: 'dsm_${fmtStamp14(now)}_${randomHex(6)}',
       sessionId: sessionID,
@@ -638,7 +654,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
       attachments: fileIDs.join(','),
     );
     if (!appendDsMessage(u)) {
-      await dsJSONErr(res, 500, '保存用户消息失败');
+      await dsJSONErr(res, 500, 'ユーザーメッセージの保存に失敗しました');
       return;
     }
     userMsg = u;
@@ -653,7 +669,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
         reasoning: reasoning,
       );
       if (!appendDsMessage(a)) {
-        await dsJSONErr(res, 500, '保存回答失败');
+        await dsJSONErr(res, 500, '回答の保存に失敗しました');
         return;
       }
       aiMsg = a;
@@ -662,7 +678,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
     final sess = getDsSession(sessionID);
     if (sess != null) {
       var title = sess.title;
-      if (title.isEmpty || title == '新对话') {
+      if (title.isEmpty || title == '新しい会話') {
         final runes = content.runes.toList();
         if (runes.length > 18) {
           title = '${String.fromCharCodes(runes.sublist(0, 18))}…';
@@ -697,7 +713,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await dsJSONErr(res, 400, '无效请求体');
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
     return;
   }
   final sessionID = mStr(body, 'sessionId');
@@ -707,12 +723,12 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   var level = intArgDefault(body, 'reasoningLevel', 1);
 
   if (sessionID.trim().isEmpty) {
-    await dsJSONErr(res, 400, '缺少会话ID');
+    await dsJSONErr(res, 400, 'セッション ID がありません');
     return;
   }
   final cfg = getDsConfig();
   if (cfg.apiKey.isEmpty) {
-    await dsJSONErr(res, 400, '请先配置 DeepSeek API Key');
+    await dsJSONErr(res, 400, '先に DeepSeek API Key を設定してください');
     return;
   }
   final model = trimOr(mStr(body, 'model'), cfg.model.isEmpty ? DS_DEFAULT_MODEL : cfg.model);
@@ -729,7 +745,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
     }
   }
   if (base.trim().isEmpty) {
-    await dsJSONErr(res, 400, '没有可继续生成的内容');
+    await dsJSONErr(res, 400, '継続生成できる内容がありません');
     return;
   }
   if (level < 1) level = 1;
@@ -737,9 +753,10 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   final params = levelToParams(level);
 
   final sysParts = <String>[
-    '你正在续写同一段回答的剩余部分：紧接上一条 assistant 消息的最后一个字继续输出。禁止复述已有内容，禁止重新开头，禁止输出任何解释、标题或总结语。'
+    DS_JA_ONLY_SYSTEM_PROMPT,
+    'あなたは同じ回答の残りを続けて書いています。直前の assistant メッセージの最後の文字に続けて出力してください。既出の内容の繰り返し、書き直し、説明・見出し・まとめの出力は禁止です。'
   ];
-  if (deepThink) sysParts.add('你可以进行深度的、多步骤的推理，请充分展示你的思考过程。');
+  if (deepThink) sysParts.add('深い多段階の推論が可能です。思考プロセスを十分に示してください。');
 
   final apiMessages = <Map<String, dynamic>>[
     {'role': 'system', 'content': sysParts.join('\n')},
@@ -753,11 +770,11 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   apiMessages.add({'role': 'assistant', 'content': base});
   apiMessages.add({
     'role': 'user',
-    'content': '（续写指令）请从中断处接着往下写，紧接上文最后一个字，不要重复，不要重述开头。',
+    'content': '（継続指示）中断箇所から続けて書いてください。直前の最後の文字に続け、繰り返しや冒頭の言い直しはしないこと。',
   });
 
   final sse = Sse(res);
-  logp('▶️ 继续生成：session=$sessionID 原文=${runeLen(base)} 字 model=$model');
+  logp('▶️ 継続生成: session=$sessionID 元テキスト=${runeLen(base)} 文字 model=$model');
 
   final addBuf = StringBuffer();
   final reasoningBuf = StringBuffer();
@@ -782,7 +799,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
       usageAcc,
     );
   } catch (e) {
-    logp('⚠️ 继续生成中断: $e');
+    logp('⚠️ 継続生成が中断されました: $e');
     await sse.send('error', {'message': '$e'});
     await sse.done();
     return;
@@ -824,7 +841,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
     aiMsg = a;
   }
 
-  logp('✅ 继续生成完成：新增 ${runeLen(addBuf.toString())} 字，合并后 ${runeLen(merged)} 字');
+  logp('✅ 継続生成完了: 追加 ${runeLen(addBuf.toString())} 文字、結合後 ${runeLen(merged)} 文字');
   await sse.send('done', {
     'aiMessage': aiMsg?.toJson(),
     'content': merged,

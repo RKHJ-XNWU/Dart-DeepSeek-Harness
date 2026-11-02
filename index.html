@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -19,94 +19,94 @@
 <body>
     <div id="dscTopProbe"></div>
     <div id="deepseekChatApp">
-        <!-- 顶栏 -->
+        <!-- 上部バー -->
         <div class="dsc-topbar">
-            <button class="dsc-icon-btn" id="dscSidebarToggle" title="会话列表">☰</button>
+            <button class="dsc-icon-btn" id="dscSidebarToggle" title="セッション一覧">☰</button>
             <div class="dsc-title-wrap">
-                <div class="dsc-title" id="dscChatTitle">探索未至之境·新版</div>
-                <div class="dsc-subtitle" id="dscChatSub">DeepSeek 聊天 · 点击左上角切换会话</div>
+                <div class="dsc-title" id="dscChatTitle">未踏の境地を探る・新版</div>
+                <div class="dsc-subtitle" id="dscChatSub">DeepSeek チャット · 左上をタップしてセッション切替</div>
             </div>
-            <button class="dsc-icon-btn accent" id="dscNewBtn" title="新建会话">＋</button>
+            <button class="dsc-icon-btn accent" id="dscNewBtn" title="新規セッション">＋</button>
             <div class="dsc-more-wrap">
-                <button class="dsc-icon-btn" id="dscMoreBtn" title="更多功能">⋯</button>
+                <button class="dsc-icon-btn" id="dscMoreBtn" title="その他の機能">⋯</button>
                 <div class="dsc-more-menu" id="dscMoreMenu">
-                    <button class="dsc-more-item" id="dscForumBtn" title="进入论坛 · 帖子广场"><span class="ic">💬</span><span class="tx">论坛 · 帖子广场</span></button>
-                    <button class="dsc-more-item" id="dscVocabBtn" title="日语单词本"><span class="ic">📚</span><span class="tx">日语单词本</span></button>
-                    <button class="dsc-more-item" id="dscFilesToggle" title="文件管理"><span class="ic">📁</span><span class="tx">文件管理</span></button>
-                    <button class="dsc-more-item" id="dscPeakValleyBtn" title="峰谷提醒"><span class="ic">🏔️</span><span class="tx">峰谷提醒</span></button>
-                    <button class="dsc-more-item" id="dscBackupBtn" title="数据备份（data + imgs）"><span class="ic">📦</span><span class="tx">数据备份</span></button>
-                    <button class="dsc-more-item" id="dscRestoreBtn" title="从备份恢复数据"><span class="ic">♻️</span><span class="tx">恢复数据</span></button>
-                    <button class="dsc-more-item" id="dscSettingsBtn" title="设置"><span class="ic">⚙️</span><span class="tx">设置</span></button>
-                    <button class="dsc-more-item" id="dscGlobalSearchBtn" title="搜索会话"><span class="ic">🔍</span><span class="tx">搜索会话</span></button>
-                    <button class="dsc-more-item" id="dscCosplayBtn" title="角色扮演"><span class="ic">🎭</span><span class="tx">角色扮演</span></button>
-                    <button class="dsc-more-item" id="dscAnnounceBtn" title="公告管理"><span class="ic">📢</span><span class="tx">公告管理</span></button>
+                    <button class="dsc-more-item" id="dscForumBtn" title="フォーラム · 投稿広場へ"><span class="ic">💬</span><span class="tx">フォーラム · 投稿広場</span></button>
+                    <button class="dsc-more-item" id="dscVocabBtn" title="日本語単語帳"><span class="ic">📚</span><span class="tx">日本語単語帳</span></button>
+                    <button class="dsc-more-item" id="dscFilesToggle" title="ファイル管理"><span class="ic">📁</span><span class="tx">ファイル管理</span></button>
+                    <button class="dsc-more-item" id="dscPeakValleyBtn" title="ピーク／オフピーク通知"><span class="ic">🏔️</span><span class="tx">ピーク／オフピーク通知</span></button>
+                    <button class="dsc-more-item" id="dscBackupBtn" title="データバックアップ（data + imgs）"><span class="ic">📦</span><span class="tx">データバックアップ</span></button>
+                    <button class="dsc-more-item" id="dscRestoreBtn" title="バックアップから復元"><span class="ic">♻️</span><span class="tx">データ復元</span></button>
+                    <button class="dsc-more-item" id="dscSettingsBtn" title="設定"><span class="ic">⚙️</span><span class="tx">設定</span></button>
+                    <button class="dsc-more-item" id="dscGlobalSearchBtn" title="セッション検索"><span class="ic">🔍</span><span class="tx">セッション検索</span></button>
+                    <button class="dsc-more-item" id="dscCosplayBtn" title="ロールプレイ"><span class="ic">🎭</span><span class="tx">ロールプレイ</span></button>
+                    <button class="dsc-more-item" id="dscAnnounceBtn" title="お知らせ管理"><span class="ic">📢</span><span class="tx">お知らせ管理</span></button>
                 </div>
             </div>
-            <button class="dsc-icon-btn dsc-close-gone" id="dscCloseBtn" title="关闭">✕</button>
+            <button class="dsc-icon-btn dsc-close-gone" id="dscCloseBtn" title="閉じる">✕</button>
         </div>
 
         <div class="dsc-body">
-            <!-- 会话侧栏 -->
+            <!-- 会話サイドバー -->
             <aside class="dsc-sidebar" id="dscSidebar">
                 <div class="dsc-sidebar-search">
                     <div class="dsc-search-wrap">
                         <span class="dsc-search-icon">🔍</span>
-                        <input type="text" id="dscSessionSearch" placeholder="搜索会话..." autocomplete="off">
+                        <input type="text" id="dscSessionSearch" placeholder="セッションを検索..." autocomplete="off">
                         <button class="dsc-search-clear" id="dscSessionSearchClear" type="button">✕</button>
                     </div>
                     <label class="dsc-regex-toggle" id="dscRegexToggle">
                         <input type="checkbox" id="dscRegexCheckbox">
-                        <span>正则匹配</span>
+                        <span>正規表現</span>
                     </label>
                 </div>
                 <div class="dsc-session-list" id="dscSessionList"></div>
                 <div class="dsc-session-empty" id="dscSessionEmpty" style="display:none;">
                     <span class="emoji">💬</span>
-                    <p>还没有会话</p>
+                    <p>セッションがまだありません</p>
                 </div>
                 <div class="dsc-session-footer">
-                    <button class="dsc-session-act-btn" id="dscSelectModeBtn" title="多选">☑️ 多选</button>
-                    <button class="dsc-session-act-btn danger" id="dscClearAllSessionsBtn" title="清空全部">🗑️ 清空全部</button>
+                    <button class="dsc-session-act-btn" id="dscSelectModeBtn" title="複数選択">☑️ 複数選択</button>
+                    <button class="dsc-session-act-btn danger" id="dscClearAllSessionsBtn" title="すべて消去">🗑️ すべて消去</button>
                 </div>
                 <div class="dsc-session-batch" id="dscSessionBatch">
                     <label class="dsc-batch-all">
                         <input type="checkbox" id="dscBatchSelectAll">
-                        <span>全选</span>
+                        <span>すべて選択</span>
                     </label>
-                    <span class="dsc-batch-count" id="dscBatchCount">已选 0</span>
-                    <button class="dsc-batch-btn danger" id="dscBatchDeleteBtn">删除选中</button>
-                    <button class="dsc-batch-btn ghost" id="dscBatchCancelBtn">取消</button>
+                    <span class="dsc-batch-count" id="dscBatchCount">選択 0 件</span>
+                    <button class="dsc-batch-btn danger" id="dscBatchDeleteBtn">選択を削除</button>
+                    <button class="dsc-batch-btn ghost" id="dscBatchCancelBtn">キャンセル</button>
                 </div>
             </aside>
 
-            <!-- 主聊天区 -->
+            <!-- メインチャット領域 -->
             <main class="dsc-main">
                 <div class="dsc-messages" id="dscMessages"></div>
                 <div class="dsc-attach-bar" id="dscAttachBar"></div>
                 <div class="dsc-input-wrap">
-                    <textarea id="dscInput" rows="1" placeholder="发消息或按住说话" autocomplete="off"></textarea>
+                    <textarea id="dscInput" rows="1" placeholder="メッセージを送信、または長押しで話す" autocomplete="off"></textarea>
                 </div>
                 <div class="dsc-action-bar">
                     <div class="dsc-switch-group">
-                        <button class="dsc-switch-btn" id="dscWebSearchBtn" title="联网搜索">
+                        <button class="dsc-switch-btn" id="dscWebSearchBtn" title="ウェブ検索">
                             <span class="ic">🌐</span>
-                            <span class="lbl">联网</span>
+                            <span class="lbl">ウェブ</span>
                         </button>
-                        <button class="dsc-switch-btn" id="dscDeepThinkBtn" title="深度思考">
+                        <button class="dsc-switch-btn" id="dscDeepThinkBtn" title="深い思考">
                             <span class="ic">🧠</span>
                             <span class="lbl">思考</span>
                         </button>
-                        <button class="dsc-level-btn" id="dscLevelBtn" title="推理等级（1-50）">
+                        <button class="dsc-level-btn" id="dscLevelBtn" title="推論レベル（1-50）">
                             <span class="ic">🧩</span>
-                            <span class="lbl">推理</span>
+                            <span class="lbl">推論</span>
                             <span class="lvl-num" id="dscLevelBtnNum">30</span>
                         </button>
                         <div class="dsc-tools-extra" id="dscToolsExtra"></div>
                     </div>
                     <div class="dsc-right-group">
-                        <button class="dsc-newline-btn" id="dscNewlineBtn" title="插入换行">↵</button>
-                        <button class="dsc-plus-btn" id="dscPlusBtn" title="上传附件">＋</button>
-                        <button class="dsc-send-btn" id="dscSendBtn" title="发送">
+                        <button class="dsc-newline-btn" id="dscNewlineBtn" title="改行を挿入">↵</button>
+                        <button class="dsc-plus-btn" id="dscPlusBtn" title="添付をアップロード">＋</button>
+                        <button class="dsc-send-btn" id="dscSendBtn" title="送信">
                             <svg class="dsc-send-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
@@ -117,19 +117,19 @@
                 <div class="dsc-plus-menu" id="dscPlusMenu">
                     <button class="dsc-menu-item" data-type="image">
                         <span class="menu-icon">🖼️</span>
-                        <div class="menu-info"><div class="menu-title">图片</div><div class="menu-desc">jpg / png / gif / webp</div></div>
+                        <div class="menu-info"><div class="menu-title">画像</div><div class="menu-desc">jpg / png / gif / webp</div></div>
                     </button>
                     <button class="dsc-menu-item" data-type="document">
                         <span class="menu-icon">📄</span>
-                        <div class="menu-info"><div class="menu-title">文档</div><div class="menu-desc">pdf / txt / md / docx / json / 代码</div></div>
+                        <div class="menu-info"><div class="menu-title">文書</div><div class="menu-desc">pdf / txt / md / docx / json / コード</div></div>
                     </button>
                     <button class="dsc-menu-item" data-type="video">
                         <span class="menu-icon">🎬</span>
-                        <div class="menu-info"><div class="menu-title">视频</div><div class="menu-desc">mp4 / mov / avi / mkv</div></div>
+                        <div class="menu-info"><div class="menu-title">動画</div><div class="menu-desc">mp4 / mov / avi / mkv</div></div>
                     </button>
                     <button class="dsc-menu-item" data-type="any">
                         <span class="menu-icon">📁</span>
-                        <div class="menu-info"><div class="menu-title">任意文件</div><div class="menu-desc">不限格式 · 最大 5GB</div></div>
+                        <div class="menu-info"><div class="menu-title">任意のファイル</div><div class="menu-desc">形式自由 · 最大 5GB</div></div>
                     </button>
                 </div>
 
@@ -137,47 +137,47 @@
                 <input type="file" id="dscFileInputDoc" accept=".pdf,.txt,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.json,.xml,.yaml,.yml,.ini,.conf,.log,.go,.js,.ts,.py,.java,.c,.cpp,.h,.hpp,.cs,.rb,.php,.swift,.kt,.rs,.html,.css,.scss,.less,.sh,.bat,.ps1,.sql,.litematic,.nbt,.schematic,.mcstructure" style="display:none;">
                 <input type="file" id="dscFileInputVideo" accept="video/*" style="display:none;">
                 <input type="file" id="dscFileInputAny" style="display:none;">
-                <!-- 恢复数据用隐藏 input -->
+                <!-- データ復元用隐藏 input -->
                 <input type="file" id="dscRestoreFileInput" accept=".tar.gz,.tgz,application/gzip" style="display:none;">
             </main>
 
             <aside class="dsc-files-panel" id="dscFilesPanel">
                 <div class="dsc-files-header">
-                    <div class="dsc-files-title">📁 文件管理</div>
+                    <div class="dsc-files-title">📁 ファイル管理</div>
                     <button class="dsc-files-close" id="dscFilesClose">✕</button>
                 </div>
                 <div class="dsc-files-upload">
                     <div class="dsc-upload-zone" id="dscUploadZone">
                         <span class="icon">📤</span>
-                        <div class="main-text">点击或拖拽上传</div>
-                        <div class="sub-text">图片 / 视频 / 文档 / 代码 · 最大 5GB</div>
+                        <div class="main-text">タップまたはドラッグでアップロード</div>
+                        <div class="sub-text">画像 / 動画 / 文書 / コード · 最大 5GB</div>
                         <input type="file" id="dscFileInput">
                     </div>
                 </div>
                 <div class="dsc-gen-panel">
-                    <div class="dsc-gen-title">🎨 AI 图片生成</div>
+                    <div class="dsc-gen-title">🎨 AI 画像生成</div>
                     <div class="dsc-gen-row">
-                        <input type="text" id="dscGenPrompt" placeholder="描述你想生成的图片..." autocomplete="off">
+                        <input type="text" id="dscGenPrompt" placeholder="生成したい画像を描写..." autocomplete="off">
                         <button class="dsc-gen-btn" id="dscGenBtn">🎨 生成</button>
                     </div>
                 </div>
                 <div class="dsc-files-filter">
-                    <button class="dsc-filter-chip active" data-cat="all">全部</button>
-                    <button class="dsc-filter-chip" data-cat="image">🖼️ 图片</button>
-                    <button class="dsc-filter-chip" data-cat="video">🎬 视频</button>
-                    <button class="dsc-filter-chip" data-cat="document">📄 文档</button>
-                    <button class="dsc-filter-chip" data-cat="code">💻 代码</button>
+                    <button class="dsc-filter-chip active" data-cat="all">すべて</button>
+                    <button class="dsc-filter-chip" data-cat="image">🖼️ 画像</button>
+                    <button class="dsc-filter-chip" data-cat="video">🎬 動画</button>
+                    <button class="dsc-filter-chip" data-cat="document">📄 文書</button>
+                    <button class="dsc-filter-chip" data-cat="code">💻 コード</button>
                     <button class="dsc-filter-chip" data-cat="minecraft">🧱 MC</button>
                 </div>
                 <div class="dsc-files-search">
                     <div class="wrap">
                         <span class="s-icon">🔍</span>
-                        <input type="text" id="dscFilesSearch" placeholder="搜索文件名..." autocomplete="off">
+                        <input type="text" id="dscFilesSearch" placeholder="ファイル名を検索..." autocomplete="off">
                         <button class="s-clear" id="dscFilesSearchClear">✕</button>
                     </div>
                     <label class="dsc-files-regex" id="dscFilesRegexToggle">
                         <input type="checkbox" id="dscFilesRegexCheckbox">
-                        <span>正则</span>
+                        <span>正規表現</span>
                     </label>
                 </div>
                 <div class="dsc-files-list" id="dscFilesList"></div>
@@ -193,189 +193,189 @@
 
         <div class="dsc-toast-wrap" id="dscToastWrap"></div>
 
-        <!-- 设置弹层 -->
+        <!-- 設定ダイアログ -->
         <div class="dsc-modal-overlay" id="dscSettingsOverlay">
             <div class="dsc-modal dsc-settings-modal">
                 <div class="dsc-settings-head">
                     <div class="dsc-settings-head-ic">⚙️</div>
                     <div class="dsc-settings-head-tx">
-                        <div class="dsc-settings-head-title">DeepSeek 设置</div>
-                        <div class="dsc-settings-head-sub">连接凭证 · 模型选择 · 图片自动路由</div>
+                        <div class="dsc-settings-head-title">DeepSeek 設定</div>
+                        <div class="dsc-settings-head-sub">接続情報 · モデル選択 · 画像自動ルーティング</div>
                     </div>
                 </div>
 
                 <div class="dsc-settings-body">
-                    <div class="dsc-status" id="dscApiStatus">读取中...</div>
+                    <div class="dsc-status" id="dscApiStatus">読み込み中...</div>
 
                 <div class="dsc-settings-sec">
-                    <div class="dsc-settings-sec-title">连接凭证</div>
+                    <div class="dsc-settings-sec-title">接続情報</div>
                     <div class="dsc-field">
                         <label for="dscApiKeyInput">DeepSeek API Key</label>
                         <input type="password" id="dscApiKeyInput" placeholder="sk-..." autocomplete="off">
                     </div>
                     <div class="dsc-field">
-                        <label for="dscModelSelect">对话模型
-                            <button type="button" class="dsc-model-add-btn" id="dscModelAddBtn" title="添加自定义模型">＋</button>
+                        <label for="dscModelSelect">対話モデル
+                            <button type="button" class="dsc-model-add-btn" id="dscModelAddBtn" title="カスタムモデルを追加">＋</button>
                         </label>
                         <select id="dscModelSelect">
-                            <option value="deepseek-flash">deepseek-flash（当前可用）</option>
+                            <option value="deepseek-flash">deepseek-flash（現在利用可）</option>
                             <option value="deepseek-v4-pro">deepseek-v4-pro（V4 Pro）</option>
-                            <option value="deepseek-chat">deepseek-chat（旧名·服务端路由至 flash）</option>
-                            <option value="deepseek-reasoner">deepseek-reasoner（旧名·服务端路由至 flash）</option>
+                            <option value="deepseek-chat">deepseek-chat（旧称・サーバー側で flash へルーティング）</option>
+                            <option value="deepseek-reasoner">deepseek-reasoner（旧称・サーバー側で flash へルーティング）</option>
                         </select>
                         <div class="dsc-model-add-row" id="dscModelAddRow">
-                            <input type="text" id="dscModelNewInput" placeholder="输入模型名，如 deepseek-v4-pro" autocomplete="off">
-                            <button type="button" class="dsc-btn primary" id="dscModelNewOk">添加</button>
-                            <button type="button" class="dsc-btn" id="dscModelNewCancel">取消</button>
+                            <input type="text" id="dscModelNewInput" placeholder="モデル名を入力（例：deepseek-v4-pro）" autocomplete="off">
+                            <button type="button" class="dsc-btn primary" id="dscModelNewOk">追加</button>
+                            <button type="button" class="dsc-btn" id="dscModelNewCancel">キャンセル</button>
                         </div>
                         <div class="dsc-model-hint" id="dscModelHint"></div>
                     </div>
                     <div class="dsc-field">
-                        <label for="dscImgKeyInput">图片生成 Key <span class="dsc-field-opt">可选</span></label>
-                        <input type="password" id="dscImgKeyInput" placeholder="第三方文生图 Key，可留空" autocomplete="off">
+                        <label for="dscImgKeyInput">画像生成キー <span class="dsc-field-opt">任意</span></label>
+                        <input type="password" id="dscImgKeyInput" placeholder="サードパーティの画像生成キー（空欄可）" autocomplete="off">
                     </div>
                 </div>
                 </div>
 
                 <div class="dsc-modal-footer">
-                    <button class="dsc-btn ghost" id="dscSettingsCancel">取消</button>
-                    <button class="dsc-btn primary" id="dscSettingsSave">保存设置</button>
+                    <button class="dsc-btn ghost" id="dscSettingsCancel">キャンセル</button>
+                    <button class="dsc-btn primary" id="dscSettingsSave">設定を保存</button>
                 </div>
             </div>
         </div>
 
-        <!-- 推理等级弹窗 -->
+        <!-- 推論レベル弹窗 -->
         <div class="dsc-modal-overlay" id="dscLevelOverlay">
             <div class="dsc-modal" style="max-width:400px;">
-                <div class="dsc-modal-title">🧩 推理等级</div>
-                <div class="dsc-modal-sub" style="margin-bottom:10px;">等级越高，模型自我反思轮数越多，回答越准确完整</div>
+                <div class="dsc-modal-title">🧩 推論レベル</div>
+                <div class="dsc-modal-sub" style="margin-bottom:10px;">レベルが高いほど自己反省の回数が増え、回答がより正確で完全になります</div>
                 <div class="dsc-level-display">
                     <div class="dsc-level-num" id="dscLevelNum">30</div>
-                    <div class="dsc-level-tag" id="dscLevelTag">三轮推理</div>
+                    <div class="dsc-level-tag" id="dscLevelTag">3 回推論</div>
                 </div>
                 <input type="range" id="dscLevelRange" min="1" max="50" step="1" value="30" class="dsc-level-range">
                 <div class="dsc-level-labels">
-                    <span>1 · 单轮</span>
-                    <span>25 · 双轮</span>
-                    <span>50 · 四轮</span>
+                    <span>1 · 単一ラウンド</span>
+                    <span>25 · 二重ラウンド</span>
+                    <span>50 · 四重ラウンド</span>
                 </div>
                 <div class="dsc-level-info" id="dscLevelInfo">
-                    <div style="margin-bottom:4px;">🧠 <b>3 轮</b>推理 · 约 <span class="hl">10,971</span> Tokens/次</div>
-                    <div style="font-size:0.7rem;opacity:0.75;">回答 + 2 次深度反思 · Token 消耗约 ~4x</div>
+                    <div style="margin-bottom:4px;">🧠 <b>3 ラウンド</b>推論 · 約  <span class="hl">10,971</span> Tokens/回</div>
+                    <div style="font-size:0.7rem;opacity:0.75;">回答 + 2 回の深い反省 · Token 消費は約 ~4x</div>
                 </div>
                 <div class="dsc-modal-footer">
-                    <button class="dsc-btn ghost" id="dscLevelCancel">取消</button>
+                    <button class="dsc-btn ghost" id="dscLevelCancel">キャンセル</button>
                     <button class="dsc-btn primary" id="dscLevelSave">💾 保存</button>
                 </div>
             </div>
         </div>
 
-        <!-- 重命名弹层 -->
+        <!-- 名前変更ダイアログ -->
         <div class="dsc-modal-overlay" id="dscRenameOverlay">
             <div class="dsc-modal" style="max-width:360px;">
-                <div class="dsc-modal-title">✏️ 重命名会话</div>
-                <div class="dsc-modal-sub" style="margin-bottom:14px;">给这个会话起个好记的名字</div>
+                <div class="dsc-modal-title">✏️ セッション名を変更</div>
+                <div class="dsc-modal-sub" style="margin-bottom:14px;">このセッションに覚えやすい名前を付けましょう</div>
                 <div class="dsc-field">
-                    <input type="text" id="dscRenameInput" placeholder="输入新标题..." maxlength="60" autocomplete="off">
+                    <input type="text" id="dscRenameInput" placeholder="新しいタイトルを入力..." maxlength="60" autocomplete="off">
                 </div>
                 <div class="dsc-modal-footer">
-                    <button class="dsc-btn ghost" id="dscRenameCancel">取消</button>
+                    <button class="dsc-btn ghost" id="dscRenameCancel">キャンセル</button>
                     <button class="dsc-btn primary" id="dscRenameSave">💾 保存</button>
                 </div>
             </div>
         </div>
 
-        <!-- 角色扮演弹层 -->
+        <!-- ロールプレイ弹层 -->
         <div class="dsc-modal-overlay" id="dscCosplayOverlay">
             <div class="dsc-modal dsc-cosplay-modal" style="max-width:480px;">
-                <div class="dsc-modal-title">🎭 角色扮演</div>
-                <div class="dsc-modal-sub">开启后，助手将以所选角色的身份、语气与思考方式回应（下一条消息起生效）</div>
+                <div class="dsc-modal-title">🎭 ロールプレイ</div>
+                <div class="dsc-modal-sub">有効にすると、アシスタントは選択したキャラクターの身分・口調・思考法で応答します（次のメッセージから有効）</div>
                 <div class="dsc-cosplay-toolbar">
                     <label class="dsc-cosplay-toggle">
                         <input type="checkbox" id="dscCosplayEnabled">
-                        <span>启用角色扮演</span>
+                        <span>ロールプレイを有効化</span>
                     </label>
-                    <select id="dscCosplayStyle" title="思考风格">
-                        <option value="neutral">🧠 中性思考</option>
-                        <option value="role">🎭 角色沉浸</option>
+                    <select id="dscCosplayStyle" title="思考スタイル">
+                        <option value="neutral">🧠 ニュートラル思考</option>
+                        <option value="role">🎭 キャラ没入</option>
                     </select>
                 </div>
-                <div class="dsc-cosplay-status" id="dscCosplayStatus">加载中…</div>
+                <div class="dsc-cosplay-status" id="dscCosplayStatus">読み込み中…</div>
                 <div class="dsc-cosplay-list" id="dscCosplayList"></div>
                 <div class="dsc-cosplay-editor" id="dscCosplayEditor">
-                    <div class="dsc-field"><label>名字 *</label><input type="text" id="dscCosplayName" placeholder="例：蓝色大肥鱼"></div>
-                    <div class="dsc-field"><label>头像字符</label><input type="text" id="dscCosplayEmoji" placeholder="例：🐋" maxlength="8"></div>
-                    <div class="dsc-field"><label>身份与背景（我是谁）</label><textarea id="dscCosplayDesc" placeholder="角色的身份、来历、世界观……"></textarea></div>
+                    <div class="dsc-field"><label>名前 *</label><input type="text" id="dscCosplayName" placeholder="例：青い大きな太った魚"></div>
+                    <div class="dsc-field"><label>アイコン文字</label><input type="text" id="dscCosplayEmoji" placeholder="例：🐋" maxlength="8"></div>
+                    <div class="dsc-field"><label>身分と背景（私は誰か）</label><textarea id="dscCosplayDesc" placeholder="キャラクターの身分・来歴・世界観……"></textarea></div>
                     <div class="dsc-field"><label>性格</label><textarea id="dscCosplayPersonality"></textarea></div>
-                    <div class="dsc-field"><label>说话风格</label><textarea id="dscCosplayStyleText"></textarea></div>
-                    <div class="dsc-field"><label>行为守则</label><textarea id="dscCosplayRules"></textarea></div>
-                    <div class="dsc-field"><label>场景 / 关系</label><textarea id="dscCosplayScenario"></textarea></div>
-                    <div class="dsc-field"><label>开场白</label><textarea id="dscCosplayFirstMes"></textarea></div>
+                    <div class="dsc-field"><label>話し方</label><textarea id="dscCosplayStyleText"></textarea></div>
+                    <div class="dsc-field"><label>行動規範</label><textarea id="dscCosplayRules"></textarea></div>
+                    <div class="dsc-field"><label>場面 / 関係</label><textarea id="dscCosplayScenario"></textarea></div>
+                    <div class="dsc-field"><label>冒頭のセリフ</label><textarea id="dscCosplayFirstMes"></textarea></div>
                     <div class="dsc-modal-footer">
-                        <button class="dsc-btn ghost" id="dscCosplayEditCancel">取消</button>
-                        <button class="dsc-btn primary" id="dscCosplaySaveRole">💾 保存角色</button>
+                        <button class="dsc-btn ghost" id="dscCosplayEditCancel">キャンセル</button>
+                        <button class="dsc-btn primary" id="dscCosplaySaveRole">💾 キャラクターを保存</button>
                     </div>
                 </div>
                 <div class="dsc-modal-footer">
-                    <button class="dsc-btn ghost" id="dscCosplayAddBtn">＋ 新建角色</button>
-                    <button class="dsc-btn primary" id="dscCosplayDone">完成</button>
+                    <button class="dsc-btn ghost" id="dscCosplayAddBtn">＋ キャラクターを新規作成</button>
+                    <button class="dsc-btn primary" id="dscCosplayDone">完了</button>
                 </div>
             </div>
         </div>
 
-                <!-- 公告管理弹层（全屏） -->
+                <!-- お知らせ管理弹层（全屏） -->
         <div class="dsc-modal-overlay" id="dscAnnAdminOverlay">
             <div class="dsc-modal dsc-ann-admin">
                 <div class="dsc-ann-admin-head">
                     <div class="dsc-ann-admin-head-left">
-                        <div class="dsc-ann-admin-title">📢 公告管理</div>
-                        <div class="dsc-ann-admin-sub">最多 5 条公告 · 按优先级依次展示</div>
+                        <div class="dsc-ann-admin-title">📢 お知らせ管理</div>
+                        <div class="dsc-ann-admin-sub">最大 5 件のお知らせ · 優先度順に表示</div>
                     </div>
-                    <button class="dsc-ann-admin-close-btn" id="dscAnnClose" title="关闭">✕</button>
+                    <button class="dsc-ann-admin-close-btn" id="dscAnnClose" title="閉じる">✕</button>
                 </div>
                 <div class="dsc-ann-admin-body">
                     <div class="dsc-ann-list" id="dscAnnList"></div>
                     <div class="dsc-ann-add">
-                        <button class="dsc-btn primary" id="dscAnnAddBtn">＋ 新增公告</button>
+                        <button class="dsc-btn primary" id="dscAnnAddBtn">＋ 追加公告</button>
                     </div>
                     <div class="dsc-ann-editor" id="dscAnnEditor" style="display:none;">
                         <div class="dsc-ann-group">
-                            <div class="dsc-ann-group-title">基本信息</div>
+                            <div class="dsc-ann-group-title">基本情報</div>
                             <div class="dsc-field">
-                                <label>📌 公告标题（最多 500 字）</label>
-                                <input type="text" id="dscAnnTitle" maxlength="500" placeholder="输入公告标题..." autocomplete="off">
+                                <label>📌 お知らせタイトル（最大 500 字）</label>
+                                <input type="text" id="dscAnnTitle" maxlength="500" placeholder="お知らせのタイトルを入力..." autocomplete="off">
                             </div>
                             <div class="dsc-field">
-                                <label>📝 公告内容（最多 50000 字）</label>
-                                <textarea id="dscAnnContent" maxlength="50000" rows="8" placeholder="输入公告内容..."></textarea>
+                                <label>📝 お知らせ本文（最大 50000 字）</label>
+                                <textarea id="dscAnnContent" maxlength="50000" rows="8" placeholder="お知らせの本文を入力..."></textarea>
                             </div>
                         </div>
                         <div class="dsc-ann-group">
-                            <div class="dsc-ann-group-title">展示时间</div>
+                            <div class="dsc-ann-group-title">表示期間</div>
                             <div class="dsc-ann-row">
                                 <div class="dsc-field">
-                                    <label>🕐 开始时间</label>
+                                    <label>🕐 開始日時</label>
                                     <input type="datetime-local" id="dscAnnStart">
                                 </div>
                                 <div class="dsc-field">
-                                    <label>🕑 结束时间</label>
+                                    <label>🕑 終了日時</label>
                                     <input type="datetime-local" id="dscAnnEnd">
                                 </div>
                             </div>
                         </div>
                         <div class="dsc-ann-group">
-                            <div class="dsc-ann-group-title">展示设置</div>
+                            <div class="dsc-ann-group-title">表示設定</div>
                             <div class="dsc-ann-setting-row">
                                 <div class="dsc-ann-setting-info">
-                                    <div class="dsc-ann-setting-label">🔢 优先级</div>
-                                    <div class="dsc-ann-setting-desc">数值越大越优先展示</div>
+                                    <div class="dsc-ann-setting-label">🔢 優先度</div>
+                                    <div class="dsc-ann-setting-desc">数値が大きいほど優先して表示</div>
                                 </div>
                                 <input type="number" id="dscAnnPriority" value="0" class="dsc-ann-priority-input">
                             </div>
                             <div class="dsc-ann-setting-row">
                                 <div class="dsc-ann-setting-info">
-                                    <div class="dsc-ann-setting-label">⚡ 最高级别</div>
-                                    <div class="dsc-ann-setting-desc">无视优先级与时间，强制展示</div>
+                                    <div class="dsc-ann-setting-label">⚡ 最上位</div>
+                                    <div class="dsc-ann-setting-desc">優先度と時間を無視して強制表示</div>
                                 </div>
                                 <label class="dsc-switch">
                                     <input type="checkbox" id="dscAnnForce">
@@ -384,7 +384,7 @@
                             </div>
                         </div>
                         <div class="dsc-ann-editor-footer">
-                            <button class="dsc-btn ghost" id="dscAnnEditCancel">取消</button>
+                            <button class="dsc-btn ghost" id="dscAnnEditCancel">キャンセル</button>
                             <button class="dsc-btn primary" id="dscAnnSave">💾 保存</button>
                         </div>
                     </div>
@@ -393,27 +393,27 @@
         </div>
 
 
-        <!-- 论坛：全屏列表页 -->
+        <!-- フォーラム：全画面リストページ -->
         <div class="dsc-modal-overlay" id="dscForumOverlay">
             <div class="dsc-forum">
                 <div class="dsc-forum-head">
                     <div class="dsc-forum-head-left">
-                        <div class="dsc-forum-title">💬 论坛 · 帖子广场</div>
-                        <div class="dsc-forum-sub" id="dscForumSub">帖子列表</div>
+                        <div class="dsc-forum-title">💬 フォーラム · 投稿広場</div>
+                        <div class="dsc-forum-sub" id="dscForumSub">投稿一覧</div>
                     </div>
                     <div class="dsc-forum-head-right">
-                        <button class="dsc-forum-icon-btn" id="dscForumMoreBtn" title="更多功能">⋯</button>
-                        <button class="dsc-forum-icon-btn" id="dscForumCloseBtn" title="关闭">✕</button>
+                        <button class="dsc-forum-icon-btn" id="dscForumMoreBtn" title="その他の機能">⋯</button>
+                        <button class="dsc-forum-icon-btn" id="dscForumCloseBtn" title="閉じる">✕</button>
                     </div>
                 </div>
                 <div class="dsc-forum-batch-bar" id="dscForumBatchBar">
                     <label class="dsc-batch-all">
                         <input type="checkbox" id="dscForumSelectAll">
-                        <span>全选</span>
+                        <span>すべて選択</span>
                     </label>
-                    <span class="dsc-forum-batch-count" id="dscForumBatchCount">已选 0</span>
-                    <button class="dsc-batch-btn danger" id="dscForumBatchDelBtn">删除选中</button>
-                    <button class="dsc-batch-btn ghost" id="dscForumBatchCancelBtn">取消</button>
+                    <span class="dsc-forum-batch-count" id="dscForumBatchCount">選択 0 件</span>
+                    <button class="dsc-batch-btn danger" id="dscForumBatchDelBtn">選択を削除</button>
+                    <button class="dsc-batch-btn ghost" id="dscForumBatchCancelBtn">キャンセル</button>
                 </div>
                 <div class="dsc-forum-body" id="dscForumBody">
                     <div class="dsc-forum-list" id="dscForumList"></div>
@@ -421,85 +421,85 @@
             </div>
         </div>
 
-        <!-- 论坛：详情页 -->
+        <!-- フォーラム：詳細ページ -->
         <div class="dsc-modal-overlay" id="dscForumDetailOverlay">
             <div class="dsc-forum">
                 <div class="dsc-forum-head">
-                    <button class="dsc-forum-icon-btn" id="dscForumDetailBackBtn" title="返回">←</button>
+                    <button class="dsc-forum-icon-btn" id="dscForumDetailBackBtn" title="戻る">←</button>
                     <div class="dsc-forum-head-left">
-                        <div class="dsc-forum-title" id="dscForumDetailTitle">帖子详情</div>
+                        <div class="dsc-forum-title" id="dscForumDetailTitle">投稿の詳細</div>
                         <div class="dsc-forum-sub" id="dscForumDetailMeta"></div>
                     </div>
                     <div class="dsc-forum-head-right">
                         <button class="dsc-forum-icon-btn" id="dscForumDetailMoreBtn" title="操作">⋯</button>
-                        <button class="dsc-forum-icon-btn" id="dscForumDetailCloseBtn" title="关闭">✕</button>
+                        <button class="dsc-forum-icon-btn" id="dscForumDetailCloseBtn" title="閉じる">✕</button>
                     </div>
                 </div>
                 <div class="dsc-forum-body dsc-forum-detail-body" id="dscForumDetailBody"></div>
             </div>
         </div>
 
-        <!-- 论坛：发帖页 -->
+        <!-- 论坛：投稿する页 -->
         <div class="dsc-modal-overlay" id="dscForumComposeOverlay">
             <div class="dsc-forum">
                 <div class="dsc-forum-head">
-                    <button class="dsc-forum-icon-btn" id="dscForumComposeCancelBtn" title="取消">✕</button>
+                    <button class="dsc-forum-icon-btn" id="dscForumComposeCancelBtn" title="キャンセル">✕</button>
                     <div class="dsc-forum-head-left">
-                        <div class="dsc-forum-title" id="dscForumComposeTitle">✍️ 发帖</div>
-                        <div class="dsc-forum-sub">标题最多 5000 字 · 正文最多 500 万字</div>
+                        <div class="dsc-forum-title" id="dscForumComposeTitle">✍️ 投稿する</div>
+                        <div class="dsc-forum-sub">タイトル最大 5000 字 · 本文最大 500 万字</div>
                     </div>
-                    <button class="dsc-btn primary" id="dscForumComposeSubmitBtn">发布</button>
+                    <button class="dsc-btn primary" id="dscForumComposeSubmitBtn">公開</button>
                 </div>
                 <div class="dsc-forum-body dsc-forum-compose-body">
                     <div class="dsc-field">
-                        <label>📌 标题（<span class="cnt" id="dscForumTitleCount">0</span>/5000）</label>
-                        <input type="text" id="dscForumTitleInput" placeholder="输入标题..." autocomplete="off">
+                        <label>📌 タイトル（<span class="cnt" id="dscForumTitleCount">0</span>/5000）</label>
+                        <input type="text" id="dscForumTitleInput" placeholder="タイトルを入力..." autocomplete="off">
                     </div>
                     <div class="dsc-field">
-                        <label>📝 正文（<span class="cnt" id="dscForumContentCount">0</span>/5000000）</label>
-                        <textarea id="dscForumContentInput" placeholder="输入正文..." rows="18"></textarea>
-                        <div class="dsc-forum-compose-tip">支持换行与段落，保存时不会截断内容。</div>
+                        <label>📝 本文（<span class="cnt" id="dscForumContentCount">0</span>/5000000）</label>
+                        <textarea id="dscForumContentInput" placeholder="本文を入力..." rows="18"></textarea>
+                        <div class="dsc-forum-compose-tip">改行と段落に対応。保存時に内容は切り詰められません。</div>
                     </div>
                 </div>
             </div>
         </div>
-<!-- 日语单词本：主列表 v2 -->
+<!-- 日本語単語帳：主列表 v2 -->
         <div class="dsc-modal-overlay" id="dscVocabOverlay">
             <div class="dsc-vocab">
                 <div class="dsc-vocab-head">
                     <div class="dsc-vocab-head-left">
-                        <div class="dsc-vocab-title">📚 日语单词本</div>
-                        <div class="dsc-vocab-sub" id="dscVocabSub">加载中…</div>
+                        <div class="dsc-vocab-title">📚 日本語単語帳</div>
+                        <div class="dsc-vocab-sub" id="dscVocabSub">読み込み中…</div>
                     </div>
                     <div class="dsc-vocab-head-right">
-                        <button class="dsc-vocab-icon-btn" id="dscVocabReviewBtn" title="开始复习">🎯</button>
-                        <button class="dsc-vocab-icon-btn primary" id="dscVocabAddBtn" title="添加单词">＋</button>
-                        <button class="dsc-vocab-icon-btn" id="dscVocabMoreBtn" title="更多">⋯</button>
-                        <button class="dsc-vocab-icon-btn" id="dscVocabCloseBtn" title="关闭">✕</button>
+                        <button class="dsc-vocab-icon-btn" id="dscVocabReviewBtn" title="復習を開始">🎯</button>
+                        <button class="dsc-vocab-icon-btn primary" id="dscVocabAddBtn" title="単語を追加">＋</button>
+                        <button class="dsc-vocab-icon-btn" id="dscVocabMoreBtn" title="その他">⋯</button>
+                        <button class="dsc-vocab-icon-btn" id="dscVocabCloseBtn" title="閉じる">✕</button>
                     </div>
                 </div>
                 <div class="dsc-vocab-toolbar">
-                    <input type="text" id="dscVocabSearch" placeholder="搜索单词/读音/释义…" autocomplete="off">
+                    <input type="text" id="dscVocabSearch" placeholder="単語／読み／意味を検索…" autocomplete="off">
                     <select id="dscVocabLevelFilter">
-                        <option value="">全部级别</option>
+                        <option value="">すべてのレベル</option>
                         <option value="N5">N5</option>
                         <option value="N4">N4</option>
                         <option value="N3">N3</option>
                         <option value="N2">N2</option>
                         <option value="N1">N1</option>
-                        <option value="其他">其他</option>
+                        <option value="その他">その他</option>
                     </select>
                     <label class="dsc-vocab-due-toggle">
                         <input type="checkbox" id="dscVocabDueOnly">
-                        <span>仅待复习</span>
+                        <span>復習待ちのみ</span>
                     </label>
                 </div>
                 <div class="dsc-vocab-row-tabs" id="dscVocabRowTabs"></div>
                 <div class="dsc-vocab-batch-bar" id="dscVocabBatchBar">
-                    <label><input type="checkbox" id="dscVocabSelectAll"><span>全选</span></label>
-                    <span class="dsc-vocab-batch-count" id="dscVocabBatchCount">已选 0</span>
-                    <button class="dsc-vocab-batch-btn danger" id="dscVocabBatchDelBtn">删除选中</button>
-                    <button class="dsc-vocab-batch-btn ghost" id="dscVocabBatchCancelBtn">取消</button>
+                    <label><input type="checkbox" id="dscVocabSelectAll"><span>すべて選択</span></label>
+                    <span class="dsc-vocab-batch-count" id="dscVocabBatchCount">選択 0 件</span>
+                    <button class="dsc-vocab-batch-btn danger" id="dscVocabBatchDelBtn">選択を削除</button>
+                    <button class="dsc-vocab-batch-btn ghost" id="dscVocabBatchCancelBtn">キャンセル</button>
                 </div>
                 <div class="dsc-vocab-body" id="dscVocabBody">
                     <div class="dsc-vocab-list" id="dscVocabList"></div>
@@ -507,88 +507,88 @@
             </div>
         </div>
 
-        <!-- 日语单词本：编辑弹层 v2 -->
+        <!-- 日本語単語帳：編集ダイアログ v2 -->
         <div class="dsc-modal-overlay" id="dscVocabEditorOverlay">
             <div class="dsc-vocab">
                 <div class="dsc-vocab-head">
                     <div class="dsc-vocab-head-left">
-                        <div class="dsc-vocab-title" id="dscVocabEditorTitle">✍️ 添加单词</div>
-                        <div class="dsc-vocab-sub">填写单词信息</div>
+                        <div class="dsc-vocab-title" id="dscVocabEditorTitle">✍️ 単語を追加</div>
+                        <div class="dsc-vocab-sub">単語の情報を入力</div>
                     </div>
                     <div class="dsc-vocab-head-right">
-                        <button class="dsc-vocab-icon-btn" id="dscVocabEditorClose" title="关闭">✕</button>
+                        <button class="dsc-vocab-icon-btn" id="dscVocabEditorClose" title="閉じる">✕</button>
                     </div>
                 </div>
                 <div class="dsc-vocab-editor-body">
                     <div class="dsc-vocab-field">
-                        <label>单词 *</label>
-                        <input type="text" id="dscVocabWordInput" placeholder="日语单词" autocomplete="off">
+                        <label>単語 *</label>
+                        <input type="text" id="dscVocabWordInput" placeholder="日本語単語" autocomplete="off">
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>假名读音</label>
-                        <input type="text" id="dscVocabReadingInput" placeholder="如：たべる" autocomplete="off">
+                        <label>かな読み</label>
+                        <input type="text" id="dscVocabReadingInput" placeholder="例：たべる" autocomplete="off">
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>发音（数字标记）</label>
-                        <input type="text" id="dscVocabPitchInput" placeholder="如：0 或 [1] 或 [0,2]" autocomplete="off">
+                        <label>発音（数字表記）</label>
+                        <input type="text" id="dscVocabPitchInput" placeholder="例：0 / [1] / [0,2]" autocomplete="off">
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>释义</label>
-                        <textarea id="dscVocabMeaningInput" placeholder="中文释义" rows="3"></textarea>
+                        <label>意味</label>
+                        <textarea id="dscVocabMeaningInput" placeholder="中国語の意味" rows="3"></textarea>
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>词性</label>
-                        <input type="text" id="dscVocabPosInput" placeholder="如：动词/名词/形容词" autocomplete="off">
+                        <label>品詞</label>
+                        <input type="text" id="dscVocabPosInput" placeholder="例：動詞／名詞／形容詞" autocomplete="off">
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>级别</label>
+                        <label>レベル</label>
                         <select id="dscVocabLevelInput">
-                            <option value="">未分级</option>
+                            <option value="">未分類</option>
                             <option value="N5">N5</option>
                             <option value="N4">N4</option>
                             <option value="N3">N3</option>
                             <option value="N2">N2</option>
                             <option value="N1">N1</option>
-                            <option value="其他">其他</option>
+                            <option value="その他">その他</option>
                         </select>
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>标签（逗号分隔）</label>
-                        <input type="text" id="dscVocabTagsInput" placeholder="如：日常生活,动词" autocomplete="off">
+                        <label>タグ（カンマ区切り）</label>
+                        <input type="text" id="dscVocabTagsInput" placeholder="例：日常生活,動詞" autocomplete="off">
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>例句</label>
-                        <textarea id="dscVocabExampleInput" placeholder="例句（可选）" rows="4"></textarea>
+                        <label>例文</label>
+                        <textarea id="dscVocabExampleInput" placeholder="例文（任意）" rows="4"></textarea>
                     </div>
                     <div class="dsc-vocab-field">
-                        <label>图片（4:3 缩略图）</label>
+                        <label>画像（4:3 サムネイル）</label>
                         <div class="dsc-vocab-image-edit">
                             <div class="dsc-vocab-image-preview" id="dscVocabImagePreview">🖼️</div>
                             <div class="dsc-vocab-image-actions">
-                                <button type="button" id="dscVocabImagePickBtn">📷 选择图片</button>
-                                <button type="button" id="dscVocabImageDelBtn">🗑️ 移除图片</button>
+                                <button type="button" id="dscVocabImagePickBtn">📷 画像を選択</button>
+                                <button type="button" id="dscVocabImageDelBtn">🗑️ 画像を削除</button>
                             </div>
                         </div>
                         <input type="file" id="dscVocabImageInput" accept="image/*" style="display:none;">
                     </div>
                 </div>
                 <div class="dsc-vocab-editor-foot">
-                    <button class="dsc-vocab-btn" id="dscVocabEditorCancel">取消</button>
+                    <button class="dsc-vocab-btn" id="dscVocabEditorCancel">キャンセル</button>
                     <button class="dsc-vocab-btn primary" id="dscVocabEditorSubmit">💾 保存</button>
                 </div>
             </div>
         </div>
 
-        <!-- 日语单词本：复习弹层 -->
+        <!-- 日本語単語帳：復習ダイアログ -->
         <div class="dsc-modal-overlay" id="dscVocabReviewOverlay">
             <div class="dsc-vocab">
                 <div class="dsc-vocab-head">
                     <div class="dsc-vocab-head-left">
-                        <div class="dsc-vocab-title">🎯 复习模式</div>
+                        <div class="dsc-vocab-title">🎯 復習モード</div>
                         <div class="dsc-vocab-sub" id="dscVocabReviewProgress"></div>
                     </div>
                     <div class="dsc-vocab-head-right">
-                        <button class="dsc-vocab-icon-btn" id="dscVocabReviewClose" title="退出">✕</button>
+                        <button class="dsc-vocab-icon-btn" id="dscVocabReviewClose" title="終了">✕</button>
                     </div>
                 </div>
                 <div class="dsc-vocab-review-body" id="dscVocabReviewBody"></div>
@@ -596,14 +596,14 @@
             </div>
         </div>
 
-        <!-- 确认弹层 -->
+        <!-- 確認ダイアログ -->
         <div class="dsc-modal-overlay" id="dscConfirmOverlay">
             <div class="dsc-modal" style="max-width:340px;">
-                <div class="dsc-modal-title" id="dscConfirmTitle">确认</div>
+                <div class="dsc-modal-title" id="dscConfirmTitle">確認</div>
                 <div class="dsc-modal-sub" id="dscConfirmMsg" style="margin-bottom:20px;"></div>
                 <div class="dsc-modal-footer">
-                    <button class="dsc-btn ghost" id="dscConfirmCancel">取消</button>
-                    <button class="dsc-btn danger" id="dscConfirmOk">确定</button>
+                    <button class="dsc-btn ghost" id="dscConfirmCancel">キャンセル</button>
+                    <button class="dsc-btn danger" id="dscConfirmOk">OK</button>
                 </div>
             </div>
         </div>
@@ -611,14 +611,14 @@
 
     <script src="ds-files.js"></script>
     <script src="ds-devtools.js"></script>
-    <script src="deepseek-chat.js?v=20261025modelroute"></script>
+    <script src="deepseek-chat.js?v=20261102ttsja"></script>
     <script src="peakvalley.js"></script>
 
-    <!-- ★ 恢复数据：完全用内联脚本接管，不改 deepseek-chat.js -->
+    <!-- ★ データ復元：完全用内联脚本接管，不改 deepseek-chat.js -->
     <script>
     (function () {
         'use strict';
-        console.log('[RESTORE] 内联恢复模块加载');
+        console.log('[RESTORE] インライン復元モジュールを読み込み');
 
         function $(id) { return document.getElementById(id); }
 
@@ -678,10 +678,10 @@
 
         async function doRestore(file) {
             if (file.size > 50 * 1024 * 1024 * 1024 * 1024) {
-                showToast('文件超过 50TB 上限', 'error');
+                showToast('ファイルが 50TB の上限を超えています', 'error');
                 return;
             }
-            showToast('⏳ 正在上传备份文件…（' + (file.size / 1024 / 1024).toFixed(1) + ' MB）', 'info');
+            showToast('⏳ バックアップファイルをアップロード中…（' + (file.size / 1024 / 1024).toFixed(1) + ' MB）', 'info');
 
             var lastPct = -1;
             var form = new FormData();
@@ -696,7 +696,7 @@
                         var pct = Math.floor((ev.loaded / ev.total) * 100);
                         if (pct !== lastPct && pct % 10 === 0) {
                             lastPct = pct;
-                            showToast('⏳ 上传中 ' + pct + '%（' +
+                            showToast('⏳ アップロード中 ' + pct + '%（' +
                                 (ev.loaded / 1024 / 1024).toFixed(1) + ' / ' +
                                 (ev.total / 1024 / 1024).toFixed(1) + ' MB）', 'info');
                         }
@@ -711,16 +711,16 @@
                             reject(new Error(msg));
                         }
                     };
-                    xhr.onerror = function () { reject(new Error('网络错误')); };
+                    xhr.onerror = function () { reject(new Error('ネットワークエラー')); };
                     xhr.send(form);
                 });
 
-                showToast('✅ 恢复成功！已解压 ' + (result.extracted || 0) +
-                    ' 个文件，页面即将刷新…', 'success');
+                showToast('✅ 復元に成功しました！展開済み ' + (result.extracted || 0) +
+                    ' 件のファイル。ページを再読み込みします…', 'success');
                 setTimeout(function () { location.reload(); }, 2000);
             } catch (err) {
-                console.error('[RESTORE] 失败:', err);
-                showCenterError('恢复失败：' + (err.message || err));
+                console.error('[RESTORE] 失敗:', err);
+                showCenterError('復元に失敗：' + (err.message || err));
             }
         }
 
@@ -729,20 +729,20 @@
             var input = $('dscRestoreFileInput');
             if (!btn || !input) return;
 
-            // 点按钮 → 弹确认框 → 打开文件选择
+            // 点ボタン → 確認ダイアログ表示 → ファイル選択を開く
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                // 顺手关掉「⋯」菜单
+                // ついでにオフに「⋯」メニュー
                 var menu = $('dscMoreMenu');
                 var moreBtn = $('dscMoreBtn');
                 if (menu) menu.classList.remove('open');
                 if (moreBtn) moreBtn.classList.remove('more-active');
 
                 confirmDialog(
-                    '♻️ 从备份恢复数据',
-                    '将使用你上传的 .tar.gz 备份文件，覆盖当前 data/ 与 imgs/ 目录下的全部内容。\n\n' +
-                    '此操作不可撤销，请确认你已经做好当前数据的备份！\n\n' +
-                    '（建议：先用「📦 数据备份」按钮把当前数据下载一份）'
+                    '♻️ バックアップから復元',
+                    'アップロードした .tar.gz バックアップで、現在の data/ と imgs/ ディレクトリ全体を上書きします。\n\n' +
+                    'この操作は元に戻せません。現在のデータのバックアップが済んでいるか確認してください！\n\n' +
+                    '（推奨：先に「📦 データバックアップ」ボタンで現在のデータをダウンロードしてください）'
                 ).then(function (ok) {
                     if (!ok) return;
                     input.value = '';
@@ -750,12 +750,12 @@
                 });
             });
 
-            // 文件选择后上传
+            // ファイル選択後にアップロード
             input.addEventListener('change', function (e) {
                 var file = e.target.files && e.target.files[0];
                 if (!file) return;
                 if (!/\.(tar\.gz|tgz|gz)$/i.test(file.name)) {
-                    showToast('请上传 .tar.gz 备份文件', 'error');
+                    showToast('.tar.gz バックアップファイルをアップロードしてください', 'error');
                     input.value = '';
                     return;
                 }
@@ -763,7 +763,7 @@
                 input.value = '';
             });
 
-            console.log('[RESTORE] ✅ 恢复按钮已绑定');
+            console.log('[RESTORE] ✅ 復元ボタンをバインドしました');
         }
 
         if (document.readyState === 'loading') {
@@ -774,7 +774,7 @@
     })();
     </script>
 
-    <!-- 启动入口 -->
+    <!-- 起動入口 -->
     <script>
     (function () {
         var done = false, tries = 0;
@@ -803,7 +803,7 @@
         setTimeout(enter, 1200);
     })();
     </script>
-    <!-- FIX: 阻止安卓浏览器长按控件出现的蓝色选中高亮方块 -->
+    <!-- FIX: 阻止安卓浏览器长押す控件出现的蓝色选中高亮方块 -->
     <script>
     (function () {
       var SEL = 'button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"], a[href], label[for], .dsc-icon-btn, .dsc-menu-item, .dsc-more-item, .dsc-session-act-btn, .dsc-batch-btn, .dsc-switch-btn, .dsc-advanced-btn, .dsc-longtext-btn, .dsc-level-btn, .dsc-novel-btn, .dsc-plus-btn, .dsc-send-btn, .dsc-newline-btn, .dsc-msg-copy-btn, .dsc-msg-speak-btn, .dsc-code-copy, .dsc-msg-continue-btn, .dsc-think-header, .dsc-batch-all, .dsc-regex-toggle, .dsc-custom-select-btn, .dsc-custom-select-label';
@@ -823,9 +823,9 @@
         if (e.touches.length !== 1) { el0 = null; return; }
         var t = e.target;
         // ===== FIX(vocab-swipe) =====
-        // 假名栏 / 单词本纵向列表 / 工具栏行：需要原生滚动（横向 pan-x 或纵向），
-        // 不能走「模拟点击 + scrollTop 补偿」这套，否则手指滑不动。
-        // 直接返回、不做 preventDefault，让浏览器原生接管。
+        // 仮名欄 / 単語帳の縦リスト / ツールバー行：ネイティブスクロールが必要（横向き pan-x または縦方向）、
+        // 「模擬クリック」は使えません + scrollTop 補償」の仕組みがないと、指でスクロールできません。
+        // 直接戻る、不做 preventDefault。ブラウザのネイティブ処理に任せます。
         if (t && t.closest && t.closest(
               '.dsc-vocab-row-tabs, ' +
               '.dsc-vocab-body, ' +

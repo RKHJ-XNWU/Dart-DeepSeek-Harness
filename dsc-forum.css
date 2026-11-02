@@ -1,9 +1,9 @@
 /* ============================================================
-   dsc-forum.css —— 论坛帖子模块（帖子展示与论坛发帖）
-   沿用现有站点视觉风格与色彩变量（indigo 主色 #4f46e5 等）
+   dsc-forum.css —— フォーラム投稿モジュール（投稿表示とフォーラム投稿）
+   既存サイトのビジュアルスタイルと色変数を踏襲（indigo メイン #4f46e5 など）
    ============================================================ */
 
-/* ============ 全屏覆盖层（列表 / 详情 / 发帖） ============ */
+/* ============ 全画面オーバーレイ（一覧 / 詳細 / 投稿） ============ */
 #dscForumOverlay,
 #dscForumDetailOverlay,
 #dscForumComposeOverlay {
@@ -37,7 +37,7 @@
   background: #ffffff;
 }
 
-/* ============ 顶部栏 ============ */
+/* ============ 上部バー ============ */
 .dsc-forum-head {
   display: flex;
   align-items: center;
@@ -66,7 +66,7 @@
 .dsc-forum-icon-btn:hover { background: #f3f4f6; color: #1f2937; }
 .dsc-forum-icon-btn.active { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
 
-/* ============ 内容滚动区 ============ */
+/* ============ 内容スクロール領域 ============ */
 .dsc-forum-body {
   flex: 1;
   overflow-y: auto;
@@ -78,7 +78,7 @@
 .dsc-forum-body::-webkit-scrollbar { width: 6px; }
 .dsc-forum-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
-/* ============ 批量操作条 ============ */
+/* ============ 一括操作バー ============ */
 .dsc-forum-batch-bar {
   display: none;
   align-items: center;
@@ -99,7 +99,7 @@
 .dsc-batch-btn.ghost { background: transparent; border-color: transparent; color: #6b7280; }
 .dsc-batch-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* ============ 帖子列表 & 卡片 ============ */
+/* ============ 投稿リスト & 卡片 ============ */
 .dsc-forum-list { display: flex; flex-direction: column; gap: 10px; }
 .dsc-forum-empty { text-align: center; color: #9ca3af; font-size: 0.9rem; padding: 40px 16px; line-height: 1.7; }
 .dsc-forum-empty .emoji { font-size: 2rem; display: block; margin-bottom: 10px; }
@@ -156,7 +156,7 @@
 }
 .dsc-forum-card-summary.blocked { color: #9ca3af; font-style: italic; }
 
-/* 状态标签 */
+/* 状態ラベル */
 .dsc-forum-tag {
   display: inline-flex; align-items: center;
   font-size: 0.66rem; padding: 2px 8px; border-radius: 999px;
@@ -166,7 +166,7 @@
 .dsc-forum-tag.feature { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
 .dsc-forum-tag.block { background: #f3f4f6; color: #9ca3af; border: 1px solid #e5e7eb; }
 
-/* ============ 详情页 ============ */
+/* ============ 詳細ページ ============ */
 .dsc-forum-detail-body { padding-top: 18px; }
 .dsc-forum-detail-meta {
   font-size: 0.76rem; color: #9ca3af; margin-bottom: 14px;
@@ -187,7 +187,7 @@
 }
 .dsc-forum-detail-blocked .emoji { font-size: 2.2rem; display: block; margin-bottom: 10px; }
 
-/* ============ 发帖页 ============ */
+/* ============ 投稿ページ ============ */
 .dsc-forum-compose-body { display: flex; flex-direction: column; gap: 0; }
 .dsc-forum-compose-body .dsc-field { margin-bottom: 16px; }
 .dsc-forum-compose-body .dsc-field label { font-size: 0.8rem; color: #4b5563; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
@@ -204,7 +204,7 @@
 .dsc-forum-compose-body .dsc-field textarea { min-height: 46vh; max-height: none; }
 .dsc-forum-compose-body .dsc-forum-compose-tip { font-size: 0.72rem; color: #9ca3af; margin-top: 6px; }
 
-/* ============ 通用悬浮操作菜单（fixed 定位，避免被滚动容器裁切） ============ */
+/* ============ 汎用フローティング操作メニュー（fixed 配置でスクロールコンテナに切り取られない） ============ */
 .dsc-forum-popmenu {
   position: fixed;
   z-index: 400000;
@@ -228,7 +228,7 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* 小屏适配 */
+/* 小画面対応 */
 @media (max-width: 720px) {
   .dsc-forum-head { padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); gap: 8px; }
   .dsc-forum-body { padding: 12px 12px calc(20px + env(safe-area-inset-bottom, 0px)); }
@@ -236,7 +236,7 @@
   .dsc-forum-icon-btn { width: 34px; height: 34px; }
 }
 
-/* ============ 加载更多 ============ */
+/* ============ さらに読み込む ============ */
 .dsc-forum-loadmore {
   text-align: center;
   font-size: 0.8rem;

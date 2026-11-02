@@ -1,28 +1,28 @@
-// peakvalley.js — 峰谷提醒前端（移植自 chicheng-peak 插件）
+// peakvalley.js — ピーク／オフピーク通知前端（移植自 chicheng-peak 插件）
 //
-// 职责：
-//   1. 页面边缘呼吸边框（高峰橙 / 低峰蓝）、光晕方向、流光彗星
-//   2. 输入框光效：跟随 DeepSeek 聊天的输入框控件，参数与页面边框完全独立
-//   3. 状态角标：PC / 手机端各自四角定位
-//   4. 浏览器本地通知
-//   5. 设置面板：状态 / 时段 / 边框 / 输入框 / 角标 / 通知 / 推送提醒 / 关于
+// 役割：
+// 1. ページ端の呼吸する枠線（ピークはオレンジ / オフピークはブルー）、グローの方向、流れる光（コメット）
+// 2. 入力欄の光効果：DeepSeek チャットの入力欄コントロールに追従し、設定はページ枠と完全に独立
+//   3. 状態バッジ：PC / スマホ各自四角定位
+//   4. 浏览器ローカル通知
+// 5. 設定パネル：状態 / 時間帯 / 枠 / 入力欄 / バッジ / 通知 / プッシュ通知 / この機能について
 //
-// 后端：/api/peakvalley/*（peakvalley.go）
-// 时段（北京时间）：高峰 09:00–12:00、14:00–18:00，其余为低峰。
+// バックエンド：/api/peakvalley/*（peakvalley.go）
+// 時間帯（北京時間）：ピーク 09:00–12:00、14:00–18:00、それ以外はオフピーク。
 
 (function () {
     'use strict';
 
     var API_BASE = '/api/peakvalley/';
 
-    // 运行期状态
-    var cfg = null;          // 已保存配置
-    var status = null;       // 最近一次 status 载荷
-    var defaults = null;     // 服务端默认值
-    var channelTypes = [];   // 渠道类型元数据
+    // 実行時の状態
+    var cfg = null;          // 保存済み配置
+    var status = null;       // 直近の status ペイロード
+    var defaults = null;     // サーバー側の既定値
+    var channelTypes = [];   // チャネルの種類元数据
     var timezones = [];
     var dataPath = '';
-    var work = null;         // 编辑中的配置副本
+    var work = null;         // 編集中的配置副本
 
     var pollTimer = null;
     var posTimer = null;
@@ -34,13 +34,13 @@
     var lastPeakFired = '';
     var lastValleyFired = '';
 
-    var modal = null;        // 设置面板根节点
+    var modal = null;        // 設定パネルのルートノード
     var modalBody = null;
     var countdownTimer = null;
-    var editingChannel = null;   // 正在编辑的渠道
+    var editingChannel = null;   // 正在編集的渠道
     var channelMsg = '';
 
-    // ============================================================ 基础工具
+    // ============================================================ 基本ユーティリティ
 
     function $(id) {
         return document.getElementById(id);
@@ -85,7 +85,7 @@
             return res.json();
         }).then(function (body) {
             if (!body || body.ok !== true) {
-                var msg = body && body.error && body.error.message ? body.error.message : '请求失败';
+                var msg = body && body.error && body.error.message ? body.error.message : 'リクエストに失敗';
                 var err = new Error(msg);
                 err.code = body && body.error ? body.error.code : 'api-error';
                 throw err;
@@ -109,8 +109,8 @@
         }, 2400);
     }
 
-    // ============================================================ 阶段本地计算
-    // 用于设置面板的即时预览：不依赖服务端往返
+    // ============================================================ 段階のローカル計算
+    // 設定パネルの即時プレビュー用：サーバー往復に依存しない
 
     function parseHM(s) {
         var m = /^(\d{1,2}):([0-5]\d)$/.exec(String(s || '').trim());
@@ -137,7 +137,7 @@
                 if (h === 24) { h = 0; }
                 return h * 60 + mi;
             }
-        } catch (e) { /* 回退到本地时区 */ }
+        } catch (e) { /* 回退到本地タイムゾーン */ }
         return d.getHours() * 60 + d.getMinutes();
     }
 
@@ -159,10 +159,10 @@
     }
 
     function phaseLabel(phase) {
-        return phase === 'peak' ? '高峰期' : '低峰期';
+        return phase === 'peak' ? 'ピーク時間帯' : 'オフピーク時間帯';
     }
 
-    // ============================================================ 覆盖层
+    // ============================================================ オーバーレイ
 
     var ov = {
         root: null, ring: null, glow: null, svg: null, rect: null,
@@ -181,7 +181,7 @@
         var glow = ce('div');
         glow.id = 'pv-glow';
 
-        // 流光：用 SVG 描边虚线实现，沿边框匀速跑光
+        // 流光：SVG のストローク破線で実装し、枠に沿って等速で光が走る
         var svgNS = 'http://www.w3.org/2000/svg';
         var svg = document.createElementNS(svgNS, 'svg');
         svg.id = 'pv-svg';
@@ -218,7 +218,7 @@
 
         var badge = ce('div');
         badge.id = 'pv-badge';
-        badge.title = '峰谷提醒（点击打开设置）';
+        badge.title = 'ピーク／オフピーク通知（タップで設定を開く）';
         badge.addEventListener('click', function () { openSettings(); });
         document.body.appendChild(badge);
 
@@ -234,7 +234,7 @@
         ov.badge = badge;
     }
 
-    /** 生效范围：默认只在 DeepSeek 聊天打开时生效 */
+    /** 適用範囲：既定では DeepSeek チャットを開いたときに有効 */
     function scopeActive() {
         var scope = (work && work.scope) || (cfg && cfg.scope) || 'deepseek';
         if (scope === 'global') { return true; }
@@ -250,7 +250,7 @@
         ov.badge.style.display = 'none';
     }
 
-    /** 把配色/尺寸/动画套到页面边框图层 */
+    /** 配色/サイズ/アニメーションをページ枠レイヤーに適用する */
     function applyEdgeLayer(edge, phase) {
         var color = phase === 'peak' ? edge.peakColor : edge.valleyColor;
         var width = clamp(edge.width, 1, 14);
@@ -263,7 +263,7 @@
         ov.ring.style.border = width + 'px solid ' + color;
         ov.ring.style.opacity = String(opacity);
 
-        // 光晕：呼吸动画只改 opacity（走合成层，不触发重排）
+        // グロー：呼吸アニメーションは opacity のみ変更（コンポジット層で処理し、リフローを起こさない）
         ov.glow.style.boxShadow = (dirIn ? 'inset ' : '') + '0 0 ' + glow + 'px ' + color;
         if (edge.animation === 'breathing' && glow > 0) {
             ov.glow.className = 'pv-anim-breathing';
@@ -291,7 +291,7 @@
         return speed;
     }
 
-    /** 输入框光效图层 */
+    /** 入力欄の光効果图层 */
     function applyComposerLayer(comp, phase) {
         var color = phase === 'peak' ? comp.peakColor : comp.valleyColor;
         var width = clamp(comp.width, 1, 14);
@@ -333,7 +333,7 @@
         }
         var phase = s.phase || 'valley';
 
-        // ---- 页面边缘
+        // ---- ページ端
         var edge = s.edge || {};
         if (edge.enabled !== false) {
             applyEdgeLayer(edge, phase);
@@ -342,10 +342,10 @@
             ov.ring.style.opacity = '0';
             ov.glow.style.opacity = '0';
             ov.svg.style.display = 'none';
-            ov.root.style.display = 'block'; // 角标/输入框仍可能独立开启
+            ov.root.style.display = 'block'; // バッジ/入力欄は独立して有効になる場合があります
         }
 
-        // ---- 输入框光效
+        // ---- 入力欄の光効果
         var comp = s.composer || {};
         if (comp.enabled !== false) {
             applyComposerLayer(comp, phase);
@@ -354,7 +354,7 @@
             ov.composer.style.display = 'none';
         }
 
-        // ---- 状态角标
+        // ---- 状態バッジ
         var bd = s.badge || {};
         if (bd.enabled !== false) {
             applyBadge(bd, phase);
@@ -362,7 +362,7 @@
             ov.badge.style.display = 'none';
         }
 
-        // 页面边缘全关且无角标/输入框时彻底隐藏
+        // ページ端をすべてオフかつバッジ/入力欄なしのとき完全に非表示
         var anyEdge = edge.enabled !== false;
         var anyComp = comp.enabled !== false;
         var anyBadge = bd.enabled !== false;
@@ -407,7 +407,7 @@
         }
     }
 
-    /** 找到 DeepSeek 聊天的输入框容器（优先 .dsc-input-wrap） */
+    /** DeepSeek チャットの入力欄コンテナを取得（.dsc-input-wrap を優先） */
     function composerEl() {
         var input = $('dscInput');
         if (input) {
@@ -417,7 +417,7 @@
             }
             return input;
         }
-        // 兜底：可见的 textarea（排除弹窗内的输入框）
+        // フォールバック：可視の textarea（ダイアログ内の入力欄を除く）
         var nodes = document.querySelectorAll('textarea');
         for (var i = 0; i < nodes.length; i += 1) {
             var n = nodes[i];
@@ -450,7 +450,7 @@
         try {
             var cs = window.getComputedStyle ? window.getComputedStyle(el).borderRadius : '';
             if (cs && cs !== '0px' && cs !== '') { radius = cs; }
-        } catch (e) { /* 保留默认 */ }
+        } catch (e) { /* 既定値を保持 */ }
 
         ov.composer.style.display = 'block';
         ov.composer.style.left = Math.round(r.left) + 'px';
@@ -460,13 +460,13 @@
         ov.composer.style.borderRadius = radius;
         ov.cglow.style.borderRadius = radius;
 
-        // 流光路径尺寸
+        // 流れる光のパス寸法
         ov.crect.setAttribute('width', String(Math.max(0, Math.round(r.width) - 2)));
         ov.crect.setAttribute('height', String(Math.max(0, Math.round(r.height) - 2)));
         ov.crect.setAttribute('rx', String(parseFloat(radius) || 10));
     }
 
-    /** 流光动画：用 stroke-dashoffset 沿矩形匀速跑光（兼容性最好） */
+    /** 流れる光のアニメーション：stroke-dashoffset で矩形に沿って等速で光を走らせる（互換性が最良） */
     function flowFrame(ts) {
         rafId = null;
         var now = ts || Date.now();
@@ -547,7 +547,7 @@
         applyBadge(bd, phase);
     }
 
-    // ============================================================ 本地通知
+    // ============================================================ ローカル通知
 
     function notifySupported() {
         return typeof window !== 'undefined' && 'Notification' in window;
@@ -558,7 +558,7 @@
         if (Notification.permission !== 'granted') { return; }
         try {
             new Notification(String(title), { body: String(body), tag: 'peakvalley' });
-        } catch (e) { /* 部分移动浏览器不允许直接构造 */ }
+        } catch (e) { /* 一部のモバイルブラウザは直接構築を許可しない */ }
     }
 
     function detectNotify(s) {
@@ -567,17 +567,17 @@
         var body = '';
         if (s.localNotify.onTransition !== false && s.phase && lastPhase !== null && s.phase !== lastPhase) {
             var peakNow = s.phase === 'peak';
-            title = peakNow ? 'DeepSeek 高峰期开始' : 'DeepSeek 低峰期开始';
-            body = peakNow ? '当前为高峰期（09:00–12:00 / 14:00–18:00）' : '当前为低峰期（空闲时段，价格约为高峰一半）';
+            title = peakNow ? 'DeepSeek ピーク時間帯が開始' : 'DeepSeek オフピーク時間帯が開始';
+            body = peakNow ? '現在はピーク時間帯（09:00–12:00 / 14:00–18:00）' : '現在はオフピーク時間帯（アイドル時間、料金はピークの約半額）';
         } else if (s.localNotify.onReminder === true && s.reminders) {
             var pk = s.reminders.peak ? s.reminders.peak.lastFiredAt : '';
             var vl = s.reminders.valley ? s.reminders.valley.lastFiredAt : '';
             if (pk && pk !== lastPeakFired) {
-                title = (s.reminders.peak.title || '高峰期提醒');
-                body = '已通过推送渠道发送高峰期提醒';
+                title = (s.reminders.peak.title || 'ピーク時間帯の通知');
+                body = 'プッシュチャネルでピーク時間帯の通知を送信しました';
             } else if (vl && vl !== lastValleyFired) {
-                title = (s.reminders.valley.title || '低峰期提醒');
-                body = '已通过推送渠道发送低峰期提醒';
+                title = (s.reminders.valley.title || 'オフピーク時間帯の通知');
+                body = 'プッシュチャネルでオフピーク時間帯の通知を送信しました';
             }
             lastPeakFired = pk || '';
             lastValleyFired = vl || '';
@@ -586,7 +586,7 @@
         if (title) { notify(title, body); }
     }
 
-    // ============================================================ 轮询
+    // ============================================================ ポーリング
 
     function startPolling(seconds) {
         stopPolling();
@@ -610,12 +610,12 @@
                 updateStatusCard();
             }
         }).catch(function (e) {
-            // 服务端不可用：隐藏覆盖层，避免残留旧状态误导
+            // サーバー不通：オーバーレイを隠し、古い状態の残像で誤解させない
             hideAll();
         });
     }
 
-    // ============================================================ 设置面板
+    // ============================================================ 設定面板
 
     function previewStatus() {
         var w = work || cfg;
@@ -635,7 +635,7 @@
         ensureFlowLoop();
     }
 
-    // ---- 通用控件
+    // ---- 汎用コントロール
 
     function mkSwitch(checked, onChange) {
         var wrap = ce('label', 'pv-switch');
@@ -734,7 +734,7 @@
         return ta;
     }
 
-    /** 一行：左标签 + 右控件 */
+    /** 一行：左タグ + 右控件 */
     function row(name, help, ctrl) {
         var wrap = ce('div', 'pv-row');
         var lab = ce('div', 'pv-label');
@@ -773,31 +773,31 @@
         var head = ce('div', 'pv-head');
         head.appendChild(ce('div', 'pv-head-icon', '🏔️'));
         var headText = ce('div', 'pv-head-text');
-        headText.appendChild(ce('div', 'pv-head-title', '峰谷提醒'));
-        headText.appendChild(ce('div', 'pv-head-sub', 'DeepSeek 峰谷时段 · 边框光效 · 推送提醒'));
+        headText.appendChild(ce('div', 'pv-head-title', 'ピーク／オフピーク通知'));
+        headText.appendChild(ce('div', 'pv-head-sub', 'DeepSeek ピーク／オフピーク時間帯 · 枠の光効果 · プッシュ通知'));
         head.appendChild(headText);
         var closeBtn = ce('button', 'pv-close', '✕');
         closeBtn.type = 'button';
-        closeBtn.title = '关闭';
+        closeBtn.title = '閉じる';
         closeBtn.addEventListener('click', function () { closeSettings(); });
         head.appendChild(closeBtn);
 
         var body = ce('div', 'pv-body');
 
         var foot = ce('div', 'pv-foot');
-        var resetAll = btn('恢复全部默认', 'pv-btn-ghost pv-btn-sm', function () {
-            if (!confirm('将把所有外观与提醒设置恢复为默认值（推送渠道保留），确定吗？')) { return; }
+        var resetAll = btn('すべて既定に戻す', 'pv-btn-ghost pv-btn-sm', function () {
+            if (!confirm('すべての外観と通知の設定を既定値に戻します（プッシュチャネルは保持）。よろしいですか？')) { return; }
             api('reset', { section: 'all' }).then(function (v) {
                 cfg = v.config;
                 work = clone(cfg);
                 renderBody();
                 refreshPreview();
-                toast('已恢复默认');
-            }).catch(function (e) { toast('恢复失败：' + e.message); });
+                toast('既定に戻しました');
+            }).catch(function (e) { toast('復元に失敗：' + e.message); });
         });
         foot.appendChild(resetAll);
         foot.appendChild(ce('div', 'pv-foot-spacer'));
-        foot.appendChild(btn('关闭', '', function () { closeSettings(); }));
+        foot.appendChild(btn('閉じる', '', function () { closeSettings(); }));
         foot.appendChild(btn('保存', 'pv-btn-primary', saveConfig));
 
         sheet.appendChild(head);
@@ -813,7 +813,7 @@
         modal = overlay;
         modalBody = body;
 
-        // 真实可见高度变化时（浏览器工具栏收放、横竖屏切换、软键盘弹出）同步给 CSS
+        // 実際の可視高さが変わったとき（ブラウザツールバーの出入り、縦横切替、ソフトキーボード表示）に CSS へ同期
         var sync = function () { syncViewportVar(); };
         window.addEventListener('resize', sync);
         window.addEventListener('orientationchange', sync);
@@ -823,7 +823,7 @@
         }
     }
 
-    // 把"实际可见高度"写进 --pv-vh，让面板永远不超过可见区域
+    // 「実際の可視高さ」を --pv-vh に書き込み、パネルが可視領域を超えないようにする
     function syncViewportVar() {
         if (!modal) { return; }
         var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 0;
@@ -836,7 +836,7 @@
         ensureModal();
         syncViewportVar();
         modalBody.innerHTML = '';
-        modalBody.appendChild(ce('div', 'pv-empty', '加载中…'));
+        modalBody.appendChild(ce('div', 'pv-empty', '読み込み中…'));
         modal.classList.add('pv-open');
 
         api('config').then(function (v) {
@@ -850,11 +850,11 @@
             renderBody();
             refreshPreview();
             startCountdown();
-            // 打开面板时刷新一次状态，保证阶段与倒计时是最新的
+            // パネルを開いたときに状態を 1 回更新し、段階とカウントダウンを最新に保つ
             poll();
         }).catch(function (e) {
             modalBody.innerHTML = '';
-            var err = ce('div', 'pv-empty', '加载失败：' + e.message + '（请确认服务已启动）');
+            var err = ce('div', 'pv-empty', '読み込みに失敗：' + e.message + '（サービスが起動しているか確認してください）');
             modalBody.appendChild(err);
         });
     }
@@ -863,7 +863,7 @@
         if (modal) { modal.classList.remove('pv-open'); }
         stopCountdown();
         editingChannel = null;
-        // 放弃未保存的改动，回到已保存状态
+        // 放弃未保存的改动，回到保存済み状态
         work = null;
         applyOverlay(status);
     }
@@ -892,9 +892,9 @@
             applyOverlay(status);
             ensureFlowLoop();
             startPolling(cfg.pollSeconds);
-            toast('已保存');
+            toast('保存済み');
         }).catch(function (e) {
-            toast('保存失败：' + e.message);
+            toast('保存に失敗：' + e.message);
         });
     }
 
@@ -915,12 +915,12 @@
         modalBody.appendChild(buildAboutCard());
     }
 
-    // ---- 状态卡
+    // ---- 状態カード
 
     var statusCardRefs = {};
 
     function buildStatusCard() {
-        var c = card('当前状态', '实时阶段、下一转折倒计时与手动覆盖。');
+        var c = card('現在の状態', '現在の時間帯、次の切替までのカウントダウン、手動上書き。');
         var line = ce('div', 'pv-row');
 
         var pill = ce('span', 'pv-pill');
@@ -938,34 +938,34 @@
         statusCardRefs = { pill: pill, pillText: pillText, nextText: nextText };
         updateStatusCard();
 
-        c.appendChild(row('启用峰谷提醒', '总开关，关闭后边框、光效、角标与推送提醒全部停止。',
+        c.appendChild(row('ピーク／オフピーク通知を有効化', 'メインスイッチ。オフにすると枠・光効果・バッジ・プッシュ通知がすべて停止します。',
             mkSwitch(work.enabled, function (v) {
                 work.enabled = v;
                 refreshPreview();
             })));
 
-        c.appendChild(row('生效范围', '默认只在 DeepSeek 聊天界面生效，避免影响其他页面。',
+        c.appendChild(row('適用範囲', '既定では DeepSeek チャット画面のみで有効になり、他のページに影響しません。',
             mkSelect([
-                { value: 'deepseek', label: '仅 DeepSeek 聊天' },
-                { value: 'global', label: '全部页面' }
+                { value: 'deepseek', label: 'DeepSeek チャットのみ' },
+                { value: 'global', label: 'すべてのページ' }
             ], work.scope, function (v) {
                 work.scope = v;
                 refreshPreview();
                 positionComposer();
             })));
 
-        c.appendChild(row('判定模式', '自动判定按下方时段计算；强制模式用于预览效果。',
+        c.appendChild(row('判定モード', '自動判定は下記の時間帯で計算します。強制モードは見た目の確認用です。',
             mkSelect([
-                { value: 'auto', label: '自动判定' },
-                { value: 'peak', label: '强制高峰' },
-                { value: 'valley', label: '强制低峰' }
+                { value: 'auto', label: '自動判定' },
+                { value: 'peak', label: 'ピークを強制' },
+                { value: 'valley', label: 'オフピークを強制' }
             ], work.override, function (v) {
                 work.override = v;
                 refreshPreview();
                 updateStatusCard();
             })));
 
-        c.appendChild(row('状态刷新间隔', '页面打开时向服务端查询阶段的频率（秒）。',
+        c.appendChild(row('状態更新の間隔', 'ページを開いている間にサーバーへ段階を問い合わせる頻度（秒）。',
             mkRange(5, 60, 1, work.pollSeconds, ' 秒', function (v) {
                 work.pollSeconds = Math.round(v);
             })));
@@ -985,36 +985,36 @@
 
         if (!statusCardRefs.nextText) { return; }
         if (work.override !== 'auto') {
-            statusCardRefs.nextText.textContent = '强制模式下不计算转折';
+            statusCardRefs.nextText.textContent = '強制モードでは切替を計算しません';
             return;
         }
         var nextAt = status && status.nextTransitionAt ? new Date(status.nextTransitionAt) : null;
         if (!nextAt || isNaN(nextAt.getTime())) {
-            statusCardRefs.nextText.textContent = '下一转折：—';
+            statusCardRefs.nextText.textContent = '次の切替：—';
             return;
         }
         var diff = Math.max(0, Math.round((nextAt.getTime() - Date.now()) / 1000));
         var hh = Math.floor(diff / 3600);
         var mm = Math.floor((diff % 3600) / 60);
         var ss = diff % 60;
-        var cd = hh > 0 ? (hh + ' 小时 ' + mm + ' 分') : (mm + ' 分 ' + pad2(ss) + ' 秒');
-        var nextPhase = status && status.nextPhase === 'peak' ? '高峰期' : '低峰期';
+        var cd = hh > 0 ? (hh + ' 時間 ' + mm + ' 分') : (mm + ' 分 ' + pad2(ss) + ' 秒');
+        var nextPhase = status && status.nextPhase === 'peak' ? 'ピーク時間帯' : 'オフピーク時間帯';
         var t = new Date(nextAt.getTime());
         var hm = pad2(t.getHours()) + ':' + pad2(t.getMinutes());
-        statusCardRefs.nextText.textContent = '下一转折：' + hm + ' → ' + nextPhase + '（' + cd + '后）';
+        statusCardRefs.nextText.textContent = '次の切替：' + hm + ' → ' + nextPhase + '（' + cd + '後）';
     }
 
-    // ---- 高峰时段卡
+    // ---- ピーク時間帯カード
 
     function buildWindowsCard() {
-        var c = card('高峰时段设置', '默认官方时段（北京时间，2026-08-17 起生效）。其余时间自动视为低峰期。');
+        var c = card('ピーク時間帯の設定', '既定の公式時間帯（北京時間、2026-08-17 から有効）。それ以外の時間は自動的にオフピーク時間帯とみなされます。');
         var list = ce('div', 'pv-row-col');
         list.id = 'pvWindowList';
 
         function renderWindows() {
             list.innerHTML = '';
             if (!work.windows.length) {
-                list.appendChild(ce('div', 'pv-empty', '还没有时段，请添加至少一个'));
+                list.appendChild(ce('div', 'pv-empty', '時間帯がありません。少なくとも 1 つ追加してください'));
             }
             work.windows.forEach(function (w, idx) {
                 var line = ce('div', 'pv-window-row');
@@ -1033,9 +1033,9 @@
                     work.windows[idx].end = en.value;
                     refreshPreview();
                 });
-                var del = btn('移除', 'pv-btn-danger pv-btn-sm', function () {
+                var del = btn('削除', 'pv-btn-danger pv-btn-sm', function () {
                     if (work.windows.length <= 1) {
-                        toast('至少保留一个高峰时段');
+                        toast('ピーク時間帯を少なくとも 1 つ残してください');
                         return;
                     }
                     work.windows.splice(idx, 1);
@@ -1054,12 +1054,12 @@
         renderWindows();
 
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('＋ 添加时段', '', function () {
+        actions.appendChild(btn('＋ 時間帯を追加', '', function () {
             work.windows.push({ start: '09:00', end: '12:00' });
             renderWindows();
             refreshPreview();
         }));
-        actions.appendChild(btn('恢复官方默认', '', function () {
+        actions.appendChild(btn('公式の既定に戻す', '', function () {
             work.windows = [
                 { start: '09:00', end: '12:00' },
                 { start: '14:00', end: '18:00' }
@@ -1069,7 +1069,7 @@
         }));
         c.appendChild(actions);
 
-        c.appendChild(row('时区', '时段按此时区换算；官方时段为北京时间。',
+        c.appendChild(row('タイムゾーン', '時間帯はこのタイムゾーンで換算されます。公式時間帯は北京時間です。',
             mkSelect(timezones.map(function (tz) { return { value: tz, label: tz }; }),
                 work.timezone, function (v) {
                     work.timezone = v;
@@ -1080,74 +1080,74 @@
         return c;
     }
 
-    // ---- 视觉参数卡（边框 / 输入框共用）
+    // ---- 見た目のパラメータカード（枠 / 入力欄で共用）
 
     function buildVisualControls(target, prefix) {
         var frag = document.createDocumentFragment();
 
-        frag.appendChild(row('高峰颜色', '高峰期使用的颜色。',
+        frag.appendChild(row('ピーク時の色', 'ピーク時間帯に使用する色。',
             mkColor(target.peakColor, function (v) {
                 target.peakColor = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('低峰颜色', '低峰期使用的颜色。',
+        frag.appendChild(row('オフピーク時の色', 'オフピーク時間帯に使用する色。',
             mkColor(target.valleyColor, function (v) {
                 target.valleyColor = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('边框宽度', '1～14 像素。',
+        frag.appendChild(row('枠の幅', '1～14 ピクセル。',
             mkRange(1, 14, 1, target.width, ' px', function (v) {
                 target.width = Math.round(v);
                 refreshPreview();
             })));
 
-        frag.appendChild(row('光晕强度', '0 为无光晕。',
+        frag.appendChild(row('グロー強度', '0 でグローなし。',
             mkRange(0, 80, 1, target.glow, ' px', function (v) {
                 target.glow = Math.round(v);
                 refreshPreview();
             })));
 
-        frag.appendChild(row('不透明度', '整体透明度，0.2～1。',
+        frag.appendChild(row('不透明度', '全体の透明度、0.2～1。',
             mkRange(0.2, 1, 0.05, target.opacity, '', function (v) {
                 target.opacity = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('呼吸动画', '呼吸 / 常亮 / 关闭。',
+        frag.appendChild(row('呼吸アニメーション', '呼吸 / 常時点灯 / オフ。',
             mkSelect([
                 { value: 'breathing', label: '呼吸' },
-                { value: 'solid', label: '常亮' },
-                { value: 'off', label: '关闭' }
+                { value: 'solid', label: '常時点灯' },
+                { value: 'off', label: '閉じる' }
             ], target.animation, function (v) {
                 target.animation = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('呼吸频率', '一个呼吸周期的秒数。',
+        frag.appendChild(row('呼吸の周期', '呼吸 1 周期の秒数。',
             mkRange(0.5, 10, 0.1, target.breathingSpeed, ' s', function (v) {
                 target.breathingSpeed = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('光效方向', '光晕向外扩散或向内收拢。',
+        frag.appendChild(row('光効果の方向', 'グローが外向きに広がるか内向きに収まるか。',
             mkSelect([
-                { value: 'out', label: '向外' },
-                { value: 'in', label: '向内' }
+                { value: 'out', label: '外向き' },
+                { value: 'in', label: '内向き' }
             ], target.glowDirection, function (v) {
                 target.glowDirection = v;
                 refreshPreview();
             })));
 
-        frag.appendChild(row('流光彗星', '沿边框循环跑动的光点。',
+        frag.appendChild(row('流れる光（コメット）', '枠に沿って周回する光点。',
             mkSwitch(target.flow, function (v) {
                 target.flow = v;
                 refreshPreview();
                 ensureFlowLoop();
             })));
 
-        frag.appendChild(row('流光速度', '跑完一圈的秒数（2～24）。',
+        frag.appendChild(row('光の速さ', '1 周にかかる秒数（2～24）。',
             mkRange(2, 24, 1, target.flowSpeed, ' s', function (v) {
                 target.flowSpeed = v;
                 ensureFlowLoop();
@@ -1157,15 +1157,15 @@
     }
 
     function buildEdgeCard() {
-        var c = card('页面边框', '页面边缘的呼吸边框：高峰橙、低峰蓝，颜色与呼吸均可调。');
-        c.appendChild(row('启用边框', '关闭后页面边缘不再显示，输入框与角标独立生效。',
+        var c = card('ページ枠', 'ページ端の呼吸する枠線：ピークはオレンジ、オフピークはブルー。色と呼吸は調整できます。');
+        c.appendChild(row('枠を有効化', 'オフにするとページ端は表示されません。入力欄とバッジは独立して機能します。',
             mkSwitch(work.edge.enabled, function (v) {
                 work.edge.enabled = v;
                 refreshPreview();
             })));
         c.appendChild(buildVisualControls(work.edge, 'edge'));
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('恢复边框默认', 'pv-btn-sm', function () {
+        actions.appendChild(btn('枠を既定に戻す', 'pv-btn-sm', function () {
             work.edge = clone(defaults.edge);
             renderBody();
             refreshPreview();
@@ -1175,8 +1175,8 @@
     }
 
     function buildComposerCard() {
-        var c = card('输入框光效', '给 DeepSeek 聊天的输入框加一层独立光效，参数与页面边框完全分开。');
-        c.appendChild(row('启用输入框光效', '跟随聊天输入框控件定位，滚动与键盘弹出时自动贴合。',
+        var c = card('入力欄の光効果', 'DeepSeek チャットの入力欄に独立した光効果を追加します。設定はページ枠と完全に分離されています。');
+        c.appendChild(row('入力欄の光効果を有効化', 'チャット入力欄のコントロールに追従して配置。スクロールやキーボード表示時も自動で追従します。',
             mkSwitch(work.composer.enabled, function (v) {
                 work.composer.enabled = v;
                 refreshPreview();
@@ -1184,7 +1184,7 @@
             })));
         c.appendChild(buildVisualControls(work.composer, 'composer'));
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('恢复输入框默认', 'pv-btn-sm', function () {
+        actions.appendChild(btn('入力欄を既定に戻す', 'pv-btn-sm', function () {
             work.composer = clone(defaults.composer);
             renderBody();
             refreshPreview();
@@ -1193,7 +1193,7 @@
         return c;
     }
 
-    // ---- 角标卡
+    // ---- バッジカード
 
     function cornerSelect(value, onChange) {
         return mkSelect([
@@ -1205,8 +1205,8 @@
     }
 
     function buildBadgeCard() {
-        var c = card('状态角标', '独立的阶段角标，不随边框开关联动；PC 与手机端可分别设置位置。');
-        c.appendChild(row('启用角标', '点击角标可直接打开本设置面板。',
+        var c = card('状態バッジ', '独立した時間帯バッジ。枠のスイッチとは連動しません。PC とスマホで位置を別々に設定できます。');
+        c.appendChild(row('バッジを有効化', 'バッジをタップするとこの設定パネルを直接開けます。',
             mkSwitch(work.badge.enabled, function (v) {
                 work.badge.enabled = v;
                 refreshPreview();
@@ -1215,27 +1215,27 @@
 
         ['desktop', 'mobile'].forEach(function (key) {
             var pos = work.badge[key];
-            var title = key === 'desktop' ? 'PC 端' : '手机端';
+            var title = key === 'desktop' ? 'PC' : 'スマホ';
             var sub = ce('div', 'pv-card-desc', title);
             sub.style.marginTop = '2px';
             c.appendChild(sub);
-            c.appendChild(row('所在角落', '', cornerSelect(pos.corner, function (v) {
+            c.appendChild(row('表示位置', '', cornerSelect(pos.corner, function (v) {
                 pos.corner = v;
                 refreshPreview();
                 updateBadgePositionOnly();
             })));
-            c.appendChild(row('水平偏移', '', mkRange(0, 240, 1, pos.x, ' px', function (v) {
+            c.appendChild(row('水平オフセット', '', mkRange(0, 240, 1, pos.x, ' px', function (v) {
                 pos.x = Math.round(v);
                 updateBadgePositionOnly();
             })));
-            c.appendChild(row('垂直偏移', '', mkRange(0, 400, 1, pos.y, ' px', function (v) {
+            c.appendChild(row('垂直オフセット', '', mkRange(0, 400, 1, pos.y, ' px', function (v) {
                 pos.y = Math.round(v);
                 updateBadgePositionOnly();
             })));
         });
 
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('恢复角标默认', 'pv-btn-sm', function () {
+        actions.appendChild(btn('バッジを既定に戻す', 'pv-btn-sm', function () {
             work.badge = clone(defaults.badge);
             renderBody();
             refreshPreview();
@@ -1244,63 +1244,63 @@
         return c;
     }
 
-    // ---- 本地通知卡
+    // ---- ローカル通知卡
 
     function buildNotifyCard() {
-        var c = card('本地通知', '浏览器系统通知：页面打开时，阶段转折或托管提醒触发时弹窗提醒。');
+        var c = card('ローカル通知', 'ブラウザのシステム通知：ページを開いている間に、時間帯の切替や予約リマインダーの発火時に通知します。');
 
         var pText = ce('div', 'pv-msg pv-msg-muted', permissionText());
         c.appendChild(pText);
 
-        c.appendChild(row('启用本地通知', '',
+        c.appendChild(row('ローカル通知を有効化', '',
             mkSwitch(work.localNotify.enabled, function (v) {
                 work.localNotify.enabled = v;
             })));
 
-        c.appendChild(row('阶段转折时通知', '高峰期 / 低峰期切换时提醒。',
+        c.appendChild(row('フェーズ転換時に通知', 'ピーク／オフピークの切替時に通知します。',
             mkSwitch(work.localNotify.onTransition, function (v) {
                 work.localNotify.onTransition = v;
             })));
 
-        c.appendChild(row('托管提醒触发时通知', '服务端通过推送渠道发出提醒时同步通知。',
+        c.appendChild(row('予約リマインダーの発火時に通知', 'サーバーがプッシュチャネルで通知を送るときに同期して通知します。',
             mkSwitch(work.localNotify.onReminder, function (v) {
                 work.localNotify.onReminder = v;
             })));
 
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('请求通知权限', 'pv-btn-sm', function () {
+        actions.appendChild(btn('通知権限をリクエスト', 'pv-btn-sm', function () {
             if (!notifySupported()) {
-                toast('当前浏览器不支持通知');
+                toast('このブラウザは通知に対応していません');
                 return;
             }
             Notification.requestPermission().then(function (p) {
                 pText.textContent = permissionText();
-                toast(p === 'granted' ? '已获得通知权限' : '未获得权限：' + p);
+                toast(p === 'granted' ? '通知権限を取得しました' : '権限を取得できませんでした：' + p);
             });
         }));
-        actions.appendChild(btn('发送测试通知', 'pv-btn-sm', function () {
+        actions.appendChild(btn('テスト通知を送信', 'pv-btn-sm', function () {
             if (!notifySupported() || Notification.permission !== 'granted') {
-                toast('请先授权通知');
+                toast('先に通知を許可してください');
                 return;
             }
-            notify('峰谷提醒测试', '如果你看到这条通知，说明本地通知可用。');
+            notify('ピーク／オフピーク通知テスト', 'この通知が見えていれば、ローカル通知は利用可能です。');
         }));
         c.appendChild(actions);
         return c;
     }
 
     function permissionText() {
-        if (!notifySupported()) { return '当前浏览器不支持 Notification API'; }
+        if (!notifySupported()) { return 'このブラウザは Notification API に対応していません'; }
         var p = Notification.permission;
-        if (p === 'granted') { return '通知权限：已授权'; }
-        if (p === 'denied') { return '通知权限：已被拒绝（需在浏览器站点设置中开启）'; }
-        return '通知权限：尚未授权';
+        if (p === 'granted') { return '通知権限：許可済み'; }
+        if (p === 'denied') { return '通知権限：拒否されています（ブラウザのサイト設定で有効にしてください）'; }
+        return '通知権限：未許可';
     }
 
-    // ---- 推送渠道卡
+    // ---- プッシュチャネル卡
 
     function buildChannelCard() {
-        var c = card('推送渠道', '提醒通过以下渠道发送。密钥保存在服务端配置文件（权限 0600），接口返回时自动打码。');
+        var c = card('プッシュチャネル', 'リマインダーは以下のチャネルで送信されます。キーはサーバー側の設定ファイル（権限 0600）に保存され、API 応答時は自動でマスクされます。');
 
         if (channelMsg) {
             var m = ce('div', 'pv-msg ' + (channelMsg.indexOf('✅') === 0 ? 'pv-msg-ok' : 'pv-msg-err'), channelMsg);
@@ -1309,60 +1309,60 @@
 
         var list = ce('div', 'pv-row-col');
         if (!work.channels.length) {
-            list.appendChild(ce('div', 'pv-empty', '还没有推送渠道。添加一个后，提醒才能送达手机。'));
+            list.appendChild(ce('div', 'pv-empty', 'プッシュチャネルがまだありません。1 つ追加すると、リマインダーがスマホに届きます。'));
         }
         work.channels.forEach(function (ch) {
             var item = ce('div', 'pv-channel');
             var info = ce('div', 'pv-channel-info');
             info.appendChild(ce('div', 'pv-channel-name', ch.name || ch.type));
             var configured = channelConfigured(ch);
-            var subText = ch.type + ' · ' + (configured ? '已配置' : '未填写完整');
+            var subText = ch.type + ' · ' + (configured ? '設定済み' : '未入力の項目があります');
             info.appendChild(ce('div', 'pv-channel-sub', subText));
             item.appendChild(info);
 
             var tagCls = 'pv-tag';
-            var tagText = '已启用';
-            if (!ch.enabled) { tagCls += ' pv-tag-off'; tagText = '已停用'; }
-            else if (!configured) { tagCls += ' pv-tag-warn'; tagText = '待完善'; }
+            var tagText = '有効';
+            if (!ch.enabled) { tagCls += ' pv-tag-off'; tagText = '無効'; }
+            else if (!configured) { tagCls += ' pv-tag-warn'; tagText = '未設定'; }
             item.appendChild(ce('span', tagCls, tagText));
 
-            item.appendChild(btn('编辑', 'pv-btn-sm', function () {
+            item.appendChild(btn('編集', 'pv-btn-sm', function () {
                 editingChannel = clone(ch);
                 renderBody();
             }));
-            item.appendChild(btn('测试', 'pv-btn-sm', function () {
-                channelMsg = '发送中…';
+            item.appendChild(btn('テスト', 'pv-btn-sm', function () {
+                channelMsg = '送信中…';
                 renderBody();
                 api('channelTest', { id: ch.id }).then(function (r) {
-                    channelMsg = r.ok ? '✅ 发送成功：' + (r.name || ch.name) : '❌ 发送失败：' + (r.error || '未知错误');
+                    channelMsg = r.ok ? '✅ 送信成功：' + (r.name || ch.name) : '❌ 送信失敗：' + (r.error || '不明なエラー');
                     renderBody();
                 }).catch(function (e) {
-                    channelMsg = '❌ 发送失败：' + e.message;
+                    channelMsg = '❌ 送信失敗：' + e.message;
                     renderBody();
                 });
             }));
-            item.appendChild(btn('删除', 'pv-btn-danger pv-btn-sm', function () {
-                if (!confirm('删除渠道「' + (ch.name || ch.type) + '」？')) { return; }
+            item.appendChild(btn('削除', 'pv-btn-danger pv-btn-sm', function () {
+                if (!confirm('チャネル「' + (ch.name || ch.type) + '」？')) { return; }
                 api('channelDelete', { id: ch.id }).then(function () {
                     return api('config');
                 }).then(function (v) {
                     cfg = v.config;
                     work.channels = clone(cfg.channels);
-                    channelMsg = '✅ 已删除';
+                    channelMsg = '✅ 削除しました';
                     renderBody();
-                }).catch(function (e) { toast('删除失败：' + e.message); });
+                }).catch(function (e) { toast('削除に失敗しました：' + e.message); });
             }));
 
             list.appendChild(item);
         });
         c.appendChild(list);
 
-        // 渠道编辑表单
+        // チャネル編集フォーム
         if (editingChannel) {
             c.appendChild(buildChannelForm());
         } else {
             var actions = ce('div', 'pv-btn-row');
-            actions.appendChild(btn('＋ 添加渠道', 'pv-btn-primary pv-btn-sm', function () {
+            actions.appendChild(btn('＋ チャネルを追加', 'pv-btn-primary pv-btn-sm', function () {
                 editingChannel = {
                     id: '', type: 'serverchan', name: 'Server酱', enabled: true,
                     key: '', server: '', chatId: '', secret: '', method: 'POST', body: ''
@@ -1391,60 +1391,60 @@
         var box = ce('div', 'pv-card');
         box.style.border = '1px solid #c7d2fe';
         box.style.background = '#f8faff';
-        box.appendChild(ce('div', 'pv-card-title', editingChannel.id ? '编辑渠道' : '添加渠道'));
+        box.appendChild(ce('div', 'pv-card-title', editingChannel.id ? 'チャネルを編集' : 'チャネルを追加'));
 
-        // 类型
+        // 種類
         var typeOpts = channelTypes.map(function (t) { return { value: t.type, label: t.name }; });
         if (!typeOpts.length) {
             typeOpts = [{ value: 'serverchan', label: 'Server酱' }];
         }
-        box.appendChild(row('渠道类型', '', mkSelect(typeOpts, editingChannel.type, function (v) {
+        box.appendChild(row('チャネルの種類', '', mkSelect(typeOpts, editingChannel.type, function (v) {
             editingChannel.type = v;
             var meta = findChannelType(v);
             if (!editingChannel.id && meta) { editingChannel.name = meta.name; }
             renderBody();
         })));
 
-        box.appendChild(row('名称', '仅用于列表展示。',
-            mkText(editingChannel.name, '例如：我的手机', function (v) { editingChannel.name = v; })));
+        box.appendChild(row('名前', 'リスト表示専用です。',
+            mkText(editingChannel.name, '例：私のスマホ', function (v) { editingChannel.name = v; })));
 
         var meta = findChannelType(editingChannel.type);
         var fields = meta ? meta.fields : ['key'];
 
         if (fields.indexOf('key') >= 0) {
-            var keyLabel = editingChannel.type === 'telegram' ? 'Bot Token' : (editingChannel.type === 'bark' ? 'DeviceKey' : '密钥 / SendKey');
-            box.appendChild(row(keyLabel, '已保存的密钥会显示为打码形式，不修改则保留原值。',
-                mkText(editingChannel.key, '在此填写', function (v) { editingChannel.key = v; })));
+            var keyLabel = editingChannel.type === 'telegram' ? 'Bot Token' : (editingChannel.type === 'bark' ? 'DeviceKey' : 'キー / SendKey');
+            box.appendChild(row(keyLabel, '保存済みのキーはマスク表示されます。変更しなければ元の値が保持されます。',
+                mkText(editingChannel.key, 'ここに入力', function (v) { editingChannel.key = v; })));
         }
         if (fields.indexOf('server') >= 0) {
-            var srvLabel = editingChannel.type === 'webhook' ? 'Webhook 地址' : 'Webhook / 服务器地址';
-            box.appendChild(row(srvLabel, editingChannel.type === 'bark' ? '留空使用 https://api.day.app' : '完整 URL',
+            var srvLabel = editingChannel.type === 'webhook' ? 'Webhook アドレス' : 'Webhook / サーバーアドレス';
+            box.appendChild(row(srvLabel, editingChannel.type === 'bark' ? '空欄なら https://api.day.app を使用' : '完全な URL',
                 mkText(editingChannel.server, 'https://', function (v) { editingChannel.server = v; })));
         }
         if (fields.indexOf('chatId') >= 0) {
-            box.appendChild(row('Chat ID', 'Telegram 会话 ID。',
-                mkText(editingChannel.chatId, '例如 123456789', function (v) { editingChannel.chatId = v; })));
+            box.appendChild(row('Chat ID', 'Telegram のチャット ID。',
+                mkText(editingChannel.chatId, '例：123456789', function (v) { editingChannel.chatId = v; })));
         }
         if (fields.indexOf('secret') >= 0) {
-            box.appendChild(row('加签密钥', '钉钉 / 飞书的 secret，可选。',
-                mkText(editingChannel.secret, '可选', function (v) { editingChannel.secret = v; })));
+            box.appendChild(row('署名キー', 'DingTalk / Feishu の secret（任意）。',
+                mkText(editingChannel.secret, '任意', function (v) { editingChannel.secret = v; })));
         }
         if (fields.indexOf('method') >= 0) {
-            box.appendChild(row('请求方法', '',
+            box.appendChild(row('リクエスト方法', '',
                 mkSelect([{ value: 'POST', label: 'POST' }, { value: 'GET', label: 'GET' }],
                     editingChannel.method || 'POST', function (v) { editingChannel.method = v; })));
         }
         if (fields.indexOf('body') >= 0) {
-            box.appendChild(row('请求体模板', '支持 {title} 与 {content} 占位。',
+            box.appendChild(row('リクエスト本文のテンプレート', '{title} と {content} のプレースホルダに対応。',
                 mkTextarea(editingChannel.body, '{"title":"{title}","content":"{content}"}',
                     function (v) { editingChannel.body = v; })));
         }
 
-        box.appendChild(row('启用该渠道', '',
+        box.appendChild(row('このチャネルを有効化', '',
             mkSwitch(editingChannel.enabled, function (v) { editingChannel.enabled = v; })));
 
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('保存渠道', 'pv-btn-primary pv-btn-sm', function () {
+        actions.appendChild(btn('チャネルを保存', 'pv-btn-primary pv-btn-sm', function () {
             var payload = clone(editingChannel);
             api('channelSave', { channel: payload }).then(function () {
                 return api('config');
@@ -1452,14 +1452,14 @@
                 cfg = v.config;
                 work.channels = clone(cfg.channels);
                 editingChannel = null;
-                channelMsg = '✅ 渠道已保存';
+                channelMsg = '✅ チャネルを保存しました';
                 renderBody();
             }).catch(function (e) {
                 channelMsg = '❌ ' + e.message;
                 renderBody();
             });
         }));
-        actions.appendChild(btn('取消', 'pv-btn-sm', function () {
+        actions.appendChild(btn('キャンセル', 'pv-btn-sm', function () {
             editingChannel = null;
             renderBody();
         }));
@@ -1479,78 +1479,78 @@
     function buildReminderCard(phase) {
         var r = work.reminders[phase];
         var isPeak = phase === 'peak';
-        var c = card(isPeak ? '高峰期提醒' : '低峰期提醒',
-            '到达' + (isPeak ? '高峰' : '低峰') + '前（或到达时）通过推送渠道发送提醒。调度在服务端执行，页面关闭也会送达。');
+        var c = card(isPeak ? 'ピーク時間帯の通知' : 'オフピーク時間帯の通知',
+            '到達' + (isPeak ? 'ピーク' : 'オフピーク') + '前に（または到達時に）プッシュチャネルでリマインダーを送信します。スケジューリングはサーバー側で実行されるため、ページを閉じても届きます。');
 
-        c.appendChild(row('启用提醒', '',
+        c.appendChild(row('通知を有効化', '',
             mkSwitch(r.enabled, function (v) { r.enabled = v; })));
 
-        c.appendChild(row('提前提醒', '0 表示准时在阶段开始的那一刻发送。',
+        c.appendChild(row('事前通知', '0 は時間帯が始まる瞬間に送信することを意味します。',
             mkSelect([
-                { value: '0', label: '准时（到达时）' },
-                { value: '5', label: '提前 5 分钟' },
-                { value: '10', label: '提前 10 分钟' },
-                { value: '15', label: '提前 15 分钟' },
-                { value: '30', label: '提前 30 分钟' },
-                { value: '60', label: '提前 60 分钟' }
+                { value: '0', label: '定刻（到達時）' },
+                { value: '5', label: '5 分前' },
+                { value: '10', label: '10 分前' },
+                { value: '15', label: '15 分前' },
+                { value: '30', label: '30 分前' },
+                { value: '60', label: '60 分前' }
             ], String(r.leadMinutes), function (v) { r.leadMinutes = parseInt(v, 10) || 0; })));
 
-        var chOpts = [{ value: 'all', label: '全部启用渠道' }];
+        var chOpts = [{ value: 'all', label: 'すべてのチャネルを有効化' }];
         work.channels.forEach(function (ch) {
             chOpts.push({ value: 'id:' + ch.id, label: (ch.name || ch.type) });
         });
         if (r.channel && r.channel !== 'all' && r.channel.indexOf('id:') !== 0 && !findChannel(r.channel)) {
             chOpts.push({ value: r.channel, label: r.channel });
         }
-        c.appendChild(row('推送渠道', '',
+        c.appendChild(row('プッシュチャネル', '',
             mkSelect(chOpts, r.channel || 'all', function (v) { r.channel = v; })));
 
-        c.appendChild(row('标题模板', '可用变量：{phase} {start} {end} {time} {date}',
-            mkText(r.title, 'DeepSeek 高峰期开始', function (v) { r.title = v; })));
+        c.appendChild(row('タイトルテンプレート', '使用可能な変数：{phase} {start} {end} {time} {date}',
+            mkText(r.title, 'DeepSeek ピーク時間帯が開始', function (v) { r.title = v; })));
 
-        c.appendChild(row('内容模板', '同样支持上述变量。',
-            mkTextarea(r.content, '{phase}开始：{start}～{end}', function (v) { r.content = v; })));
+        c.appendChild(row('本文テンプレート', '上記の変数も同様に使用できます。',
+            mkTextarea(r.content, '{phase}開始：{start}～{end}', function (v) { r.content = v; })));
 
-        c.appendChild(row('额外固定时间', 'HH:MM，多个用逗号分隔；仅在该阶段进行中触发。',
-            mkText(r.times, '例如 10:30,15:00', function (v) { r.times = v; })));
+        c.appendChild(row('追加の固定時刻', 'HH:MM。複数はカンマ区切り。その段階の進行中のみ発火します。',
+            mkText(r.times, '例：10:30,15:00', function (v) { r.times = v; })));
 
         var actions = ce('div', 'pv-btn-row');
-        actions.appendChild(btn('发送测试', 'pv-btn-sm', function () {
-            var info = ce('div', 'pv-msg pv-msg-muted', '发送中…');
+        actions.appendChild(btn('テスト送信', 'pv-btn-sm', function () {
+            var info = ce('div', 'pv-msg pv-msg-muted', '送信中…');
             c.appendChild(info);
             api('test', { kind: phase, channel: r.channel, title: r.title, content: r.content })
                 .then(function (v) {
                     var ok = v.result && v.result.ok;
                     info.className = 'pv-msg ' + (ok ? 'pv-msg-ok' : 'pv-msg-err');
                     info.textContent = ok
-                        ? '✅ 已发送（' + v.result.sent + '/' + v.result.total + '）\n' + v.title
-                        : '❌ ' + ((v.result && v.result.error) || '发送失败');
+                        ? '✅ 送信しました（' + v.result.sent + '/' + v.result.total + '）\n' + v.title
+                        : '❌ ' + ((v.result && v.result.error) || '送信に失敗');
                 }).catch(function (e) {
                     info.className = 'pv-msg pv-msg-err';
                     info.textContent = '❌ ' + e.message;
                 });
         }));
-        actions.appendChild(btn('立即触发一次', 'pv-btn-sm', function () {
+        actions.appendChild(btn('今すぐ 1 回発火', 'pv-btn-sm', function () {
             api('fireNow', { phase: phase }).then(function (v) {
                 if (v.skipped) {
-                    toast('该阶段提醒未启用');
+                    toast('この段階の通知は有効になっていません');
                     return;
                 }
                 var ok = v.result && v.result.ok;
-                toast(ok ? '已触发并发送' : '触发失败：' + ((v.result && v.result.error) || '未知错误'));
-            }).catch(function (e) { toast('触发失败：' + e.message); });
+                toast(ok ? '発火して送信しました' : '発火に失敗：' + ((v.result && v.result.error) || '不明なエラー'));
+            }).catch(function (e) { toast('発火に失敗：' + e.message); });
         }));
         c.appendChild(actions);
 
         if (r.lastFiredAt) {
             var res = r.lastResult;
-            var text = '最近触发：' + formatTime(r.lastFiredAt);
+            var text = '最近の発火：' + formatTime(r.lastFiredAt);
             if (res) {
-                text += res.ok ? ' · 成功 ' + res.sent + '/' + res.total : ' · 失败：' + (res.error || '');
+                text += res.ok ? ' · 成功 ' + res.sent + '/' + res.total : ' · 失敗：' + (res.error || '');
             }
             c.appendChild(ce('div', 'pv-msg ' + (res && res.ok ? 'pv-msg-ok' : 'pv-msg-err'), text));
         } else {
-            c.appendChild(ce('div', 'pv-msg pv-msg-muted', '尚未触发过'));
+            c.appendChild(ce('div', 'pv-msg pv-msg-muted', 'まだ発火していません'));
         }
 
         return c;
@@ -1570,15 +1570,15 @@
             ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     }
 
-    // ---- 关于卡
+    // ---- この機能について卡
 
     function buildAboutCard() {
-        var c = card('关于', '');
+        var c = card('この機能について', '');
         var lines = [
-            '官方时段（北京时间）：高峰 09:00–12:00、14:00–18:00；其余为低峰（空闲）时段，API 价格约为高峰一半。',
-            '生效日期：2026-08-17 起。',
-            '配置文件：' + (dataPath || 'data/peakvalley/config.json'),
-            '调度：服务端每 30 秒检查一次；服务重启后会补发 10 分钟内到期的提醒。'
+            '公式の時間帯（北京時間）：ピークは 09:00–12:00、14:00–18:00。それ以外はオフピーク（アイドル）時間帯で、API 料金はピークの約半額です。',
+            '有効開始日：2026-08-17 より。',
+            '設定ファイル：' + (dataPath || 'data/peakvalley/config.json'),
+            'スケジューラ：サーバーが 30 秒ごとに確認します。サービス再起動後、10 分以内に期限が来るリマインダーは再送されます。'
         ];
         lines.forEach(function (t) {
             c.appendChild(ce('div', 'pv-card-desc', t));
@@ -1586,13 +1586,13 @@
         return c;
     }
 
-    // ============================================================ 启动
+    // ============================================================ 起動
 
     function bindEntryButtons() {
         var sbBtn = $('sidebarPeakValleyBtn');
         if (sbBtn) {
             sbBtn.addEventListener('click', function () {
-                // 关闭侧边栏后再打开面板
+                // サイドバーを閉じてからパネルを開く
                 var menu = $('sidebarMenu');
                 var ovl = $('menuOverlay');
                 if (menu) { menu.classList.remove('open'); }
@@ -1612,7 +1612,7 @@
         bindEntryButtons();
         startTracking();
 
-        // 聊天界面开关会影响「仅在 DeepSeek 聊天生效」的判定
+        // チャット画面のスイッチが「DeepSeek チャットのみで有効」の判定に影響する
         var app = $('deepseekChatApp');
         if (app && typeof MutationObserver !== 'undefined') {
             try {
@@ -1636,12 +1636,12 @@
             startPolling(cfg.pollSeconds);
             poll();
         }).catch(function () {
-            // 服务端未就绪时静默重试，不打扰页面
+            // サーバー未準備のときは静かに再試行し、ページを邪魔しない
             setTimeout(boot, 3000);
         });
     }
 
-    // 对外接口（便于调试与外部调用）
+    // 公開インターフェース（デバッグと外部呼び出し用）
     window.PeakValley = {
         open: openSettings,
         close: closeSettings,

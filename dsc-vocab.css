@@ -1,5 +1,5 @@
 /* ============================================================
-   dsc-vocab.css —— 日语单词本
+   dsc-vocab.css —— 日本語単語帳
    ============================================================ */
 
 #dscVocabOverlay,
@@ -35,7 +35,7 @@
   overflow: hidden;
 }
 
-/* 顶部栏 */
+/* 上部バー */
 .dsc-vocab-head {
   display: flex;
   align-items: center;
@@ -64,7 +64,7 @@
 .dsc-vocab-icon-btn.primary { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
 .dsc-vocab-icon-btn.primary:hover { background: #e0e7ff; }
 
-/* 工具栏 */
+/* ツールバー */
 .dsc-vocab-toolbar {
   display: flex;
   align-items: center;
@@ -166,7 +166,7 @@
 }
 .dsc-vocab-loadmore:hover { background: #f3f4f6; color: #4f46e5; }
 
-/* 编辑弹层 */
+/* 編集ダイアログ */
 .dsc-vocab-editor-body {
   flex: 1;
   overflow-y: auto;
@@ -222,7 +222,7 @@
 .dsc-vocab-btn.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .dsc-vocab-btn.primary:hover { background: #4338ca; }
 
-/* 复习弹层 */
+/* 復習ダイアログ */
 .dsc-vocab-review-body {
   flex: 1;
   display: flex;
@@ -266,7 +266,7 @@
 .dsc-vocab-review-empty { text-align: center; color: #9ca3af; padding: 40px 20px; font-size: 0.95rem; line-height: 1.7; }
 .dsc-vocab-review-empty .emoji { font-size: 2.4rem; display: block; margin-bottom: 12px; }
 
-/* 悬浮菜单 */
+/* フローティングメニュー */
 .dsc-vocab-popmenu {
   position: fixed;
   z-index: 400000;
@@ -308,7 +308,7 @@
 }
 
 
-/* ============ v2: 分片行 + 搜索 + 批量 + 缩略图 ============ */
+/* ============ v2: 分割行 + 検索 + 一括 + サムネイル ============ */
 .dsc-vocab-row-tabs {
   display: flex; flex-wrap: wrap; gap: 6px;
   padding: 8px 16px; border-bottom: 1px solid #ececf1;
@@ -342,7 +342,7 @@
 .dsc-vocab-batch-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .dsc-vocab-batch-btn.ghost { background: transparent; border-color: transparent; }
 
-/* 卡片：加缩略图 + 勾选框 */
+/* カード：サムネイル + チェックボックスを追加 */
 .dsc-vocab-card { display: flex; gap: 10px; }
 .dsc-vocab-card-check {
   width: 18px; height: 18px; margin-top: 14px; flex-shrink: 0;
@@ -363,7 +363,7 @@
 .dsc-vocab-thumb.empty { font-size: 1.1rem; color: #d1d5db; }
 .dsc-vocab-card-body { flex: 1; min-width: 0; }
 
-/* 编辑页图片预览（同样 4:3） */
+/* 編集ページの画像プレビュー（同じく 4:3） */
 .dsc-vocab-image-edit {
   display: flex; align-items: center; gap: 10px;
 }
@@ -384,8 +384,8 @@
 .dsc-vocab-image-actions button:hover { background: #f3f4f6; }
 
 
-/* ============ 爷们版布局优化 v3 ============ */
-/* 工具栏重排：整齐、宽敞 */
+/* ============ 骨太版レイアウト最適化 v3 ============ */
+/* ツールバーの再配置：整然と、ゆったりと */
 .dsc-vocab-toolbar {
   display: flex;
   flex-direction: column;
@@ -435,7 +435,7 @@
   height: 20px;
 }
 
-/* 假名行：横向滑动，拒绝换行 */
+/* 仮名行：横スワイプ、折り返しなし */
 .dsc-vocab-row-tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -474,7 +474,7 @@
   opacity: 0.7;
 }
 
-/* 卡片稍微加宽边距，看着更硬朗 */
+/* カードの余白を少し広げ、より硬い印象に */
 .dsc-vocab-card {
   padding: 16px;
   border-radius: 14px;
@@ -483,11 +483,11 @@
 .dsc-vocab-card.due { border-color: #fcd34d; }
 .dsc-vocab-card.mastered { border-color: #bbf7d0; }
 
-/* 调整批量栏，加大按钮 */
+/* 一括バーを調整し、ボタンを大きく */
 .dsc-vocab-batch-bar {
   padding: 12px 16px;
   gap: 12px;
-  background: #fdf2f8; /* 有点粉色醒目的背景 */
+  background: #fdf2f8; /* ややピンクで目立つ背景 */
   border-bottom: 1px solid #fbcfe8;
 }
 .dsc-vocab-batch-btn {
@@ -503,7 +503,7 @@
 }
 
 
-/* ============ 假名滑动栏终极修复 ============ */
+/* ============ 仮名スライドバーの最終修正 ============ */
 .dsc-vocab-row-tabs {
   display: flex !important;
   flex-wrap: nowrap !important;
@@ -515,13 +515,13 @@
   gap: 12px !important;
   background: #fafafa !important;
   border-bottom: 1px solid #ececf1 !important;
-  scrollbar-width: none !important; /* Firefox 隐藏滚动条 */
+  scrollbar-width: none !important; /* Firefox のスクロールバーを非表示 */
 }
 .dsc-vocab-row-tabs::-webkit-scrollbar {
-  display: none !important; /* Chrome/Safari 隐藏滚动条 */
+  display: none !important; /* Chrome/Safari のスクロールバーを非表示 */
 }
 .dsc-vocab-row-tab {
-  flex: 0 0 auto !important; /* 绝对不收缩 */
+  flex: 0 0 auto !important; /* 絶対に縮まない */
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -535,7 +535,7 @@
   cursor: pointer !important;
   user-select: none !important;
   -webkit-user-select: none !important;
-  touch-action: pan-x !important; /* 只允许横向滑动，给浏览器手势权限 */
+  touch-action: pan-x !important; /* 横スワイプのみ許可し、ブラウザにジェスチャ権限を与える */
 }
 .dsc-vocab-row-tab.active {
   background: #4f46e5 !important;
@@ -549,7 +549,7 @@
 }
 
 
-/* pygen: touch-safety —— 假名栏 & 列表必须允许原生滚动 */
+/* pygen: touch-safety —— 仮名欄 & リストはネイティブスクロールを許可する必要がある */
 .dsc-vocab-row-tabs,
 .dsc-vocab-row-tab,
 .dsc-vocab-body {
@@ -560,10 +560,10 @@
   overscroll-behavior-x: contain;
 }
 
-/* ============ 假名行终极完整展示修复 (Auto Wrap) ============ */
+/* ============ 仮名行の完全表示の最終修正 (Auto Wrap) ============ */
 .dsc-vocab-row-tabs {
   display: flex !important;
-  flex-wrap: wrap !important; /* 允许换行！ */
+  flex-wrap: wrap !important; /* 折り返しを許可！ */
   overflow-x: hidden !important;
   overflow-y: visible !important;
   padding: 12px 16px !important;
@@ -587,7 +587,7 @@
   cursor: pointer !important;
   user-select: none !important;
   -webkit-user-select: none !important;
-  touch-action: manipulation !important; /* 恢复普通点击 */
+  touch-action: manipulation !important; /* 通常のタップに戻す */
 }
 .dsc-vocab-row-tab.active {
   background: #4f46e5 !important;
@@ -600,11 +600,11 @@
   opacity: 0.7 !important;
 }
 
-/* 列表本身的边距变小 */
+/* リスト自体の余白を小さく */
 .dsc-vocab-list { gap: 8px !important; }
 .dsc-vocab-body { padding: 12px !important; }
 
-/* 卡片容器：左中右水平排布，极大压缩上下 padding */
+/* カードコンテナ：左中右の水平配置で、上下の padding を大幅に圧縮 */
 .dsc-vocab-card {
   padding: 10px 12px !important;
   display: flex !important;
@@ -616,20 +616,20 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
 }
 
-/* 如果有图片，改为右侧的小正方形缩略图 */
+/* 画像があれば右側の小さな正方形サムネイルに変更 */
 .dsc-vocab-thumb {
-  order: 2 !important; /* 放到右边 */
+  order: 2 !important; /* 右側に配置 */
   width: 44px !important;
   height: 44px !important;
   border-radius: 8px !important;
-  margin-left: auto !important; /* 靠右对齐 */
+  margin-left: auto !important; /* 右揃え */
   flex-shrink: 0 !important;
 }
 .dsc-vocab-thumb.empty {
-  display: none !important; /* 没图片就彻底隐藏，不占位置！ */
+  display: none !important; /* 画像がなければ完全に非表示にし、場所を取らない！ */
 }
 
-/* 主体内容区 */
+/* メイン内容領域 */
 .dsc-vocab-card-body {
   order: 1 !important;
   flex: 1 !important;
@@ -639,7 +639,7 @@
   justify-content: center !important;
 }
 
-/* 单词行（汉字 + 读音） */
+/* 単語行（漢字 + 読み） */
 .dsc-vocab-card-word-row {
   margin-bottom: 2px !important;
   gap: 6px !important;
@@ -653,19 +653,19 @@
   font-size: 0.75rem !important;
 }
 
-/* 释义：限制最多两行，紧凑字体 */
+/* 語義：最大2行に制限、詰めたフォント */
 .dsc-vocab-card-meaning {
   font-size: 0.8rem !important;
   color: #4b5563 !important;
   line-height: 1.4 !important;
   margin-top: 0 !important;
   display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important; /* 最多显示2行 */
+  -webkit-line-clamp: 2 !important; /* 最大2行表示 */
   -webkit-box-orient: vertical !important;
   overflow: hidden !important;
 }
 
-/* 底部标签（级别、复习状态）挤在一行，字体极小 */
+/* 下部ラベル（レベル、復習状態）が1行に詰まり、文字が極小 */
 .dsc-vocab-card-meta {
   margin-top: 4px !important;
   gap: 4px !important;
@@ -674,12 +674,12 @@
 .dsc-vocab-card-meta .tag {
   padding: 0 4px !important;
 }
-/* 隐藏不必要的标签（比如重复的“#标签”），只保留级别和复习状态 */
+/* 不要なラベル（重複した「#タグ」など）を隠し、レベルと復習状態のみ残す */
 .dsc-vocab-card-meta .tag:not(.level):not(.mastered):not(.due) {
   display: none !important; 
 }
 
-/* 右侧的更多操作按钮绝对定位 */
+/* 右側のその他操作ボタンを絶対配置 */
 .dsc-vocab-card-more {
   order: 3 !important;
   width: 24px !important;
@@ -688,14 +688,14 @@
 }
 
 
-/* ============ 最终修复版：大图 + 精简假名栏 ============ */
-/* 假名行只保留“全部”和“其他”，排布更紧凑 */
+/* ============ 最終修正版：大きな画像 + 簡素化した仮名欄 ============ */
+/* 仮名行は「すべて」と「その他」のみ残し、より詰めて配置 */
 .dsc-vocab-row-tabs {
   padding: 10px 16px !important;
   gap: 8px !important;
 }
 
-/* 卡片容器恢复宽敞 */
+/* カードコンテナを再びゆったりと */
 .dsc-vocab-list { gap: 12px !important; }
 .dsc-vocab-body { padding: 16px !important; }
 
@@ -703,13 +703,13 @@
   padding: 14px 16px !important;
   display: flex !important;
   flex-direction: row !important;
-  align-items: flex-start !important; /* 顶部对齐 */
+  align-items: flex-start !important; /* 上端揃え */
   gap: 14px !important;
   border-radius: 12px !important;
   border: 1px solid #e5e7eb !important;
 }
 
-/* 缩略图放大到 100x75 (4:3) */
+/* サムネイルを 100x75 (4:3) に拡大 */
 .dsc-vocab-thumb {
   width: 100px !important;
   height: 75px !important;
@@ -734,7 +734,7 @@
   margin-bottom: 6px !important;
 }
 .dsc-vocab-card-word {
-  font-size: 1.25rem !important; /* 稍微放大汉字 */
+  font-size: 1.25rem !important; /* 漢字を少し拡大 */
 }
 .dsc-vocab-card-reading {
   font-size: 0.85rem !important;
@@ -744,15 +744,15 @@
   line-height: 1.5 !important;
   color: #374151 !important;
   margin-bottom: 8px !important;
-  display: block !important; /* 取消行数限制 */
+  display: block !important; /* 行数制限を解除 */
   -webkit-line-clamp: unset !important;
 }
 
-/* 恢复标签显示 */
+/* ラベル表示を復活 */
 .dsc-vocab-card-meta {
   font-size: 0.75rem !important;
   gap: 8px !important;
-  margin-top: auto !important; /* 贴底 */
+  margin-top: auto !important; /* 下端に密着 */
 }
 .dsc-vocab-card-meta .tag:not(.level):not(.mastered):not(.due) {
   display: inline-block !important;

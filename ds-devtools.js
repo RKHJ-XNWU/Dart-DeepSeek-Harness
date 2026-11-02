@@ -1,12 +1,12 @@
 /* ============================================================
    ds-devtools.js
-   开发者工具：把提示词注入到「用户消息」里。
-   注入后，下次发送消息时后端会把提示词拼在用户输入前面一起发给 DeepSeek。
-   聊天窗口 / 会话 .sts 里看不到注入内容。
+   開発者ツール：プロンプトを「ユーザーメッセージ」に注入する。
+   注入後、次にメッセージを送信すると、バックエンドがプロンプトをユーザー入力の前に付けて DeepSeek へ送る。
+   チャット画面や会話 .sts には注入内容は表示されない。
    ============================================================ */
 (function () {
     'use strict';
-    console.log('[DSDT] 开发者工具脚本加载中...');
+    console.log('[DSDT] 開発者ツールのスクリプトを読み込み中...');
 
     var API_BASE = '/api/ds-devtools';
     var MENU_ENTRY_ID = 'dsdtMenuEntry';
@@ -14,7 +14,7 @@
 
     var state = {
         prompts: [],
-        activeIds: {},       // id -> true，处于「已注入」状态的提示词
+        activeIds: {},       // id -> true。「注入済み」状態のプロンプト
         selectMode: false,
         checkedIds: {},
         editingId: null,
@@ -51,7 +51,7 @@
         if (body) opts.body = JSON.stringify(body);
         return fetch(url, opts).then(function (res) {
             return res.json().catch(function () { return {}; }).then(function (data) {
-                if (!res.ok) throw new Error(data.error || ('请求失败 ' + res.status));
+                if (!res.ok) throw new Error(data.error || ('リクエスト失敗 ' + res.status));
                 return data;
             });
         });
@@ -69,7 +69,7 @@
     }
 
     // ============================================================
-    // 注入状态持久化到 localStorage（只存 id，避免服务器知道你的注入）
+    // 注入状態を localStorage に永続化（id のみ保存し、サーバーに注入内容を知られないようにする）
     // ============================================================
     function loadActiveIds() {
         try {
@@ -91,7 +91,7 @@
         } catch (e) {}
     }
 
-    // 清理已不存在的提示词的注入状态
+    // 既に存在しないプロンプトの注入状態を整理
     function pruneActiveIds() {
         var valid = {};
         state.prompts.forEach(function (p) {
@@ -102,8 +102,8 @@
     }
 
     // ============================================================
-    // ★ 对外暴露：拿当前「已注入」的提示词内容列表
-    // deepseek-chat.js 发送时会调用，把内容拼到用户输入前面
+    // ★ 对外暴露：拿現在「已注入」的プロンプト内容列表
+    // deepseek-chat.js の送信時に呼ばれ、内容をユーザー入力の前に連結する
     // ============================================================
     window.__dsDevToolsGetInjectedContents = function () {
         if (!state.prompts || state.prompts.length === 0) return [];
@@ -117,7 +117,7 @@
     };
 
     // ============================================================
-    // 弹窗构建
+    // ダイアログの構築
     // ============================================================
     function ensureModal() {
         if ($('dsdtOverlay')) return;
@@ -128,14 +128,14 @@
         overlay.innerHTML =
             '<div class="dsdt-modal">' +
                 '<div class="dsdt-header">' +
-                    '<div class="dsdt-title"><span>🛠️</span><span>开发者工具</span></div>' +
-                    '<button class="dsdt-close" id="dsdtClose" type="button" title="关闭">✕</button>' +
+                    '<div class="dsdt-title"><span>🛠️</span><span>開発者ツール</span></div>' +
+                    '<button class="dsdt-close" id="dsdtClose" type="button" title="閉じる">✕</button>' +
                 '</div>' +
                 '<div class="dsdt-warn">' +
                     '<span class="ic">⚠️</span>' +
-                    '<div><b>警告：这是开发者工具，仅可用于开发环境。</b><br>' +
-                    '注入的提示词会拼在你发送的消息前面一起发给 DeepSeek，' +
-                    '聊天窗口和会话记录中不会显示。</div>' +
+                    '<div><b>警告：これは開発者ツールであり、開発環境でのみ使用できます。</b><br>' +
+                    '注入したプロンプトは送信メッセージの前に付加されて DeepSeek に送られます。' +
+                    'チャット画面とセッション履歴には表示されません。</div>' +
                 '</div>' +
                 '<div class="dsdt-body" id="dsdtBody"></div>' +
             '</div>';
@@ -149,7 +149,7 @@
     }
 
     // ============================================================
-    // 入口视图
+    // 入口ビュー
     // ============================================================
     function renderEntry() {
         state.inListMode = false;
@@ -167,19 +167,19 @@
             banner =
                 '<div class="dsdt-active-banner">' +
                     '<span class="ic">💉</span>' +
-                    '<div>当前已注入 <b>' + activeCount + '</b> 条提示词，' +
-                    '会在下次发送消息时生效</div>' +
+                    '<div>現在注入中 <b>' + activeCount + '</b> 件のプロンプト、' +
+                    '次回メッセージ送信時に反映されます</div>' +
                 '</div>';
         }
 
         body.innerHTML =
             banner +
             '<button class="dsdt-enter-btn" id="dsdtEnterBtn" type="button">' +
-                '<span class="ic">💉</span><span>注入提示词</span>' +
+                '<span class="ic">💉</span><span>プロンプトを注入</span>' +
             '</button>' +
             '<div class="dsdt-hint">' +
-                '进入后点击提示词即可注入 / 再次点击取消注入<br>' +
-                '支持自定义新增、编辑、删除、批量删除、全部删除' +
+                '開いたあとプロンプトをタップで注入／もう一度タップで解除<br>' +
+                '追加・編集・削除・一括削除・すべて削除に対応' +
             '</div>';
 
         var btn = $('dsdtEnterBtn');
@@ -192,12 +192,12 @@
     }
 
     // ============================================================
-    // 加载 & 渲染列表
+    // 一覧の読み込みと描画
     // ============================================================
     function loadPrompts() {
         var body = $('dsdtBody');
         if (!body) return;
-        body.innerHTML = '<div class="dsdt-empty"><span class="emoji">⏳</span>加载中...</div>';
+        body.innerHTML = '<div class="dsdt-empty"><span class="emoji">⏳</span>読み込み中...</div>';
 
         api('GET', API_BASE + '/prompts').then(function (data) {
             state.prompts = data.prompts || [];
@@ -223,27 +223,27 @@
         if (activeCount > 0) {
             html += '<div class="dsdt-active-banner">' +
                         '<span class="ic">💉</span>' +
-                        '<div>已注入 <b>' + activeCount + '</b> 条，会在下次发送消息时生效</div>' +
+                        '<div>注入済み <b>' + activeCount + '</b> 件。次回メッセージ送信時に反映されます</div>' +
                     '</div>';
         }
 
         html += '<div class="dsdt-toolbar">';
-        html += '<button class="dsdt-btn primary" id="dsdtAddBtn" type="button">＋ 新增</button>';
+        html += '<button class="dsdt-btn primary" id="dsdtAddBtn" type="button">＋ 追加</button>';
         html += '<button class="dsdt-btn" id="dsdtSelectBtn" type="button">' +
-                    (state.selectMode ? '✕ 退出多选' : '☑️ 多选') + '</button>';
+                    (state.selectMode ? '✕ 複数選択を終了' : '☑️ 複数選択') + '</button>';
         if (state.selectMode) {
             html += '<button class="dsdt-btn danger" id="dsdtBatchDelBtn" type="button" ' +
                         (checkedCount === 0 ? 'disabled' : '') +
-                    '>🗑️ 删除选中(' + checkedCount + ')</button>';
+                    '>🗑️ 選択を削除(' + checkedCount + ')</button>';
         }
-        html += '<button class="dsdt-btn danger" id="dsdtClearAllBtn" type="button">🧹 全部删除</button>';
-        html += '<button class="dsdt-btn ghost" id="dsdtBackBtn" type="button">← 返回</button>';
+        html += '<button class="dsdt-btn danger" id="dsdtClearAllBtn" type="button">🧹 すべて削除</button>';
+        html += '<button class="dsdt-btn ghost" id="dsdtBackBtn" type="button">← 戻る</button>';
         html += '</div>';
 
         if (state.prompts.length === 0) {
             html += '<div class="dsdt-empty">' +
                         '<span class="emoji">📭</span>' +
-                        '暂无提示词，点击「＋ 新增」添加' +
+                        'プロンプトがありません。「＋ 追加」から追加してください' +
                     '</div>';
         } else {
             html += '<div class="dsdt-list">';
@@ -261,16 +261,16 @@
                     html += '<div class="dsdt-check" data-check="1"></div>';
                     html += '<div class="dsdt-item-main">' +
                                 '<div class="dsdt-item-title">#' + (i + 1) + ' · ' +
-                                    escapeHtml(p.title || '未命名') + '</div>' +
+                                    escapeHtml(p.title || '無題') + '</div>' +
                                 '<div class="dsdt-item-content">' +
                                     escapeHtml(p.content || '') + '</div>' +
                             '</div>';
                 } else {
                     html += '<div class="dsdt-item-main">' +
                                 '<div class="dsdt-item-title">#' + (i + 1) + ' · ' +
-                                    escapeHtml(p.title || '未命名');
+                                    escapeHtml(p.title || '無題');
                     if (isActive) {
-                        html += '<span class="dsdt-badge">💉 已注入</span>';
+                        html += '<span class="dsdt-badge">💉 注入済み</span>';
                     }
                     html += '</div>' +
                             '<div class="dsdt-item-content">' +
@@ -279,8 +279,8 @@
                                 escapeHtml(formatTime(p.createdAt)) + '</div>' +
                         '</div>' +
                         '<div class="dsdt-item-actions">' +
-                            '<button class="dsdt-icon-btn" data-act="edit" title="编辑">✏️</button>' +
-                            '<button class="dsdt-icon-btn danger" data-act="del" title="删除">✕</button>' +
+                            '<button class="dsdt-icon-btn" data-act="edit" title="編集">✏️</button>' +
+                            '<button class="dsdt-icon-btn danger" data-act="del" title="削除">✕</button>' +
                         '</div>';
                 }
 
@@ -310,25 +310,25 @@
         var batchDel = $('dsdtBatchDelBtn');
         if (batchDel) batchDel.addEventListener('click', function () {
             var ids = Object.keys(state.checkedIds);
-            if (ids.length === 0) { toast('请先选择提示词', 'info'); return; }
-            if (!window.confirm('确定删除选中的 ' + ids.length + ' 条提示词吗？')) return;
+            if (ids.length === 0) { toast('先にプロンプトを選択してください', 'info'); return; }
+            if (!window.confirm('選択した ' + ids.length + ' 件のプロンプトですか？')) return;
 
             api('POST', API_BASE + '/prompts/batch-delete', { ids: ids })
                 .then(function (data) {
                     state.checkedIds = {};
-                    toast('✅ 已删除 ' + (data.deleted || ids.length) + ' 条', 'success');
+                    toast('✅ 削除しました：' + (data.deleted || ids.length) + ' 件', 'success');
                     loadPrompts();
                 })
                 .catch(function (e) {
-                    toast('批量删除失败: ' + e.message, 'error');
+                    toast('一括削除に失敗: ' + e.message, 'error');
                 });
         });
 
         var clearAll = $('dsdtClearAllBtn');
         if (clearAll) clearAll.addEventListener('click', function () {
-            if (state.prompts.length === 0) { toast('暂无提示词', 'info'); return; }
-            if (!window.confirm('确定删除全部 ' + state.prompts.length +
-                ' 条提示词吗？此操作不可恢复！')) return;
+            if (state.prompts.length === 0) { toast('プロンプトなし', 'info'); return; }
+            if (!window.confirm('すべての ' + state.prompts.length +
+                ' 件のプロンプトですか？この操作は元に戻せません！')) return;
 
             api('DELETE', API_BASE + '/prompts?all=true')
                 .then(function () {
@@ -336,11 +336,11 @@
                     state.selectMode = false;
                     state.activeIds = {};
                     saveActiveIds();
-                    toast('✅ 已清空全部提示词', 'success');
+                    toast('✅ すべてのプロンプトを消去しました', 'success');
                     loadPrompts();
                 })
                 .catch(function (e) {
-                    toast('清空失败: ' + e.message, 'error');
+                    toast('消去に失敗: ' + e.message, 'error');
                 });
         });
 
@@ -351,7 +351,7 @@
             item.addEventListener('click', function (e) {
                 if (e.target.closest('[data-act]')) return;
 
-                // 多选模式：切换勾选
+                // 複数選択モード：チェックの切替
                 if (state.selectMode) {
                     if (state.checkedIds[id]) delete state.checkedIds[id];
                     else state.checkedIds[id] = true;
@@ -359,7 +359,7 @@
                     return;
                 }
 
-                // 普通模式：切换注入
+                // 通常モード：注入の切替
                 var p = state.prompts.find(function (x) { return x.id === id; });
                 if (!p) return;
 
@@ -367,12 +367,12 @@
                     delete state.activeIds[id];
                     saveActiveIds();
                     renderList();
-                    toast('已取消注入：' + (p.title || '未命名'), 'info');
+                    toast('注入を解除：' + (p.title || '無題'), 'info');
                 } else {
                     state.activeIds[id] = true;
                     saveActiveIds();
                     renderList();
-                    toast('💉 已注入：' + (p.title || '未命名'), 'success');
+                    toast('💉 注入済み：' + (p.title || '無題'), 'success');
                 }
             });
 
@@ -388,7 +388,7 @@
                 e.stopPropagation();
                 var p = state.prompts.find(function (x) { return x.id === id; });
                 if (!p) return;
-                if (!window.confirm('确定删除「' + (p.title || '未命名') + '」吗？')) return;
+                if (!window.confirm('「' + (p.title || '無題') + '」を削除しますか？')) return;
 
                 api('DELETE', API_BASE + '/prompts?id=' + encodeURIComponent(id))
                     .then(function () {
@@ -396,18 +396,18 @@
                             delete state.activeIds[id];
                             saveActiveIds();
                         }
-                        toast('✅ 已删除', 'success');
+                        toast('✅ 削除しました', 'success');
                         loadPrompts();
                     })
                     .catch(function (err) {
-                        toast('删除失败: ' + err.message, 'error');
+                        toast('削除に失敗: ' + err.message, 'error');
                     });
             });
         });
     }
 
     // ============================================================
-    // 编辑器
+    // 編集器
     // ============================================================
     function renderEditor(prompt) {
         var body = $('dsdtBody');
@@ -418,20 +418,20 @@
 
         body.innerHTML =
             '<div class="dsdt-field">' +
-                '<label>📌 标题</label>' +
+                '<label>📌 タイトル</label>' +
                 '<input type="text" id="dsdtEditTitle" maxlength="80" ' +
-                    'placeholder="例如：第一项 / 打招呼" ' +
+                    'placeholder="例：第一項 / 挨拶" ' +
                     'value="' + escapeHtml(isEdit ? (prompt.title || '') : '') + '">' +
             '</div>' +
             '<div class="dsdt-field">' +
-                '<label>💬 提示词内容（会拼在你发送的消息前面）</label>' +
+                '<label>💬 プロンプト内容（送信メッセージの前に付加されます）</label>' +
                 '<textarea id="dsdtEditContent" maxlength="8000" ' +
-                    'placeholder="例如：你好 / 大家好">' +
+                    'placeholder="例：こんにちは / 皆さんこんにちは">' +
                     escapeHtml(isEdit ? (prompt.content || '') : '') +
                 '</textarea>' +
             '</div>' +
             '<div class="dsdt-footer">' +
-                '<button class="dsdt-btn ghost" id="dsdtEditCancel" type="button">取消</button>' +
+                '<button class="dsdt-btn ghost" id="dsdtEditCancel" type="button">キャンセル</button>' +
                 '<button class="dsdt-btn primary" id="dsdtEditSave" type="button">💾 保存</button>' +
             '</div>';
 
@@ -449,22 +449,22 @@
             var content = (contentEl ? contentEl.value : '').trim();
 
             if (!content) {
-                toast('提示词内容不能为空', 'info');
+                toast('プロンプト内容を入力してください', 'info');
                 if (contentEl) contentEl.focus();
                 return;
             }
 
-            var payload = { title: title || '未命名', content: content };
+            var payload = { title: title || '無題', content: content };
             if (state.editingId) payload.id = state.editingId;
 
             api('POST', API_BASE + '/prompts', payload)
                 .then(function () {
-                    toast(isEdit ? '✅ 已保存' : '✅ 已新增', 'success');
+                    toast(isEdit ? '✅ 保存しました' : '✅ 追加しました', 'success');
                     state.editingId = null;
                     loadPrompts();
                 })
                 .catch(function (e) {
-                    toast('保存失败: ' + e.message, 'error');
+                    toast('保存に失敗: ' + e.message, 'error');
                 });
         });
 
@@ -475,7 +475,7 @@
     }
 
     // ============================================================
-    // 弹窗控制
+    // ダイアログ制御
     // ============================================================
     function openModal() {
         ensureModal();
@@ -497,7 +497,7 @@
     }
 
     // ============================================================
-    // 注入到 + 菜单
+    // ＋メニューへ注入
     // ============================================================
     function injectMenuItem() {
         var menu = document.getElementById('dscPlusMenu');
@@ -508,16 +508,16 @@
         btn.id = MENU_ENTRY_ID;
         btn.type = 'button';
         btn.className = 'dsc-menu-item';
-        // 故意用不会触发文件选择的类型值
+        // ファイル選択を発火させない種別値を意図的に使う
         btn.dataset.type = '__devtools__';
         btn.innerHTML =
             '<span class="menu-icon">🛠️</span>' +
             '<div class="menu-info">' +
-                '<div class="menu-title">开发者工具</div>' +
-                '<div class="menu-desc">注入提示词 · 仅限开发环境</div>' +
+                '<div class="menu-title">開発者ツール</div>' +
+                '<div class="menu-desc">プロンプト注入 · 開発環境限定</div>' +
             '</div>';
 
-        // 捕获阶段拦截，避免触发文件选择
+        // 捕捉段階で遮断し、ファイル選択の発火を防ぐ
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
             e.preventDefault();
@@ -531,7 +531,7 @@
         }, true);
 
         menu.insertBefore(btn, menu.firstChild);
-        console.log('[DSDT] ✅ 已在 + 菜单中注入「开发者工具」入口');
+        console.log('[DSDT] ✅ + メニューに「開発者ツール」を追加しました');
         return true;
     }
 
@@ -541,15 +541,15 @@
     function bootstrap() {
         state.activeIds = loadActiveIds();
 
-        // 如果有已注入的提示词，提前把提示词列表拉下来，
-        // 这样 window.__dsDevToolsGetInjectedContents() 才能拿到内容
+        // 注入済みのプロンプトがあれば、先にプロンプト一覧を取得しておき、
+        // これにより window.__dsDevToolsGetInjectedContents() が内容を取得できる
         if (Object.keys(state.activeIds).length > 0) {
             api('GET', API_BASE + '/prompts').then(function (data) {
                 state.prompts = data.prompts || [];
                 state.loaded = true;
                 pruneActiveIds();
-                console.log('[DSDT] 恢复注入状态 ' +
-                    Object.keys(state.activeIds).length + ' 条');
+                console.log('[DSDT] 注入状態を復元 ' +
+                    Object.keys(state.activeIds).length + ' 件');
             }).catch(function () {});
         }
     }
@@ -589,7 +589,7 @@
         window.__openDsDevTools = openModal;
         window.__closeDsDevTools = closeModal;
 
-        console.log('[DSDT] ✅ 开发者工具初始化完成');
+        console.log('[DSDT] ✅ 開発者ツールの初期化が完了しました');
     }
 
     if (document.readyState === 'loading') {

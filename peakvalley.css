@@ -1,17 +1,17 @@
 /* ============================================================
-   peakvalley.css — 峰谷提醒（移植自 chicheng-peak）
-   1. 覆盖层：页面边缘呼吸边框 / 光晕 / 流光 / 输入框光效 / 状态角标
-   2. 设置面板：与 DeepSeek 聊天同款浅色玻璃质感，移动端自适应
-   所有类名统一 pv- 前缀，避免与应用现有样式冲突。
+   peakvalley.css — ピーク/オフピーク通知（移植自 chicheng-peak）
+   1. 覆盖层：页面边缘呼吸边框 / 光晕 / 流光 / 入力欄の光効果 / ステータスバッジ
+   2. 設定パネル：DeepSeek チャットと同じ淡色ガラス質感、モバイル対応
+   すべてのクラス名に pv- 接頭辞を統一し、アプリ既存スタイルとの衝突を避ける。
    ============================================================ */
 
-/* ---------- 1. 覆盖层 ---------- */
+/* ---------- 1. オーバーレイ ---------- */
 
 #pv-root {
     position: fixed;
     top: 0; right: 0; bottom: 0; left: 0;
     pointer-events: none;
-    /* DeepSeek 聊天容器是 fixed + z-index:100000，这里同等层级但 DOM 在后，绘制在其上方 */
+    /* DeepSeek チャットコンテナは fixed + z-index:100000。ここは同じ階層だが DOM が後ろにあるため上に描画される */
     z-index: 100000;
     display: none;
 }
@@ -40,7 +40,7 @@
     pointer-events: none;
 }
 
-/* 输入框光效：跟随聊天输入框控件的独立图层 */
+/* 入力欄の光効果：跟随聊天输入框控件的独立图层 */
 #pv-composer {
     position: fixed;
     box-sizing: border-box;
@@ -66,7 +66,7 @@
     pointer-events: none;
 }
 
-/* 呼吸动画：只改 opacity，交给合成层，避免触发重排 */
+/* ブリージングアニメーション：opacity のみ変更し、合成レイヤーに任せて再レイアウトを避ける */
 @keyframes pv-breathe {
     0%   { opacity: .28; }
     50%  { opacity: 1; }
@@ -79,7 +79,7 @@
     animation-iteration-count: infinite;
 }
 
-/* 状态角标 */
+/* ステータスバッジ */
 #pv-badge {
     position: fixed;
     display: none;
@@ -119,7 +119,7 @@
     50%      { opacity: .45; transform: scale(.78); }
 }
 
-/* ---------- 2. 设置面板 ---------- */
+/* ---------- 2. 設定パネル ---------- */
 
 .pv-overlay {
     position: fixed;
@@ -133,7 +133,7 @@
     backdrop-filter: blur(6px);
     z-index: 100001;
     box-sizing: border-box;
-    /* 兜底：极端情况下（视口高度被浏览器 UI 大幅挤压）仍可滑动看到全部内容 */
+    /* フォールバック：極端な場合（ビューポート高さがブラウザ UI に大きく圧迫される）でもスクロールして全内容を見られる */
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -147,9 +147,9 @@
     width: 100%;
     max-width: 620px;
     max-height: 92vh;
-    /* 手机上 100vh 按"工具栏收起"的最大视口计算，会高于实际可见高度；
-       面板又是底部对齐，超出的部分（顶部标题栏）会被顶出屏幕。
-       --pv-vh 由 JS 用 visualViewport.height 写入真实可见高度。 */
+    /* スマホの 100vh は「ツールバー収納」時の最大ビューポートで計算されるため、実際の可視高さより高くなる；
+       さらにパネルは下端揃えなので、あふれた部分（上部タイトルバー）が画面外に押し出される。
+       --pv-vh は JS が visualViewport.height で実際の可視高さを書き込む。 */
     max-height: min(92vh, calc(var(--pv-vh, 92vh) - 8px));
     background: #ffffff;
     border-radius: 18px;
@@ -336,7 +336,7 @@
     cursor: pointer;
 }
 
-/* 开关 */
+/* スイッチ */
 .pv-switch {
     position: relative;
     flex: none;
@@ -368,7 +368,7 @@
 .pv-switch input:checked + .pv-switch-track { background: #4f46e5; }
 .pv-switch input:checked + .pv-switch-track::after { transform: translateX(19px); }
 
-/* 按钮 */
+/* ボタン */
 .pv-btn {
     display: inline-flex;
     align-items: center;
@@ -407,7 +407,7 @@
 
 .pv-btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* 阶段徽标 */
+/* フェーズバッジ */
 .pv-pill {
     display: inline-flex;
     align-items: center;
@@ -443,7 +443,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* 时段列表 */
+/* 時間帯リスト */
 .pv-window-row {
     display: flex;
     align-items: center;
@@ -454,7 +454,7 @@
 
 .pv-window-arrow { color: #9ca3af; font-size: .78rem; flex: none; }
 
-/* 渠道条目 */
+/* チャネル項目 */
 .pv-channel {
     display: flex;
     align-items: center;
@@ -506,7 +506,7 @@
 .pv-msg-err { color: #dc2626; }
 .pv-msg-muted { color: #9ca3af; }
 
-/* 底部操作栏 */
+/* 下部操作バー */
 .pv-foot {
     flex: none;
     display: flex;
@@ -544,7 +544,7 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* ---------- 响应式 ---------- */
+/* ---------- レスポンシブ ---------- */
 
 @media (max-width: 560px) {
     .pv-overlay { padding: 0; align-items: flex-end; }
@@ -579,14 +579,14 @@
     #pv-badge { font-size: 11px; padding: 4px 10px; }
 }
 
-/* 手机横屏：把面板收窄，避免占满 */
+/* スマホ横向き：パネルを狭くし、画面を占領しないようにする */
 @media (max-height: 480px) and (orientation: landscape) {
     .pv-sheet { max-height: 96vh; max-width: 520px; }
     .pv-overlay { align-items: center; padding: 8px; }
     .pv-body { padding: 10px; }
 }
 
-/* 无障碍：尊重"减少动态效果"偏好 */
+/* アクセシビリティ：「視差効果を減らす」設定を尊重 */
 @media (prefers-reduced-motion: reduce) {
     .pv-anim-breathing { animation: none !important; }
     #pv-badge .pv-dot-live { animation: none !important; }

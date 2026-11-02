@@ -78,6 +78,9 @@ Future<bool> synthesizeEdgeTts(
   String voice,
   Future<void> Function(List<int> audio) onAudio, {
   Duration timeout = const Duration(seconds: 60),
+  String pitch = '+0Hz',
+  String rate = '+0%',
+  String volume = '+0%',
 }) async {
   final connectionId = _uuid();
   final gec = ttsSecMsGecV2();
@@ -146,10 +149,14 @@ Future<bool> synthesizeEdgeTts(
       '{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},'
       '"outputFormat":"$_outputFormat"}}}}\r\n';
 
+  // xml:lang 跟随音色（ja-JP-* → ja-JP），否则默认 en-US
+  final ssmlLang = voice.length >= 5 ? voice.substring(0, 5) : 'en-US';
   final ssml = "<speak version='1.0' "
-      "xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>"
+      "xmlns='http://www.w3.org/2001/10/synthesis' "
+      "xml:lang='${_xmlEscape(ssmlLang)}'>"
       "<voice name='${_xmlEscape(voice)}'>"
-      "<prosody pitch='+0Hz' rate='+0%' volume='+0%'>"
+      "<prosody pitch='${_xmlEscape(pitch)}' rate='${_xmlEscape(rate)}' "
+      "volume='${_xmlEscape(volume)}'>"
       '${_xmlEscape(text)}'
       "</prosody></voice></speak>";
 

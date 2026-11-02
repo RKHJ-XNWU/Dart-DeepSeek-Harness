@@ -56,7 +56,7 @@ void cleanupStaleUploadSessions() {
       }
     } catch (_) {}
   }
-  if (cleaned > 0) logp('🧹 清理过期上传会话 $cleaned 个');
+  if (cleaned > 0) logp('🧹 期限切れのアップロードセッションを $cleaned 件クリーンアップしました');
 }
 
 String sanitizeFileName(String name) {
@@ -85,7 +85,7 @@ void removeEmptyParentDirs(String startPath, String rootDir) {
   while (dir != cleanRoot && dir.startsWith(cleanRoot)) {
     try {
       Directory(dir).deleteSync(); // 非空会抛异常
-      logp('🗑️ 已删除空目录: $dir');
+      logp('🗑️ 空のディレクトリを削除しました: $dir');
     } catch (_) {
       break;
     }
@@ -151,7 +151,7 @@ bool saveDsFileMeta(DsFileMeta m) {
     invalidateDsFileMetaCache();
     return true;
   } catch (e) {
-    logp('❌ 保存文件元数据失败: $e');
+    logp('❌ ファイルメタデータの保存に失敗しました: $e');
     return false;
   }
 }
@@ -257,10 +257,10 @@ void deleteDsFileMeta(String id) {
               final file = File(absPath);
               if (file.existsSync()) {
                 file.deleteSync();
-                logp('🗑️ 已删除文件: $relPath');
+                logp('🗑️ ファイルを削除しました: $relPath');
               }
             } catch (e) {
-              logp('❌ 删除文件失败: $e');
+              logp('❌ ファイルの削除に失敗しました: $e');
             }
             final dir = absPath.substring(0, absPath.lastIndexOf('/'));
             removeEmptyParentDirs(dir, DSFilesBlobDir);
@@ -331,14 +331,14 @@ Future<void> handleDsFileUploadStart(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await errJson(req.response, 400, '无效请求体');
+    await errJson(req.response, 400, '無効なリクエストボディです');
     return;
   }
   final fileName = sanitizeFileName(mStr(body, 'fileName'));
   final fileSize = intArgDefault(body, 'fileSize', 0);
   final mimeType = mStr(body, 'mimeType');
   if (fileName.isEmpty) {
-    await errJson(req.response, 400, '文件名不能为空');
+    await errJson(req.response, 400, 'ファイル名は必須です');
     return;
   }
   if (fileSize <= 0) {
@@ -347,7 +347,7 @@ Future<void> handleDsFileUploadStart(HttpRequest req) async {
   }
   if (fileSize > DS_MAX_FILE_SIZE) {
     await errJson(req.response, 413,
-        '文件超过 5GB 上限（当前 ${(fileSize / (1 << 30)).toStringAsFixed(2)} GB）');
+        'ファイルが 5GB の上限を超えています（現在 ${(fileSize / (1 << 30)).toStringAsFixed(2)} GB）');
     return;
   }
 
@@ -369,7 +369,7 @@ Future<void> handleDsFileUploadStart(HttpRequest req) async {
     try {
       Directory(chunkDir).deleteSync(recursive: true);
     } catch (_) {}
-    await errJson(req.response, 500, '写入会话失败');
+    await errJson(req.response, 500, 'セッションの書き込みに失敗しました');
     return;
   }
   await jsonResponse(req.response, 200, {
@@ -406,14 +406,14 @@ Future<void> handleDsFileUploadChunk(HttpRequest req) async {
 
   final sessPath = '$DSFilesChunksDir/$uploadID.json';
   if (!File(sessPath).existsSync()) {
-    await errJson(req.response, 404, '上传会话不存在');
+    await errJson(req.response, 404, 'アップロードセッションが存在しません');
     return;
   }
   Map<String, dynamic> sess;
   try {
     sess = asMap(jsonDecode(File(sessPath).readAsStringSync()));
   } catch (_) {
-    await errJson(req.response, 500, '会话已损坏');
+    await errJson(req.response, 500, 'セッションが破損しています');
     return;
   }
   final totalChunks = intArgDefault(sess, 'totalChunks', 0);
@@ -430,11 +430,11 @@ Future<void> handleDsFileUploadChunk(HttpRequest req) async {
       Directory('$DSFilesChunksDir/$uploadID').deleteSync(recursive: true);
       File(sessPath).deleteSync();
     } catch (_) {}
-    await errJson(req.response, 500, '读取分片失败（可能超出大小限制）');
+    await errJson(req.response, 500, 'チャンクの読み込みに失敗しました（サイズ上限超過の可能性）');
     return;
   }
   if (chunkData.isEmpty) {
-    await errJson(req.response, 400, '分片为空');
+    await errJson(req.response, 400, 'チャンクが空です');
     return;
   }
 
@@ -444,7 +444,7 @@ Future<void> handleDsFileUploadChunk(HttpRequest req) async {
   try {
     File(chunkPath).writeAsBytesSync(chunkData);
   } catch (_) {
-    await errJson(req.response, 500, '写入分片失败');
+    await errJson(req.response, 500, 'チャンクの書き込みに失敗しました');
     return;
   }
   await jsonResponse(req.response, 200, {
@@ -474,7 +474,7 @@ bool mergeChunks(String absPath, String chunkDir, int totalChunks) {
     }
     return true;
   } catch (e) {
-    logp('❌ 合并分片失败: $e');
+    logp('❌ チャンクの結合に失敗しました: $e');
     return false;
   }
 }
@@ -488,7 +488,7 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
   try {
     body = await readJsonBody(req);
   } catch (_) {
-    await errJson(req.response, 400, '无效请求体');
+    await errJson(req.response, 400, '無効なリクエストボディです');
     return;
   }
   final uploadID = mStr(body, 'uploadId');
@@ -503,7 +503,7 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
 
   final sessPath = '$DSFilesChunksDir/$uploadID.json';
   if (!File(sessPath).existsSync()) {
-    await errJson(req.response, 404, '上传会话不存在');
+    await errJson(req.response, 404, 'アップロードセッションが存在しません');
     return;
   }
   Map<String, dynamic> sess;
@@ -514,7 +514,7 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
       Directory('$DSFilesChunksDir/$uploadID').deleteSync(recursive: true);
       File(sessPath).deleteSync();
     } catch (_) {}
-    await errJson(req.response, 400, '上传会话损坏');
+    await errJson(req.response, 400, 'アップロードセッションが破損しています');
     return;
   }
 
@@ -540,7 +540,7 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
         Directory(chunkDir).deleteSync(recursive: true);
         File(sessPath).deleteSync();
       } catch (_) {}
-      await errJson(req.response, 500, '分片 $i 为空');
+      await errJson(req.response, 500, 'チャンク $i が空です');
       return;
     }
   }
@@ -566,14 +566,14 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
 
   if (!mergeChunks(absPath, chunkDir, totalChunks)) {
     cleanup();
-    await errJson(req.response, 500, '合并分片失败');
+    await errJson(req.response, 500, 'チャンクの結合に失敗しました');
     return;
   }
 
   final stat = FileStat.statSync(absPath);
   if (stat.size != fileSize) {
     cleanup();
-    await errJson(req.response, 500, '大小不符: 期望 $fileSize, 实际 ${stat.size}');
+    await errJson(req.response, 500, 'サイズ不一致: 期待値 $fileSize、実際 ${stat.size}');
     return;
   }
 
@@ -590,7 +590,7 @@ Future<void> handleDsFileUploadComplete(HttpRequest req) async {
   );
   if (!saveDsFileMeta(meta)) {
     cleanup();
-    await errJson(req.response, 500, '保存元数据失败');
+    await errJson(req.response, 500, 'メタデータの保存に失敗しました');
     return;
   }
 
@@ -695,7 +695,7 @@ Future<void> handleDsFileClearAll(HttpRequest req) async {
     return (b64: '', mime: '', error: '$e');
   }
   if (data.length > 32 * 1024 * 1024) {
-    return (b64: '', mime: '', error: '图片超过 32MiB 限制（DeepSeek API 限制）');
+    return (b64: '', mime: '', error: '画像が 32MiB の上限を超えています（DeepSeek API の制限）');
   }
   final mime = meta.mimeType.isEmpty ? 'image/jpeg' : meta.mimeType;
   return (b64: base64.encode(data), mime: mime, error: null);

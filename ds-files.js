@@ -1,12 +1,12 @@
-// ds-files.js - DeepSeek 文件管理前端（修复版）
-// 修复内容：
-// 1. 文件列表接口加时间戳 + no-store，防止缓存导致上传后不显示
-// 2. renderAttachBar 不再强依赖 dsFiles，避免 chip 不渲染
-// 3. 上传队列更健壮，避免卡死
-// 4. 统一处理 dscFileInput* 的 change 事件（已在 deepseek-chat.js 中移除重复绑定）
+// ds-files.js - DeepSeek ファイル管理前端（修复版）
+// 修正内容：
+// 1. ファイル一覧APIにタイムスタンプ + no-store を付与し、キャッシュでアップロード後に表示されないのを防ぐ
+// 2. renderAttachBar が dsFiles に強依存しないようにし、chip が描画されないのを防ぐ
+// 3. アップロードキューを堅牢にし、固まるのを防ぐ
+// 4. dscFileInput* の change イベントを一元処理（deepseek-chat.js 側の重複バインドは削除済み）
 (function () {
     'use strict';
-    console.log('[DSF] 脚本开始加载');
+    console.log('[DSF] スクリプトの読み込みを開始');
 
     var dsFiles = [];
     var dsSearchQ = '';
@@ -14,7 +14,7 @@
     var dsFilterCat = 'all';
     var attachedFileIds = [];
 
-    // Promise 队列，串行化上传，避免并发冲突
+    // Promise キューでアップロードを直列化し、並行競合を防ぐ
     var uploadQueue = Promise.resolve();
 
     function $(id) { return document.getElementById(id); }
@@ -62,7 +62,7 @@
         }
     }
 
-    // 【修复】加时间戳 + no-store，防止浏览器缓存
+    // 【修正】タイムスタンプ + no-store を付与し、ブラウザキャッシュを防ぐ
     async function loadDsFiles() {
         try {
             var url = '/api/ds-files/list?category=' + encodeURIComponent(dsFilterCat) + '&_t=' + Date.now();
@@ -71,7 +71,7 @@
             dsFiles = data.files || [];
             renderDsFiles();
         } catch (e) {
-            dsToast('加载文件列表失败', 'error');
+            dsToast('ファイル一覧の読み込みに失敗', 'error');
         }
     }
 
@@ -100,7 +100,7 @@
         list.innerHTML = '';
         if (filtered.length === 0) {
             list.innerHTML = '<div class="dsc-files-empty"><span class="emoji">📭</span><p>' +
-                (dsSearchQ ? '没有匹配的文件' : '还没有文件') + '</p></div>';
+                (dsSearchQ ? '一致するファイルがありません' : 'ファイルがまだありません') + '</p></div>';
             return;
         }
         var frag = document.createDocumentFragment();
@@ -118,9 +118,9 @@
                 (f.source === 'ai_generated' ? '<span style="color:#f0b8c8;">AI 生成</span>' : '') +
                 '</div></div>' +
                 '<div class="dsc-file-actions">' +
-                '<button class="dsc-file-act-btn" data-act="attach" title="附加">📎</button>' +
-                '<button class="dsc-file-act-btn" data-act="download" title="下载">⬇️</button>' +
-                '<button class="dsc-file-act-btn del" data-act="delete" title="删除">🗑️</button>' +
+                '<button class="dsc-file-act-btn" data-act="attach" title="添付">📎</button>' +
+                '<button class="dsc-file-act-btn" data-act="download" title="ダウンロード">⬇️</button>' +
+                '<button class="dsc-file-act-btn del" data-act="delete" title="削除">🗑️</button>' +
                 '</div>';
             frag.appendChild(el);
         });
@@ -128,11 +128,11 @@
     }
 
     function attachFile(fileId) {
-        if (attachedFileIds.indexOf(fileId) !== -1) { dsToast('已附加该文件', 'info'); return; }
-        if (attachedFileIds.length >= 50) { dsToast('最多附加 50 个文件', 'info'); return; }
+        if (attachedFileIds.indexOf(fileId) !== -1) { dsToast('このファイルを添付しました', 'info'); return; }
+        if (attachedFileIds.length >= 50) { dsToast('添付は最大 50 ファイルまで', 'info'); return; }
         attachedFileIds.push(fileId);
         renderAttachBar();
-        dsToast('已附加到消息', 'success');
+        dsToast('メッセージに添付しました', 'success');
     }
 
     function removeAttach(fileId) {
@@ -140,7 +140,7 @@
         renderAttachBar();
     }
 
-    // 【修复】不依赖 dsFiles 是否存在该文件，即使列表未加载也显示 chip
+    // 【修正】dsFiles にファイルがあるかに依存せず、一覧未読み込みでも chip を表示
     function renderAttachBar() {
         var bar = $('dscAttachBar');
         if (!bar) return;
@@ -156,7 +156,7 @@
             var chip = document.createElement('div');
             chip.className = 'dsc-attach-chip';
             var icon = f ? catIcon(f.category) : '📎';
-            var name = f ? f.name : ('文件 ' + String(id).slice(-8));
+            var name = f ? f.name : ('ファイル ' + String(id).slice(-8));
             chip.innerHTML =
                 '<span>' + icon + '</span>' +
                 '<span class="nm">' + dsEsc(name) + '</span>' +
@@ -174,7 +174,7 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        dsToast('开始下载...', 'info');
+        dsToast('ダウンロードを開始...', 'info');
     }
 
     async function deleteFile(fileId) {
@@ -182,20 +182,20 @@
         if (!meta) return;
         try {
             var res = await fetch('/api/ds-files/delete?id=' + encodeURIComponent(fileId), { method: 'DELETE' });
-            if (!res.ok) throw new Error('删除失败');
+            if (!res.ok) throw new Error('削除に失敗しました');
             dsFiles = dsFiles.filter(function (f) { return f.id !== fileId; });
             attachedFileIds = attachedFileIds.filter(function (id) { return id !== fileId; });
             renderDsFiles();
             renderAttachBar();
-            dsToast('已删除', 'success');
+            dsToast('削除しました', 'success');
         } catch (e) {
-            dsToast('删除失败: ' + e.message, 'error');
+            dsToast('削除に失敗: ' + e.message, 'error');
         }
     }
 
     async function doUploadFile(file) {
         if (file.size > 5 * 1024 * 1024 * 1024) {
-            dsToast('文件超过 5GB 限制', 'error');
+            dsToast('ファイルが 5GB の上限を超えています', 'error');
             return;
         }
         var prog = $('dscUploadProgress');
@@ -219,9 +219,9 @@
             try {
                 startData = await startRes.json();
             } catch (e) {
-                throw new Error('开始上传失败（服务器返回无效响应）');
+                throw new Error('アップロード開始に失敗（サーバーが無効な応答を返しました）');
             }
-            if (!startRes.ok) throw new Error(startData.error || '开始上传失败');
+            if (!startRes.ok) throw new Error(startData.error || 'アップロード開始に失敗');
             var uploadId = startData.uploadId;
             var totalChunks = startData.totalChunks;
             var chunkSize = startData.chunkSize;
@@ -236,7 +236,7 @@
                 );
                 if (!chunkRes.ok) {
                     var err = await chunkRes.json().catch(function () { return {}; });
-                    throw new Error(err.error || ('分片 ' + i + ' 上传失败'));
+                    throw new Error(err.error || ('分割 ' + i + ' のアップロードに失敗'));
                 }
                 var pct = Math.round(((i + 1) / totalChunks) * 100);
                 if (fill) fill.style.width = pct + '%';
@@ -249,13 +249,13 @@
                 body: JSON.stringify({ uploadId: uploadId })
             });
             var doneData = await doneRes.json();
-            if (!doneRes.ok) throw new Error(doneData.error || '合并失败');
-            dsToast('上传成功: ' + file.name, 'success');
+            if (!doneRes.ok) throw new Error(doneData.error || '結合に失敗');
+            dsToast('アップロード成功: ' + file.name, 'success');
 
-            // 立即附加到消息栏，无需等待列表刷新
+            // メッセージ欄へ即座に添付し、一覧の更新を待たない
             if (doneData.fileId) {
                 attachFile(doneData.fileId);
-                // 如果 dsFiles 里还没有这条记录，先放个占位，让 renderAttachBar 显示名字
+                // dsFiles にまだ記録がなければ、まずプレースホルダを置き renderAttachBar に名前を表示させる
                 if (!dsFiles.find(function (x) { return x.id === doneData.fileId; })) {
                     dsFiles.unshift({
                         id: doneData.fileId,
@@ -270,7 +270,7 @@
                 }
             }
 
-            // 再拉一次服务端列表，保证数据一致
+            // サーバー一覧をもう一度取得し、データの一致を保証
             await loadDsFiles();
 
             setTimeout(function () {
@@ -278,7 +278,7 @@
                 if (fill) fill.style.width = '0%';
             }, 1500);
         } catch (e) {
-            dsToast('上传失败: ' + e.message, 'error');
+            dsToast('アップロードに失敗: ' + e.message, 'error');
             if (prog) prog.style.display = 'none';
         }
     }
@@ -287,7 +287,7 @@
         uploadQueue = uploadQueue.then(function () {
             return doUploadFile(file);
         }).catch(function (e) {
-            console.error('[DSF] 上传队列错误:', e);
+            console.error('[DSF] アップロードキューのエラー:', e);
             return Promise.resolve();
         });
         return uploadQueue;
@@ -298,7 +298,7 @@
         var btn = $('dscGenBtn');
         if (!input || !btn) return;
         var prompt = input.value.trim();
-        if (!prompt) { dsToast('请输入图片描述', 'info'); return; }
+        if (!prompt) { dsToast('画像の説明を入力してください', 'info'); return; }
         btn.disabled = true;
         btn.textContent = '生成中...';
         try {
@@ -308,13 +308,13 @@
                 body: JSON.stringify({ prompt: prompt, width: 1024, height: 1024 })
             });
             var data = await res.json();
-            if (!res.ok) throw new Error(data.error || '生成失败');
-            dsToast('图片生成成功！', 'success');
+            if (!res.ok) throw new Error(data.error || '生成に失敗');
+            dsToast('画像の生成に成功しました！', 'success');
             input.value = '';
             await loadDsFiles();
             if (data.fileId) attachFile(data.fileId);
         } catch (e) {
-            dsToast('生成失败: ' + e.message, 'error');
+            dsToast('生成に失敗: ' + e.message, 'error');
         } finally {
             btn.disabled = false;
             btn.textContent = '🎨 生成';
@@ -322,9 +322,9 @@
     }
 
     function initDsFiles() {
-        console.log('[DSF] 初始化');
+        console.log('[DSF] 初期化');
         var panel = $('dscFilesPanel');
-        if (!panel) { console.warn('[DSF] 找不到 #dscFilesPanel'); return; }
+        if (!panel) { console.warn('[DSF] #dscFilesPanel が見つかりません'); return; }
 
         var openBtn = $('dscFilesToggle');
         var closeBtn = $('dscFilesClose');
@@ -439,14 +439,14 @@
         var genBtn = $('dscGenBtn');
         if (genBtn) genBtn.addEventListener('click', generateImage);
 
-        // 统一处理 dscFileInput* 多选上传（deepseek-chat.js 中已移除重复绑定）
+        // dscFileInput* の複数選択アップロードを一元処理（deepseek-chat.js 側の重複バインドは削除済み）
         ['dscFileInputImage', 'dscFileInputDoc', 'dscFileInputVideo', 'dscFileInputAny'].forEach(function (id) {
             var inp = $(id);
             if (!inp) return;
             inp.multiple = true;
             inp.addEventListener('change', function (e) {
                 if (e.target.files.length > 0) {
-                    // 先取出所有文件引用，再清空 input（避免文件丢失）
+                    // まず全ファイル参照を取り出してから input をクリア（ファイル消失を防ぐ）
                     var files = Array.prototype.slice.call(e.target.files);
                     e.target.value = '';
                     for (var i = 0; i < files.length; i++) {
@@ -460,7 +460,7 @@
         window.dsClearAttach = function () { attachedFileIds = []; renderAttachBar(); };
         window.dsLoadFiles = loadDsFiles;
         window.dsUploadFileDirectly = uploadFile;
-        console.log('[DSF] ✅ 初始化完成');
+        console.log('[DSF] ✅ 初期化完了');
     }
 
     if (document.readyState === 'loading') {

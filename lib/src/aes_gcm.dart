@@ -100,7 +100,7 @@ class Aes256 {
 
   static List<int> _expandKey(List<int> key) {
     if (key.length != 32) {
-      throw ArgumentError('AES-256 需要 32 字节密钥，实际 ${key.length}');
+      throw ArgumentError('AES-256 には 32 バイトの鍵が必要です（実際は ${key.length}）');
     }
     final nk = 8;
     final nr = 14;
@@ -377,7 +377,7 @@ class AesGcm {
   Uint8List decrypt(List<int> nonce, List<int> cipherWithTag,
       {List<int> aad = const []}) {
     if (cipherWithTag.length < 16) {
-      throw const FormatException('密文长度不足');
+      throw const FormatException('暗号文の長さが不足しています');
     }
     final ct = cipherWithTag.sublist(0, cipherWithTag.length - 16);
     final tag = cipherWithTag.sublist(cipherWithTag.length - 16);
@@ -387,7 +387,7 @@ class AesGcm {
     final expect = _bigToBytes(ek ^ s, 16);
     for (var i = 0; i < 16; i++) {
       if (expect[i] != tag[i]) {
-        throw const FormatException('GCM tag 校验失败');
+        throw const FormatException('GCM タグの検証に失敗しました');
       }
     }
     return _ctr(j0, ct, _aes);

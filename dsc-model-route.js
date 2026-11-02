@@ -1,10 +1,10 @@
 /* ============================================================
- * dsc-model-route.js —— 模型自动路由（图片 → 视觉模型）前端
- *   1) 在「DeepSeek 设置」弹层里追加一块路由设置卡片
+ * dsc-model-route.js —— モデル自動ルーティング（画像 → 視覚モデル）前端
+ * 1) 「DeepSeek 設定」ダイアログにルーティング設定カードを追加
  *   2) 暴露 window.dscModelRouteToast(payload)，供 deepseek-chat.js
- *      在收到 done 事件后提示「本次请求被路由了」
- *   后端：/api/ds-chat/model-router（GET 配置 / POST 保存）
- *   配置文件：ddsh/data/deepseek_chat/model_router.sts
+ * done イベント受信後に「今回のリクエストがルーティングされた」と通知
+ * バックエンド：/api/ds-chat/model-router（GET 設定 / POST 保存）
+ *   設定ファイル：ddsh/data/deepseek_chat/model_router.sts
  * ============================================================ */
 (function () {
     'use strict';
@@ -26,14 +26,14 @@
         setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 3200);
     }
 
-    // done 事件里若带 modelRoute 且确实发生了路由 → 提示一次
+    // done イベントに modelRoute があり実際にルーティングが起きたら → 1回通知
     window.dscModelRouteToast = function (payload) {
         try {
             if (!payload || !payload.modelRoute) return;
             var r = payload.modelRoute;
             if (!r.routed) return;
-            toast('🔀 本轮含图片，已自动路由 ' + r.requested + ' → ' + r.effective, 'info');
-        } catch (e) { /* 提示失败不影响主流程 */ }
+            toast('🔀 今回の画像を含むため自動ルーティング ' + r.requested + ' → ' + r.effective, 'info');
+        } catch (e) { /* 通知失敗は主フローに影響しない */ }
     };
 
     function el(tag, className, text) {
@@ -43,7 +43,7 @@
         return n;
     }
 
-    // 卡片内文本输入字段
+    // カード内のテキスト入力欄
     function makeField(id, label, value, placeholder) {
         var f = el('div', 'dsc-mr-field');
         var lb = el('label', 'dsc-mr-field-label', label);
@@ -59,7 +59,7 @@
         return f;
     }
 
-    // 开关行（整行可点）
+    // スイッチ行（行全体がタップ可能）
     function makeToggle(id, title, desc, checked) {
         var row = el('label', 'dsc-toggle-row');
         var tx = el('div', 'dsc-toggle-tx');
@@ -83,24 +83,24 @@
         var card = el('div', 'dsc-mr-card');
         card.id = 'dscMrCard';
 
-        card.appendChild(el('div', 'dsc-settings-sec-title', '模型自动路由'));
+        card.appendChild(el('div', 'dsc-settings-sec-title', 'モデル自動ルーティング'));
         card.appendChild(el('div', 'dsc-mr-sub',
-            '含图片时自动切换到支持识图的视觉模型，避免 Pro 等纯文本模型读图失败。'));
+            '画像を含むときは画像認識対応のビジョンモデルへ自動切替し、Pro などのテキスト専用モデルでの画像読み取り失敗を防ぎます。'));
 
-        card.appendChild(makeToggle('dscMrEnabled', '启用自动路由',
-            '含图片且当前模型不支持识图时，自动切换', cfg ? cfg.enabled : true));
-        card.appendChild(makeToggle('dscMrRouteMain', '主请求也跟随切换',
-            '关闭时仅图片提取用视觉模型，正文仍用所选模型', cfg ? cfg.routeMain : true));
+        card.appendChild(makeToggle('dscMrEnabled', '自動ルーティングを有効化',
+            '画像を含み、かつ現在のモデルが画像認識非対応のときに自動切替', cfg ? cfg.enabled : true));
+        card.appendChild(makeToggle('dscMrRouteMain', 'メインリクエストも追従して切替',
+            'オフのときは画像抽出のみビジョンモデルを使用し、本文は選択したモデルのまま', cfg ? cfg.routeMain : true));
 
-        card.appendChild(makeField('dscMrVisionModel', '视觉兜底模型',
+        card.appendChild(makeField('dscMrVisionModel', 'ビジョン用フォールバックモデル',
             cfg ? cfg.visionModel : 'deepseek-flash', 'deepseek-flash'));
-        card.appendChild(makeField('dscMrExtraVision', '额外支持图片的模型',
-            cfg && cfg.extraVision ? cfg.extraVision.join(',') : '', 'my-gateway/vision-x, gpt-4o（逗号分隔，可留空）'));
-        card.appendChild(makeField('dscMrExtraText', '额外不支持图片的模型',
-            cfg && cfg.extraText ? cfg.extraText.join(',') : '', 'deepseek-v4-pro（逗号分隔，可留空）'));
+        card.appendChild(makeField('dscMrExtraVision', '追加で画像に対応するモデル',
+            cfg && cfg.extraVision ? cfg.extraVision.join(',') : '', 'my-gateway/vision-x, gpt-4o（カンマ区切り、空欄可）'));
+        card.appendChild(makeField('dscMrExtraText', '追加で画像に非対応のモデル',
+            cfg && cfg.extraText ? cfg.extraText.join(',') : '', 'deepseek-v4-pro（カンマ区切り、空欄可）'));
 
         var saveRow = el('div', 'dsc-mr-save-row');
-        var btn = el('button', 'dsc-btn primary', '保存路由设置');
+        var btn = el('button', 'dsc-btn primary', 'ルーティング設定を保存');
         btn.type = 'button';
         btn.id = 'dscMrSave';
         saveRow.appendChild(btn);
@@ -109,7 +109,7 @@
         var status = el('div', 'dsc-mr-status');
         status.id = 'dscMrStatus';
         status.textContent = caps && caps.visionModels
-            ? '内置视觉型号：' + caps.visionModels.slice(0, 6).join('、') + ' …'
+            ? '内蔵ビジョンモデル：' + caps.visionModels.slice(0, 6).join('、') + ' …'
             : '';
         card.appendChild(status);
 
@@ -151,14 +151,14 @@
             if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
             cfg = data.config || body;
             if (status) {
-                status.textContent = '✅ 已保存 · 视觉模型=' + cfg.visionModel +
-                    (cfg.enabled ? ' · 路由已启用' : ' · 路由已关闭') +
-                    (cfg.routeMain ? ' · 主请求跟随' : ' · 主请求不跟随');
+                status.textContent = '✅ 保存しました · ビジョンモデル=' + cfg.visionModel +
+                    (cfg.enabled ? ' · ルーティング有効' : ' · ルーティング無効') +
+                    (cfg.routeMain ? ' · メインリクエスト追従' : ' · メインリクエスト非追従');
             }
-            toast('✅ 模型路由设置已保存', 'success');
+            toast('✅ モデルルーティング設定を保存しました', 'success');
         } catch (e) {
-            if (status) status.textContent = '❌ 保存失败：' + e.message;
-            toast('保存路由设置失败：' + e.message, 'error');
+            if (status) status.textContent = '❌ 保存に失敗：' + e.message;
+            toast('ルーティング設定の保存に失敗：' + e.message, 'error');
         } finally {
             if (btn) btn.disabled = false;
         }
@@ -173,7 +173,7 @@
                 caps = data.capabilities || null;
             }
         } catch (e) {
-            console.log('[MR] 读取路由配置失败: ' + e.message);
+            console.log('[MR] ルーティング設定の読み込みに失敗: ' + e.message);
         }
         var host = document.querySelector('#dscSettingsOverlay .dsc-modal');
         if (host) {

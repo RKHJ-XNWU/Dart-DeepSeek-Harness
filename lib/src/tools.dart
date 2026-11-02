@@ -3,7 +3,7 @@
 // 100% 对齐 Go 版 deepseek-tools.go：
 //   - 90+ 工具的 JSON Schema 与描述逐条一致
 //   - shell / Termux API / UI 自动化 / 弹窗处理逻辑一致
-//   - Shizuku 权限已撤销（shizukuDisabled = true）：拒绝任何 rish/shizuku
+//   - Shizuku 権限已撤销（shizukuDisabled = true）：拒否任何 rish/shizuku
 //     调用，实际命令一律走本地 sh，与 Go 版运行期行为一致
 // ============================================================
 
@@ -134,7 +134,7 @@ Future<ProcResult> runRawShell(String workdir, String cmdStr,
       workdir: workdir.isEmpty ? null : workdir, timeout: timeout);
 }
 
-/// 智能 shell：Shizuku 已撤销 → 直接本地 sh（并对 rish/shizuku 命令直接拒绝）
+/// 智能 shell：Shizuku 已撤销 → 直接本地 sh（并对 rish/shizuku 命令直接拒否）
 class SmartShellResult {
   final String out;
   final bool usedShizuku;
@@ -145,7 +145,7 @@ class SmartShellResult {
 Future<SmartShellResult> runSmartShell(String workdir, String cmdStr,
     {Duration? timeout}) async {
   if (shizukuDisabled && containsShizukuInvocation(cmdStr)) {
-    return const SmartShellResult('🚫 Shizuku 权限已撤销，拒绝执行相关命令', false, 1);
+    return const SmartShellResult('🚫 Shizuku 権限は取り消し済みのため、関連コマンドの実行を拒否しました', false, 1);
   }
   final r = await runRawShell(workdir, cmdStr, timeout: timeout);
   return SmartShellResult(r.out, false, r.code);
@@ -160,8 +160,8 @@ Future<String> runShellCtx(String workdir, String cmdStr,
 Future<({String out, String? error})> runTermuxAPI(
     Duration timeout, String name, List<String> args) async {
   final r = await runProcess(name, args, timeout: timeout);
-  if (r.timedOut) return (out: r.out, error: '$name 超时');
-  if (r.code != 0) return (out: r.out, error: '$name 失败');
+  if (r.timedOut) return (out: r.out, error: '$name タイムアウト');
+  if (r.code != 0) return (out: r.out, error: '$name に失敗');
   return (out: r.out, error: null);
 }
 
@@ -314,7 +314,7 @@ Future<String> doTap(int x, int y) async {
       timeout: const Duration(seconds: 3));
   invalidateUICache();
   invalidateFgCache();
-  return '✅ 点击 ($x,$y)';
+  return '✅ クリック ($x,$y)';
 }
 
 List<UiNode> findNodes(List<UiNode> nodes, String text, String resourceID,
@@ -337,16 +337,16 @@ List<UiNode> findNodes(List<UiNode> nodes, String text, String resourceID,
 // 弹窗处理
 // ------------------------------------------------------------
 const List<String> popupAllowKeywords = [
-  '允许', '同意', '始终允许', '总是允许', '确定', '好', 'OK', 'Ok', 'ok', '我知道',
-  '我知道了', '接受', '继续', '开启', '启用', '现在就', '立即', 'Allow', 'ALLOW',
+  '許可', '同意', '常に許可', '常に許可', 'OK', '好', 'OK', 'Ok', 'ok', '我知道',
+  '我知道了', '接受', '続行', 'オン', '有効化', '今すぐ', '立即', 'Allow', 'ALLOW',
   'Grant', 'Accept', 'Continue', 'Agree', 'Yes'
 ];
 const List<String> popupDenyKeywords = [
-  '拒绝', '不允许', '取消', '稍后', '以后再说', '暂不', '不再提示', '跳过', '关闭',
+  '拒否', '許可しない', '取消', '稍后', '後で', 'あとで', '不再提示', 'スキップ', '閉じる',
   'Deny', 'Cancel', 'Skip', 'Later', 'No'
 ];
 const List<String> popupCloseKeywords = [
-  '关闭', '取消', '退出', '以后再说', '跳过', '稍后', '×', '✕', '✖', 'x', 'X',
+  '閉じる', '取消', '退出', '後で', 'スキップ', '稍后', '×', '✕', '✖', 'x', 'X',
   'Close', 'Skip', 'Later'
 ];
 const List<String> popupCloseIDFragments = [
@@ -427,7 +427,7 @@ Future<({List<String> dismissed, int actions})> scanAndDismissPopups(
       for (final f in popupCloseIDFragments) {
         if (idLower.contains(f) && n.clickable) {
           await doTap(n.centerX, n.centerY);
-          dismissed.add('[关闭图标] id=${n.resourceId} (${n.centerX},${n.centerY})');
+          dismissed.add('[閉じるアイコン] id=${n.resourceId} (${n.centerX},${n.centerY})');
           actions++;
           await Future.delayed(const Duration(milliseconds: 80));
           return true;
@@ -440,12 +440,12 @@ Future<({List<String> dismissed, int actions})> scanAndDismissPopups(
   switch (prefer) {
     case 'allow':
       while (actions < maxActions) {
-        if (!await pickAndTap(popupAllowKeywords, '允许')) break;
+        if (!await pickAndTap(popupAllowKeywords, '許可')) break;
       }
       break;
     case 'deny':
       while (actions < maxActions) {
-        if (!await pickAndTap(popupDenyKeywords, '拒绝')) break;
+        if (!await pickAndTap(popupDenyKeywords, '拒否')) break;
       }
       break;
     case 'cancel':
@@ -456,8 +456,8 @@ Future<({List<String> dismissed, int actions})> scanAndDismissPopups(
     default:
       while (actions < maxActions) {
         if (await clickCloseIcon()) continue;
-        if (await pickAndTap(popupAllowKeywords, '允许')) continue;
-        if (await pickAndTap(popupDenyKeywords, '拒绝/取消')) continue;
+        if (await pickAndTap(popupAllowKeywords, '許可')) continue;
+        if (await pickAndTap(popupDenyKeywords, '拒否／キャンセル')) continue;
         break;
       }
   }
@@ -465,7 +465,7 @@ Future<({List<String> dismissed, int actions})> scanAndDismissPopups(
   if (hasPopup && actions == 0) {
     await runSmartShell('', 'input keyevent 4',
         timeout: const Duration(seconds: 2));
-    dismissed.add('[返回键]');
+    dismissed.add('[戻るキー]');
     actions++;
   }
   return (dismissed: dismissed, actions: actions);
@@ -499,32 +499,32 @@ Map<String, dynamic> objSchema(Map<String, dynamic> props,
 
 List<Map<String, dynamic>> buildDsTools() {
   return [
-    fnTool('shizuku_status', '检测 Shizuku 状态。', objSchema({})),
-    fnTool('shizuku_start', '打开 Shizuku 应用。', objSchema({})),
-    fnTool('shizuku_auto_setup', '★ 一键检测+修复 Shizuku。', objSchema({})),
+    fnTool('shizuku_status', 'Shizuku の状態を検出します。', objSchema({})),
+    fnTool('shizuku_start', 'Shizuku アプリを開きます。', objSchema({})),
+    fnTool('shizuku_auto_setup', '★ Shizuku をワンクリックで検出・修復します。', objSchema({})),
     fnTool(
         'shizuku_exec',
-        '通过 Shizuku 特权执行命令。',
-        objSchema({'command': str('命令'), 'timeout': integer('超时秒数')},
+        'Shizuku の特権でコマンドを実行します。',
+        objSchema({'command': str('命令'), 'timeout': integer('タイムアウト秒数')},
             ['command'])),
-    fnTool('shizuku_install_rish', '自动部署 rish。',
-        objSchema({'target_dir': str('目标目录')})),
+    fnTool('shizuku_install_rish', 'rish を自動デプロイします。',
+        objSchema({'target_dir': str('対象ディレクトリ')})),
     fnTool(
         'batch_tap',
-        '一次性执行多个点击。',
+        '複数のクリックをまとめて実行します。',
         objSchema({
           'points': {
             'type': 'array',
-            'description': '坐标数组',
+            'description': '座標配列',
             'items': {'type': 'object'}
           },
-          'interval_ms': integer('间隔毫秒'),
+          'interval_ms': integer('間隔（ミリ秒）'),
         }, [
           'points'
         ])),
     fnTool(
         'batch_swipe',
-        '一次执行多个滑动。',
+        '複数のスワイプをまとめて実行します。',
         objSchema({
           'actions': {
             'type': 'array',
@@ -535,41 +535,41 @@ List<Map<String, dynamic>> buildDsTools() {
         ])),
     fnTool(
         'batch_command',
-        '一次执行多条 shell 命令。',
+        '複数のシェルコマンドをまとめて実行します。',
         objSchema({
           'commands': {
             'type': 'array',
             'items': {'type': 'string'}
           },
-          'timeout': integer('总超时秒数'),
+          'timeout': integer('合計タイムアウト秒数'),
         }, [
           'commands'
         ])),
-    fnTool('smart_wait', '智能等待屏幕稳定。',
-        objSchema({'max_ms': integer('最长毫秒'), 'stable_ms': integer('稳定毫秒')})),
-    fnTool('screen_hash', '获取屏幕指纹。', objSchema({})),
-    fnTool('ocr_screen', 'OCR 识别屏幕文字。', objSchema({'lang': str('语言')})),
-    fnTool('get_screen_text', '获取屏幕所有可见文本。', objSchema({})),
-    fnTool('dismiss_popup', '自动关闭弹窗。',
+    fnTool('smart_wait', '画面が安定するまで待機します。',
+        objSchema({'max_ms': integer('最大ミリ秒'), 'stable_ms': integer('安定ミリ秒')})),
+    fnTool('screen_hash', '画面の指紋を取得します。', objSchema({})),
+    fnTool('ocr_screen', '画面上の文字を OCR で認識します。', objSchema({'lang': str('言語')})),
+    fnTool('get_screen_text', '画面の可視テキストをすべて取得します。', objSchema({})),
+    fnTool('dismiss_popup', 'ポップアップを自動で閉じます。',
         objSchema({'prefer': str('allow/deny/cancel/auto')})),
-    fnTool('auto_dismiss_dialogs', '连续清空弹窗。', objSchema({})),
-    fnTool('is_popup_present', '检测是否有弹窗。', objSchema({})),
+    fnTool('auto_dismiss_dialogs', 'ポップアップを連続でクリアします。', objSchema({})),
+    fnTool('is_popup_present', 'ポップアップの有無を検出します。', objSchema({})),
     fnTool(
         'wait_for_element',
-        '等待控件出现。',
+        '要素の出現を待機します。',
         objSchema({
           'text': str('文本'),
           'resource_id': str('resource-id'),
-          'timeout_ms': integer('超时毫秒'),
+          'timeout_ms': integer('タイムアウト（ミリ秒）'),
         })),
     fnTool(
         'download_file',
-        '下载文件。',
-        objSchema({'url': str('链接'), 'save_path': str('保存路径')},
+        'ファイルをダウンロードします。',
+        objSchema({'url': str('リンク'), 'save_path': str('保存路径')},
             ['url', 'save_path'])),
     fnTool(
         'create_file',
-        '创建/覆盖文件。',
+        'ファイルを作成／上書きします。',
         objSchema({'path': str('路径'), 'content': str('内容')},
             ['path', 'content'])),
     fnTool(
@@ -577,23 +577,23 @@ List<Map<String, dynamic>> buildDsTools() {
         '追加内容到文件。',
         objSchema({'path': str('路径'), 'content': str('内容')},
             ['path', 'content'])),
-    fnTool('read_file', '读取文件。', objSchema({'path': str('路径')}, ['path'])),
+    fnTool('read_file', 'ファイルを読み取ります。', objSchema({'path': str('路径')}, ['path'])),
     fnTool('get_file_size', '文件大小。', objSchema({'path': str('路径')}, ['path'])),
-    fnTool('list_dir', '列目录。', objSchema({'path': str('路径')})),
+    fnTool('list_dir', 'ディレクトリを一覧します。', objSchema({'path': str('路径')})),
     fnTool(
         'execute_command',
-        '执行 shell 命令。',
-        objSchema({'command': str('命令'), 'timeout': integer('超时秒数')},
+        'シェルコマンドを実行します。',
+        objSchema({'command': str('命令'), 'timeout': integer('タイムアウト秒数')},
             ['command'])),
     fnTool(
         'run_background',
-        '后台运行长任务。',
+        '長いタスクをバックグラウンドで実行します。',
         objSchema({'command': str('命令'), 'log_file': str('日志路径')},
             ['command'])),
-    fnTool('list_processes', '列进程。', objSchema({'filter': str('过滤关键字')})),
+    fnTool('list_processes', 'プロセスを一覧します。', objSchema({'filter': str('絞り込みキーワード')})),
     fnTool(
         'kill_process',
-        '杀进程。',
+        'プロセスを終了します。',
         objSchema({'pid': integer('PID'), 'signal': str('信号')}, ['pid'])),
     fnTool(
         'wait_seconds',
@@ -601,23 +601,23 @@ List<Map<String, dynamic>> buildDsTools() {
         objSchema({'seconds': integer('秒数'), 'reason': str('原因')}, ['seconds'])),
     fnTool(
         'http_request',
-        'HTTP 请求。',
+        'HTTP リクエスト。',
         objSchema({
           'method': str('GET/POST/...'),
           'url': str('URL'),
           'headers': {'type': 'object'},
           'body': str('body'),
-          'timeout': integer('超时秒数'),
+          'timeout': integer('タイムアウト秒数'),
         }, [
           'url'
         ])),
     fnTool(
         'sqlite_query',
-        '查询 SQLite 数据库。',
+        'SQLite データベースを照会します。',
         objSchema({'db_path': str('路径'), 'sql': str('SQL')}, ['db_path', 'sql'])),
     fnTool(
         'tap',
-        '点击。',
+        'クリック。',
         objSchema({
           'x': integer('X'),
           'y': integer('Y'),
@@ -627,7 +627,7 @@ List<Map<String, dynamic>> buildDsTools() {
         })),
     fnTool(
         'long_press',
-        '长按。',
+        '長押し。',
         objSchema({
           'x': integer('X'),
           'y': integer('Y'),
@@ -638,23 +638,23 @@ List<Map<String, dynamic>> buildDsTools() {
         })),
     fnTool(
         'swipe',
-        '滑动。',
+        'スワイプ。',
         objSchema({
           'direction': str('up/down/left/right'),
           'start_x': integer('起点 X'),
           'start_y': integer('起点 Y'),
-          'end_x': integer('终点 X'),
-          'end_y': integer('终点 Y'),
-          'duration_ms': integer('时长毫秒'),
+          'end_x': integer('終点 X'),
+          'end_y': integer('終点 Y'),
+          'duration_ms': integer('時間（ミリ秒）'),
         })),
-    fnTool('input_text', '输入文本。', objSchema({'text': str('文本')}, ['text'])),
+    fnTool('input_text', 'テキストを入力します。', objSchema({'text': str('文本')}, ['text'])),
     fnTool(
         'key_event',
-        '发送按键。',
-        objSchema({'key': str('按键名'), 'keycode': integer('keycode')})),
+        'キーを送信します。',
+        objSchema({'key': str('キー名'), 'keycode': integer('keycode')})),
     fnTool(
         'find_element',
-        '查找 UI 控件。',
+        'UI ウィジェットを検索します。',
         objSchema({
           'text': str('文本'),
           'resource_id': str('resource-id'),
@@ -663,10 +663,10 @@ List<Map<String, dynamic>> buildDsTools() {
         })),
     fnTool('screenshot', '截屏。', objSchema({'save_path': str('路径')})),
     fnTool('screen_size', '屏幕分辨率。', objSchema({})),
-    fnTool('ui_dump', '导出 UI XML。', objSchema({})),
+    fnTool('ui_dump', 'UI XML を出力します。', objSchema({})),
     fnTool(
         'start_app',
-        '★ 强启动应用（3秒内）。',
+        '★ アプリを強制起動します（3 秒以内）。',
         objSchema({
           'package': str('包名'),
           'activity': str('Activity'),
@@ -674,105 +674,105 @@ List<Map<String, dynamic>> buildDsTools() {
         }, [
           'package'
         ])),
-    fnTool('current_app', '当前前台应用。', objSchema({})),
-    fnTool('is_app_running', '检查应用进程。',
+    fnTool('current_app', '現在のフォアグラウンドアプリ。', objSchema({})),
+    fnTool('is_app_running', 'アプリのプロセスを確認します。',
         objSchema({'package': str('包名')}, ['package'])),
-    fnTool('force_stop_app', '强制停止应用。',
+    fnTool('force_stop_app', 'アプリを強制停止します。',
         objSchema({'package': str('包名')}, ['package'])),
-    fnTool('torch', '手电筒。', objSchema({'action': str('on/off')}, ['action'])),
+    fnTool('torch', 'フラッシュライト。', objSchema({'action': str('on/off')}, ['action'])),
     fnTool(
         'camera_photo',
         '拍照。',
-        objSchema({'save_path': str('路径'), 'camera_id': integer('摄像头 ID')},
+        objSchema({'save_path': str('路径'), 'camera_id': integer('カメラ ID')},
             ['save_path'])),
-    fnTool('camera_info', '摄像头信息。', objSchema({})),
+    fnTool('camera_info', 'カメラ情報。', objSchema({})),
     fnTool(
         'volume_set',
-        '设音量。',
+        '音量を設定します。',
         objSchema({'stream': str('music/ring/...'), 'volume': integer('音量')},
             ['stream', 'volume'])),
-    fnTool('volume_get', '获取音量。', objSchema({})),
-    fnTool('battery_status', '电池状态。', objSchema({})),
+    fnTool('volume_get', '音量を取得します。', objSchema({})),
+    fnTool('battery_status', 'バッテリー状態。', objSchema({})),
     fnTool('wifi_info', 'WiFi 信息。', objSchema({})),
-    fnTool('wifi_scan', '扫描 WiFi。', objSchema({})),
-    fnTool('wifi_enable', '开关 WiFi。', objSchema({'action': str('on/off')}, ['action'])),
+    fnTool('wifi_scan', 'WiFi をスキャンします。', objSchema({})),
+    fnTool('wifi_enable', 'WiFi をオン／オフします。', objSchema({'action': str('on/off')}, ['action'])),
     fnTool(
         'clipboard',
-        '剪贴板。',
-        objSchema({'action': str('get/set'), 'text': str('set 时的文本')},
+        'クリップボード。',
+        objSchema({'action': str('get/set'), 'text': str('set 時のテキスト')},
             ['action'])),
     fnTool(
         'notify',
-        '系统通知。',
-        objSchema({'title': str('标题'), 'content': str('内容')}, ['title'])),
+        'システム通知。',
+        objSchema({'title': str('タイトル'), 'content': str('内容')}, ['title'])),
     fnTool('toast', 'Toast。', objSchema({'text': str('文本')}, ['text'])),
-    fnTool('vibrate', '震动。', objSchema({'duration_ms': integer('毫秒')})),
-    fnTool('tts_speak', 'TTS 朗读。', objSchema({'text': str('文本')}, ['text'])),
+    fnTool('vibrate', 'バイブレーション。', objSchema({'duration_ms': integer('毫秒')})),
+    fnTool('tts_speak', 'TTS 読み上げ。', objSchema({'text': str('文本')}, ['text'])),
     fnTool('location', '地理位置。',
         objSchema({'provider': str('gps/network/passive')})),
     fnTool('brightness', '亮度。', objSchema({'value': integer('0-255')}, ['value'])),
-    fnTool('list_sensors', '列传感器。', objSchema({})),
-    fnTool('read_sensor', '读传感器。', objSchema({'sensor': str('名')}, ['sensor'])),
-    fnTool('fingerprint', '指纹。', objSchema({})),
+    fnTool('list_sensors', 'センサー一覧。', objSchema({})),
+    fnTool('read_sensor', 'センサー値を読み取ります。', objSchema({'sensor': str('名')}, ['sensor'])),
+    fnTool('fingerprint', '指紋認証。', objSchema({})),
     fnTool(
         'dialog',
-        '系统对话框。',
+        'システムダイアログ。',
         objSchema({
-          'input': str('类型'),
-          'title': str('标题'),
+          'input': str('種類'),
+          'title': str('タイトル'),
           'hint': str('提示'),
         }, [
           'input'
         ])),
-    fnTool('audio_info', '音频信息。', objSchema({})),
+    fnTool('audio_info', 'オーディオ情報。', objSchema({})),
     fnTool(
         'microphone_record',
-        '录音。',
-        objSchema({'save_path': str('路径'), 'duration_ms': integer('时长')},
+        '録音。',
+        objSchema({'save_path': str('路径'), 'duration_ms': integer('時間')},
             ['save_path'])),
-    fnTool('list_packages', '列包名。', objSchema({'filter': str('关键字')})),
+    fnTool('list_packages', '列包名。', objSchema({'filter': str('キーワード')})),
     fnTool('install_apk', '安装 APK。',
         objSchema({'apk_path': str('APK 路径')}, ['apk_path'])),
-    fnTool('uninstall_app', '卸载。', objSchema({'package': str('包名')}, ['package'])),
+    fnTool('uninstall_app', 'アンインストール。', objSchema({'package': str('包名')}, ['package'])),
     fnTool(
         'grant_permission',
-        '授予权限。',
-        objSchema({'package': str('包名'), 'permission': str('权限')},
+        '権限を付与します。',
+        objSchema({'package': str('包名'), 'permission': str('権限')},
             ['package', 'permission'])),
     fnTool(
         'revoke_permission',
-        '撤销权限。',
-        objSchema({'package': str('包名'), 'permission': str('权限')},
+        '権限を取り消します。',
+        objSchema({'package': str('包名'), 'permission': str('権限')},
             ['package', 'permission'])),
-    fnTool('list_permissions', '列权限。',
+    fnTool('list_permissions', '権限一覧。',
         objSchema({'package': str('包名')}, ['package'])),
     fnTool(
         'appops_set',
-        '设 AppOps。',
+        'AppOps を設定します。',
         objSchema(
             {'package': str('包名'), 'op': str('操作'), 'mode': str('模式')},
             ['package', 'op', 'mode'])),
     fnTool(
         'settings_get',
-        '读系统设置。',
-        objSchema({'namespace': str('system/secure/global'), 'key': str('键')},
+        'システム設定を読み取ります。',
+        objSchema({'namespace': str('system/secure/global'), 'key': str('キー')},
             ['namespace', 'key'])),
     fnTool(
         'settings_put',
-        '写系统设置。',
+        'システム設定を書き込みます。',
         objSchema({
           'namespace': str('system/secure/global'),
-          'key': str('键'),
-          'value': str('值'),
+          'key': str('キー'),
+          'value': str('値'),
         }, [
           'namespace',
           'key',
           'value'
         ])),
-    fnTool('open_url', '打开 URL。', objSchema({'url': str('URL')}, ['url'])),
-    fnTool('open_file', '打开文件。', objSchema({'path': str('路径')}, ['path'])),
+    fnTool('open_url', 'URL を開きます。', objSchema({'url': str('URL')}, ['url'])),
+    fnTool('open_file', 'ファイルを開きます。', objSchema({'path': str('路径')}, ['path'])),
     fnTool('share_file', '分享文件。', objSchema({'path': str('路径')}, ['path'])),
-    fnTool('media_scan', '媒体扫描。', objSchema({'path': str('路径')}, ['path'])),
+    fnTool('media_scan', 'メディアスキャン。', objSchema({'path': str('路径')}, ['path'])),
     fnTool(
         'media_player',
         '播放器。',
@@ -782,57 +782,57 @@ List<Map<String, dynamic>> buildDsTools() {
         objSchema({'limit': integer('条数'), 'type': str('all/inbox/sent/draft')})),
     fnTool(
         'sms_send',
-        '发短信。',
-        objSchema({'number': str('号码'), 'text': str('内容')}, ['number', 'text'])),
-    fnTool('contact_list', '通讯录。', objSchema({'limit': integer('条数')})),
-    fnTool('call_log', '通话记录。', objSchema({'limit': integer('条数')})),
+        'SMS を送信します。',
+        objSchema({'number': str('番号'), 'text': str('内容')}, ['number', 'text'])),
+    fnTool('contact_list', '連絡先。', objSchema({'limit': integer('条数')})),
+    fnTool('call_log', '通話履歴。', objSchema({'limit': integer('条数')})),
     fnTool(
         'termux_download',
-        '系统下载器。',
-        objSchema({'url': str('链接'), 'description': str('描述')}, ['url'])),
+        'システムダウンローダー。',
+        objSchema({'url': str('リンク'), 'description': str('描述')}, ['url'])),
     fnTool(
         'web_search',
-        'DeepSeek 官方联网搜索（返回结构化网页结果）。',
+        'DeepSeek 公式のウェブ検索（構造化された検索結果を返します）。',
         objSchema({
-          'query': str('搜索关键词（1-128 字符）'),
+          'query': str('検索キーワード（1〜128 文字）'),
           'count': integer('返回条数(1-50)'),
-          'need_content': boolean('是否返回页面正文'),
+          'need_content': boolean('ページ本文を返すかどうか'),
         }, [
           'query'
         ])),
-    fnTool('fetch', 'DeepSeek 官方网页抓取（返回页面 Markdown 正文）。',
-        objSchema({'url': str('网页 URL')}, ['url'])),
+    fnTool('fetch', 'DeepSeek 公式のウェブページ取得（Markdown 本文を返します）。',
+        objSchema({'url': str('ページ URL')}, ['url'])),
     fnTool(
         'cosplay_show',
-        '查看当前激活角色的角色卡，或按 id 查看指定角色的角色卡。用于确认角色设定、语气与行为守则（Cosplay 开关关闭时也可预览）。',
-        objSchema({'id': str('角色 id；省略时返回当前激活角色。')})),
-    fnTool('cosplay_list', '列出角色库中全部角色及其激活状态（角色库管理，开关关闭时也可用）。',
+        '現在アクティブなキャラクターのカードを表示します。id を指定すると該当キャラクターのカードを表示します。キャラクター設定・口調・行動指針の確認用（Cosplay スイッチがオフでもプレビュー可能）。',
+        objSchema({'id': str('キャラクター id。省略時は現在アクティブなキャラクターを返します。')})),
+    fnTool('cosplay_list', 'キャラクターライブラリの全キャラクターと有効状態を一覧します（ライブラリ管理用。スイッチがオフでも使用可能）。',
         objSchema({})),
     fnTool(
         'cosplay_switch',
-        '切换当前扮演的角色（按角色 id）；id 传 null 可退出扮演、恢复默认身份。Cosplay 开关未开启时不可用。',
-        objSchema({'id': str('目标角色 id；传字符串 "null" 表示退出扮演。')}, ['id'])),
+        '現在演じているキャラクターを切り替えます（キャラクター id）。id に null を渡すとロールプレイを終了し、既定の身分に戻ります。Cosplay スイッチがオンのときのみ使用可能。',
+        objSchema({'id': str('対象キャラクター id。文字列 "null" を渡すとロールプレイを終了します。')}, ['id'])),
     fnTool(
         'cosplay_upsert',
-        '创建或更新一个角色（角色库管理，开关关闭时也可用）。未提供 id 时创建新角色（按 name 生成 id）；提供 id 时更新既有角色。字段兼容酒馆（SillyTavern）v2 角色卡。支持用户随时自定义任何角色。',
+        'キャラクターを作成または更新します（ライブラリ管理用。スイッチがオフでも使用可能）。id を省略すると新規作成（name から id を生成）、id を指定すると既存キャラクターを更新します。フィールドは Tavern（SillyTavern）v2 キャラクターカードに準拠します。ユーザーはいつでも任意のキャラクターをカスタマイズできます。',
         objSchema({
           'id': str('既有角色 id；省略表示新建。'),
-          'name': str('角色显示名。'),
-          'emoji': str('头像字符（如 🐋）。'),
-          'system_prompt': str('原样注入 persona 顶部的指令块（如 [PERSONA_LOAD] 格式）。'),
-          'description': str('身份与背景设定（我是谁）。'),
-          'personality': str('性格核心与层次。'),
-          'style': str('说话风格（怎么说话）。'),
-          'rules': str('行为守则（该做什么 / 不做什么）。'),
-          'behavior': str('行为模式 / 私密互动。'),
-          'scenario': str('场景 / 世界观 / 关系设定。'),
-          'first_mes': str('开场白。'),
-          'mes_example': str('示例对话（few-shot）。'),
+          'name': str('キャラクター表示名。'),
+          'emoji': str('アイコン文字（例: 🐋）。'),
+          'system_prompt': str('persona の先頭にそのまま挿入される指示ブロック（例: [PERSONA_LOAD] 形式）。'),
+          'description': str('身分と背景設定（私は誰か）。'),
+          'personality': str('性格の核心と層。'),
+          'style': str('話し方のスタイル（どう話すか）。'),
+          'rules': str('行動指針（すべきこと／すべきでないこと）。'),
+          'behavior': str('行動パターン／私的なやり取り。'),
+          'scenario': str('シチュエーション／世界観／関係設定。'),
+          'first_mes': str('オープニングのセリフ。'),
+          'mes_example': str('会話例（few-shot）。'),
         }, [
           'name'
         ])),
-    fnTool('cosplay_remove', '从角色库删除一个角色（角色库管理，开关关闭时也可用）。',
-        objSchema({'id': str('要删除的角色 id。')}, ['id'])),
+    fnTool('cosplay_remove', 'キャラクターライブラリから 1 件削除します（ライブラリ管理用。スイッチがオフでも使用可能）。',
+        objSchema({'id': str('削除するキャラクターの id。')}, ['id'])),
   ];
 }
 
@@ -840,12 +840,12 @@ List<Map<String, dynamic>> buildDsTools() {
 // 工具执行实现
 // ------------------------------------------------------------
 Future<String> execToolShizukuDisabled() async {
-  return '🚫 Shizuku 权限已撤销，AI 无系统级权限';
+  return '🚫 Shizuku 権限は取り消し済みのため、AI にシステム権限がありません';
 }
 
 Future<String> execToolBatchTap(Map<String, dynamic> args) async {
   final pointsRaw = asList(args['points']);
-  if (pointsRaw.isEmpty) return 'points 不能为空';
+  if (pointsRaw.isEmpty) return 'points は必須です';
   final intervalMs = intArgDefault(args, 'interval_ms', 100);
 
   final points = <({int x, int y, String desc})>[];
@@ -871,7 +871,7 @@ Future<String> execToolBatchTap(Map<String, dynamic> args) async {
       ));
     }
   }
-  if (points.isEmpty) return '无有效点击点';
+  if (points.isEmpty) return '有効なクリック座標がありません';
 
   final cmds = <String>[];
   for (var i = 0; i < points.length; i++) {
@@ -884,7 +884,7 @@ Future<String> execToolBatchTap(Map<String, dynamic> args) async {
       timeout: Duration(seconds: points.length * 2 + 5));
   invalidateUICache();
   invalidateFgCache();
-  final sb = StringBuffer('✅ 批量点击 ${points.length} 个点：\n');
+  final sb = StringBuffer('✅ ${points.length} 点を一括クリック:\n');
   for (final p in points) {
     sb.write('  ${p.desc}\n');
   }
@@ -893,7 +893,7 @@ Future<String> execToolBatchTap(Map<String, dynamic> args) async {
 
 Future<String> execToolBatchSwipe(Map<String, dynamic> args) async {
   final actionsRaw = asList(args['actions']);
-  if (actionsRaw.isEmpty) return 'actions 不能为空';
+  if (actionsRaw.isEmpty) return 'actions は必須です';
   final cmds = <String>[];
   final descList = <String>[];
   for (final aRaw in actionsRaw) {
@@ -946,11 +946,11 @@ Future<String> execToolBatchSwipe(Map<String, dynamic> args) async {
       }
     }
   }
-  if (cmds.isEmpty) return '无有效滑动';
+  if (cmds.isEmpty) return '有効なスワイプがありません';
   await runSmartShell('', cmds.join('; '),
       timeout: Duration(seconds: cmds.length * 3 + 5));
   invalidateUICache();
-  return '✅ 批量滑动 ${cmds.length} 次: ${descList.join(', ')}';
+  return '✅ ${cmds.length} 回の一括スワイプ: ${descList.join(', ')}';
 }
 
 Future<String> execToolBatchCommand(Map<String, dynamic> args) async {
@@ -966,8 +966,8 @@ Future<String> execToolBatchCommand(Map<String, dynamic> args) async {
       timeout: Duration(seconds: timeout));
   var out = r.out;
   if (out.length > 64 * 1024) out = '${out.substring(0, 64 * 1024)}\n...[截断]';
-  if (r.code != 0 && out.isEmpty) return '执行失败（退出码 ${r.code}）';
-  return '批量执行 ${cmds.length} 条命令：\n$out';
+  if (r.code != 0 && out.isEmpty) return '実行に失敗しました（終了コード ${r.code}）';
+  return '${cmds.length} 件のコマンドを一括実行:\n$out';
 }
 
 Future<String> execToolSmartWait(Map<String, dynamic> args) async {
@@ -1001,21 +1001,21 @@ Future<String> execToolSmartWait(Map<String, dynamic> args) async {
     await Future.delayed(const Duration(milliseconds: 100));
   }
   final elapsed = DateTime.now().difference(start).inMilliseconds;
-  if (stableReached) return '✅ 屏幕已稳定（${elapsed}ms）';
-  return '⚠️ 屏幕未稳定，已等待 ${elapsed}ms';
+  if (stableReached) return '✅ 画面が安定しました（${elapsed}ms）';
+  return '⚠️ 画面が安定しません。${elapsed}ms 待機しました';
 }
 
 Future<String> execToolScreenHash() async {
   invalidateUICache();
   final xml = await dumpUIXMLCached();
-  if (xml == null) return '未能获取 UI XML';
+  if (xml == null) return 'UI XML を取得できませんでした';
   var h = 0;
   var i = 0;
   for (final c in xml.runes) {
     if (i++ > 200) break;
     h = (h * 31 + c) & 0x7FFFFFFF;
   }
-  return '屏幕指纹: $h (XML 长度 ${xml.length})';
+  return '画面指紋: $h（XML 長 ${xml.length}）';
 }
 
 Future<String> execToolGetScreenText() async {
@@ -1029,7 +1029,7 @@ Future<String> execToolGetScreenText() async {
     seen.add(t);
     sb.write('$t\n');
   }
-  if (sb.isEmpty) return '(屏幕无可见文本)';
+  if (sb.isEmpty) return '(画面に可視テキストなし)';
   var result = sb.toString();
   if (result.length > 32 * 1024) {
     result = '${result.substring(0, 32 * 1024)}\n...[截断]';
@@ -1042,13 +1042,13 @@ Future<String> execToolOCRScreen(Map<String, dynamic> args) async {
   if (lang.isEmpty) lang = 'chi_sim+eng';
   final which = await runProcess('sh', ['-c', 'command -v tesseract']);
   final tessPath = which.out.trim();
-  if (tessPath.isEmpty) return '未安装 tesseract。请执行: pkg install tesseract';
+  if (tessPath.isEmpty) return 'tesseract がインストールされていません。実行してください: pkg install tesseract';
 
   final tmpImg =
       '/data/local/tmp/ds_ocr_${DateTime.now().microsecondsSinceEpoch}.png';
   await runSmartShell('', 'screencap -p $tmpImg',
       timeout: const Duration(seconds: 15));
-  if (!File(tmpImg).existsSync()) return '截图文件不存在: $tmpImg';
+  if (!File(tmpImg).existsSync()) return 'スクリーンショットファイルが存在しません: $tmpImg';
   try {
     final langsOut =
         (await runProcess(tessPath, ['--list-langs'], timeout: const Duration(seconds: 8)))
@@ -1064,10 +1064,10 @@ Future<String> execToolOCRScreen(Map<String, dynamic> args) async {
     }
     final r = await runProcess(tessPath, [tmpImg, 'stdout', '-l', lang],
         timeout: const Duration(seconds: 60));
-    if (r.code != 0) return 'OCR 失败: ${r.out.trim()}';
+    if (r.code != 0) return 'OCR に失敗しました: ${r.out.trim()}';
     final result = r.out.trim();
-    if (result.isEmpty) return 'OCR 识别结果：(屏幕无文字或识别为空)';
-    return 'OCR 识别结果:\n$result';
+    if (result.isEmpty) return 'OCR 認識結果: （画面に文字がないか、認識結果が空です）';
+    return 'OCR 認識結果:\n$result';
   } finally {
     try {
       File(tmpImg).deleteSync();
@@ -1078,7 +1078,7 @@ Future<String> execToolOCRScreen(Map<String, dynamic> args) async {
 Future<String> execToolSQLiteQuery(Map<String, dynamic> args) async {
   final dbPath = mStr(args, 'db_path');
   final sql = mStr(args, 'sql');
-  if (dbPath.isEmpty || sql.isEmpty) return 'db_path 和 sql 不能为空';
+  if (dbPath.isEmpty || sql.isEmpty) return 'db_path と sql は必須です';
   final which = await runProcess('sh', ['-c', 'command -v sqlite3']);
   if (which.out.trim().isEmpty) return '未安装 sqlite3。安装: pkg install sqlite';
   final r = await runSmartShell(
@@ -1096,7 +1096,7 @@ Future<String> execToolTap(Map<String, dynamic> args) async {
   final rid = mStr(args, 'resource_id');
   var idx = intArgDefault(args, 'index', 0);
   if (x != null && y != null) return doTap(x, y);
-  if (text.isEmpty && rid.isEmpty) return '必须提供 (x,y) 或 text 或 resource_id';
+  if (text.isEmpty && rid.isEmpty) return '(x,y) または text または resource_id を指定してください';
 
   var nodes = await dumpUINodes();
   var matched = findNodes(nodes, text, rid);
@@ -1122,9 +1122,9 @@ Future<String> execToolLongPress(Map<String, dynamic> args) async {
     await runSmartShell('', 'input swipe $x $y $x $y $dur',
         timeout: Duration(milliseconds: dur + 3000));
     invalidateUICache();
-    return '✅ 长按 ($x,$y) ${dur}ms';
+    return '✅ 長押し ($x,$y) ${dur}ms';
   }
-  if (text.isEmpty && rid.isEmpty) return '必须提供 (x,y) 或 text 或 resource_id';
+  if (text.isEmpty && rid.isEmpty) return '(x,y) または text または resource_id を指定してください';
   final nodes = await dumpUINodes();
   final matched = findNodes(nodes, text, rid);
   if (matched.isEmpty) return '未找到控件';
@@ -1133,7 +1133,7 @@ Future<String> execToolLongPress(Map<String, dynamic> args) async {
   await runSmartShell('', 'input swipe ${n.centerX} ${n.centerY} ${n.centerX} ${n.centerY} $dur',
       timeout: Duration(milliseconds: dur + 3000));
   invalidateUICache();
-  return '✅ 长按「$text」(${n.centerX},${n.centerY}) ${dur}ms';
+  return '✅ 「$text」を長押し (${n.centerX},${n.centerY}) ${dur}ms';
 }
 
 Future<String> execToolSwipe(Map<String, dynamic> args) async {
@@ -1143,7 +1143,7 @@ Future<String> execToolSwipe(Map<String, dynamic> args) async {
   int x1 = 0, y1 = 0, x2 = 0, y2 = 0;
   if (dir.isNotEmpty) {
     final size = await getScreenSize();
-    if (size == null) return '无法获取屏幕尺寸';
+    if (size == null) return '画面サイズを取得できません';
     final w = size.w, h = size.h;
     final cx = w ~/ 2, cy = h ~/ 2;
     switch (dir) {
@@ -1180,7 +1180,7 @@ Future<String> execToolSwipe(Map<String, dynamic> args) async {
     final c = intArg(args, 'end_x');
     final d = intArg(args, 'end_y');
     if (a == null || b == null || c == null || d == null) {
-      return '需要 direction 或完整坐标';
+      return 'direction または完全な座標が必要です';
     }
     x1 = a;
     y1 = b;
@@ -1190,12 +1190,12 @@ Future<String> execToolSwipe(Map<String, dynamic> args) async {
   await runSmartShell('', 'input swipe $x1 $y1 $x2 $y2 $dur',
       timeout: Duration(milliseconds: dur + 5000));
   invalidateUICache();
-  return '✅ 滑动 ($x1,$y1)→($x2,$y2) ${dur}ms';
+  return '✅ スワイプ ($x1,$y1)→($x2,$y2) ${dur}ms';
 }
 
 Future<String> execToolInputText(Map<String, dynamic> args) async {
   final text = mStr(args, 'text');
-  if (text.isEmpty) return 'text 不能为空';
+  if (text.isEmpty) return 'text は必須です';
   final hasNonASCII = text.runes.any((r) => r > 127);
 
   if (hasNonASCII) {
@@ -1207,31 +1207,31 @@ Future<String> execToolInputText(Map<String, dynamic> args) async {
           '', 'am broadcast -a ADB_INPUT_TEXT --es msg ${shellQuote(text)}',
           timeout: const Duration(seconds: 15));
       invalidateUICache();
-      return '✅ 已通过 ADBKeyboard 输入: $text';
+      return '✅ ADBKeyboard 経由で入力しました: $text';
     }
-    // 方案 B：剪贴板 + 粘贴键
+    // 方案 B：剪贴板 + 粘贴キー
     await runTermuxAPI(const Duration(seconds: 5), 'termux-clipboard-set', [text]);
     await Future.delayed(const Duration(milliseconds: 120));
     final r = await runSmartShell('', 'input keyevent 279',
         timeout: const Duration(seconds: 10));
     if (r.code == 0) {
       invalidateUICache();
-      return '✅ 已通过剪贴板粘贴: $text';
+      return '✅ クリップボードから貼り付けました: $text';
     }
     // 方案 C：input text 兜底
     final escaped = text.replaceAll(' ', '%s');
     await runSmartShell('', 'input text ${shellQuote(escaped)}',
         timeout: const Duration(seconds: 15));
     invalidateUICache();
-    return '⚠️ 已尝试 input text（中文可能未生效）: $text';
+    return '⚠️ input text を試しました（中国語は反映されない可能性があります）: $text';
   }
 
   final escaped = text.replaceAll(' ', '%s');
   final r = await runSmartShell('', 'input text ${shellQuote(escaped)}',
       timeout: const Duration(seconds: 15));
-  if (r.code != 0 && r.out.isEmpty) return '输入失败';
+  if (r.code != 0 && r.out.isEmpty) return '入力に失敗しました';
   invalidateUICache();
-  return '✅ 输入: $text';
+  return '✅ 入力: $text';
 }
 
 const Map<String, int> keyMap = {
@@ -1258,57 +1258,57 @@ Future<String> execToolKeyEvent(Map<String, dynamic> args) async {
   final k = mStr(args, 'key').trim().toLowerCase();
   if (k.isEmpty) return '需要 key 或 keycode';
   final code = keyMap[k];
-  if (code == null) return '未知按键: $k';
+  if (code == null) return '不明なキーです: $k';
   return sendKeyEvent(code);
 }
 
 Future<String> execToolStartApp(Map<String, dynamic> args) async {
   if (shizukuDisabled) {
-    // 与 Go 版一致：无特权时仍尝试 am start（本地 sh 通常无权限）
+    // 与 Go 版一致：无特权时仍尝试 am start（本地 sh 通常无権限）
     final pkg = mStr(args, 'package').trim();
-    if (pkg.isEmpty) return 'package 不能为空';
+    if (pkg.isEmpty) return 'package は必須です';
     await runSmartShell('', 'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $pkg',
         timeout: const Duration(seconds: 3));
     invalidateFgCache();
     final fg = await getForegroundPackage();
-    if (fg == pkg) return '✅ 已打开 $pkg';
-    return '🚫 无系统级权限（Shizuku 已撤销），无法打开应用，请用户手动打开';
+    if (fg == pkg) return '✅ $pkg を起動しました';
+    return '🚫 システム権限がありません（Shizuku 取り消し済み）。アプリを起動できないため、ユーザーが手動で開いてください';
   }
-  return '🚫 无系统级权限';
+  return '🚫 システム権限がありません';
 }
 
 Future<String> execToolCurrentApp() async {
   final pkg = await getForegroundPackage();
-  if (pkg.isEmpty) return '⚠️ 无法获取前台应用';
-  return '当前前台应用: $pkg';
+  if (pkg.isEmpty) return '⚠️ フォアグラウンドアプリを取得できません';
+  return '現在のフォアグラウンドアプリ: $pkg';
 }
 
 Future<String> execToolIsAppRunning(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
-  if (pkg.isEmpty) return 'package 不能为空';
+  if (pkg.isEmpty) return 'package は必須です';
   final r = await runSmartShell('', 'pidof ${shellQuote(pkg)}',
       timeout: const Duration(seconds: 3));
   final out = r.out.trim();
-  if (out.isEmpty) return '❌ $pkg 未运行';
-  return '✅ $pkg 运行中 PID: $out';
+  if (out.isEmpty) return '❌ $pkg は実行されていません';
+  return '✅ $pkg は実行中 PID: $out';
 }
 
 Future<String> execToolForceStopApp(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
-  if (pkg.isEmpty) return 'package 不能为空';
+  if (pkg.isEmpty) return 'package は必須です';
   final r = await runSmartShell('', 'am force-stop ${shellQuote(pkg)}',
       timeout: const Duration(seconds: 3));
   invalidateFgCache();
-  if (r.code != 0 && r.out.isEmpty) return '强停失败: ${r.out}';
-  return '✅ 已强制停止 $pkg';
+  if (r.code != 0 && r.out.isEmpty) return '強制停止に失敗しました: ${r.out}';
+  return '✅ $pkg を強制停止しました';
 }
 
 Future<String> execToolDismissPopup(Map<String, dynamic> args) async {
   var prefer = mStr(args, 'prefer').trim().toLowerCase();
   if (prefer.isEmpty) prefer = 'auto';
   final r = await scanAndDismissPopups(prefer, 5);
-  if (r.actions == 0) return '✅ 未检测到弹窗';
-  return '✅ 关闭了 ${r.actions} 个弹窗：\n${r.dismissed.join('\n')}';
+  if (r.actions == 0) return '✅ ポップアップは検出されませんでした';
+  return '✅ ${r.actions} 件のポップアップを閉じました:\n${r.dismissed.join('\n')}';
 }
 
 Future<String> execToolAutoDismissDialogs() async {
@@ -1321,8 +1321,8 @@ Future<String> execToolAutoDismissDialogs() async {
     all.addAll(r.dismissed);
     await Future.delayed(const Duration(milliseconds: 120));
   }
-  if (total == 0) return '✅ 屏幕干净';
-  return '✅ 清理了 $total 个弹窗：\n${all.join('\n')}';
+  if (total == 0) return '✅ 画面はクリーンです';
+  return '✅ $total 件のポップアップをクリアしました:\n${all.join('\n')}';
 }
 
 Future<String> execToolIsPopupPresent() async {
@@ -1335,14 +1335,14 @@ Future<String> execToolIsPopupPresent() async {
           '  id=${n.resourceId} class=${n.klass} text="${truncate(txt, 40)}"');
     }
   }
-  if (popupNodes.isEmpty) return '✅ 无弹窗';
-  return '🔍 检测到 ${popupNodes.length} 个弹窗容器：\n${popupNodes.join('\n')}';
+  if (popupNodes.isEmpty) return '✅ ポップアップなし';
+  return '🔍 ${popupNodes.length} 件のポップアップコンテナを検出:\n${popupNodes.join('\n')}';
 }
 
 Future<String> execToolWaitForElement(Map<String, dynamic> args) async {
   final text = mStr(args, 'text');
   final rid = mStr(args, 'resource_id');
-  if (text.isEmpty && rid.isEmpty) return '必须提供 text 或 resource_id';
+  if (text.isEmpty && rid.isEmpty) return 'text または resource_id を指定してください';
   var timeoutMs = intArgDefault(args, 'timeout_ms', 2000);
   if (timeoutMs <= 0) timeoutMs = 2000;
   if (timeoutMs > 3000) timeoutMs = 3000;
@@ -1373,8 +1373,8 @@ Future<String> execToolFindElement(Map<String, dynamic> args) async {
   if (limit <= 0) limit = 20;
   final nodes = await dumpUINodes();
   final matched = findNodes(nodes, text, rid, klass);
-  if (matched.isEmpty) return '未找到匹配。当前 ${nodes.length} 个节点。';
-  final sb = StringBuffer('找到 ${matched.length} 个（显示前 $limit）:\n');
+  if (matched.isEmpty) return '一致するものが見つかりません。現在 ${nodes.length} 個のノード。';
+  final sb = StringBuffer('${matched.length} 件見つかりました（先頭 $limit 件を表示）:\n');
   for (var i = 0; i < matched.length && i < limit; i++) {
     final n = matched[i];
     sb.write('#$i text="${n.text}" desc="${n.contentDesc}" id="${n.resourceId}" '
@@ -1397,19 +1397,19 @@ Future<String> execToolScreenshot(Map<String, dynamic> args) async {
   try {
     size = File(absPath).lengthSync();
   } catch (_) {}
-  return '✅ 截图: $absPath ($size 字节)';
+  return '✅ スクリーンショット: $absPath ($size バイト)';
 }
 
 Future<String> execToolScreenSize() async {
   final s = await getScreenSize();
-  if (s == null) return '无法获取屏幕尺寸';
+  if (s == null) return '画面サイズを取得できません';
   return '屏幕: ${s.w} x ${s.h}';
 }
 
 Future<String> execToolUIDump() async {
   invalidateUICache();
   final xml = await dumpUIXMLCached();
-  if (xml == null) return '未能获取 UI XML';
+  if (xml == null) return 'UI XML を取得できませんでした';
   if (xml.length > 200 * 1024) {
     return '${xml.substring(0, 200 * 1024)}\n...[截断]';
   }
@@ -1422,49 +1422,49 @@ Future<String> execToolUIDump() async {
 Future<String> execToolDownloadFile(Map<String, dynamic> args) async {
   final rawURL = mStr(args, 'url');
   final savePath = mStr(args, 'save_path');
-  if (rawURL.isEmpty || savePath.isEmpty) return 'url 和 save_path 不能为空';
+  if (rawURL.isEmpty || savePath.isEmpty) return 'url と save_path は必須です';
   final absPath = resolveToolPath(savePath);
   ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
   final r = await runProcess('sh', [
     '-c',
     'curl -L --fail --silent --show-error -A "Mozilla/5.0 DeepSeekTool/2.0" -o ${shellQuote(absPath)} ${shellQuote(rawURL)}'
   ], timeout: const Duration(seconds: 600));
-  if (r.code != 0) return '下载失败: ${r.out}';
+  if (r.code != 0) return 'ダウンロードに失敗しました: ${r.out}';
   var n = 0;
   try {
     n = File(absPath).lengthSync();
   } catch (_) {}
-  return '✅ 下载 $absPath ($n 字节, ${(n / 1024 / 1024).toStringAsFixed(2)} MB)';
+  return '✅ ダウンロード $absPath ($n バイト, ${(n / 1024 / 1024).toStringAsFixed(2)} MB)';
 }
 
 Future<String> execToolCreateFile(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
   final content = mStr(args, 'content');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   final absPath = resolveToolPath(p);
   ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
   if (!writeTextFile(absPath, content)) return '写入失败';
-  return '✅ 创建 $absPath (${utf8.encode(content).length} 字节)';
+  return '✅ 作成 $absPath (${utf8.encode(content).length} バイト)';
 }
 
 Future<String> execToolAppendFile(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
   final content = mStr(args, 'content');
-  if (p.isEmpty || content.isEmpty) return 'path 和 content 不能为空';
+  if (p.isEmpty || content.isEmpty) return 'path と content は必須です';
   final absPath = resolveToolPath(p);
   ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
   try {
     File(absPath).writeAsStringSync(content, mode: FileMode.append);
     final total = File(absPath).lengthSync();
-    return '✅ 追加 ${utf8.encode(content).length} 字节。当前 $total 字节';
+    return '✅ ${utf8.encode(content).length} バイトを追記しました。現在 $total バイト';
   } catch (e) {
-    return '追加失败: $e';
+    return '追記に失敗しました: $e';
   }
 }
 
 Future<String> execToolReadFile(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   try {
     final bytes = File(resolveToolPath(p)).readAsBytesSync();
     const max = 32 * 1024 * 1024;
@@ -1473,20 +1473,20 @@ Future<String> execToolReadFile(Map<String, dynamic> args) async {
     }
     return utf8.decode(bytes, allowMalformed: true);
   } catch (e) {
-    return '读取失败: $e';
+    return '読み取りに失敗しました: $e';
   }
 }
 
 Future<String> execToolGetFileSize(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   final absPath = resolveToolPath(p);
   try {
     final size = File(absPath).lengthSync();
-    return '📄 $absPath\n$size 字节 (${(size / 1024).toStringAsFixed(2)} KB / '
+    return '📄 $absPath\n$size バイト (${(size / 1024).toStringAsFixed(2)} KB / '
         '${(size / 1024 / 1024).toStringAsFixed(2)} MB)';
   } catch (e) {
-    return '获取大小失败: $e';
+    return 'サイズ取得に失敗しました: $e';
   }
 }
 
@@ -1495,8 +1495,8 @@ Future<String> execToolListDir(Map<String, dynamic> args) async {
   final absPath = resolveToolPath(p);
   try {
     final entries = Directory(absPath).listSync();
-    if (entries.isEmpty) return '目录 $absPath 为空';
-    final sb = StringBuffer('目录: $absPath\n');
+    if (entries.isEmpty) return 'ディレクトリ $absPath は空です';
+    final sb = StringBuffer('ディレクトリ: $absPath\n');
     for (final e in entries) {
       final name = e.uri.pathSegments.last;
       var size = 0;
@@ -1512,13 +1512,13 @@ Future<String> execToolListDir(Map<String, dynamic> args) async {
     }
     return sb.toString();
   } catch (e) {
-    return '列目录失败: $e';
+    return 'ディレクトリ一覧に失敗しました: $e';
   }
 }
 
 Future<String> execToolExecuteCommand(Map<String, dynamic> args) async {
   final cmdStr = mStr(args, 'command');
-  if (cmdStr.trim().isEmpty) return 'command 不能为空';
+  if (cmdStr.trim().isEmpty) return 'command は必須です';
   var timeout = intArgDefault(args, 'timeout', defaultCmdTimeout);
   if (timeout <= 0) timeout = defaultCmdTimeout;
   if (timeout > maxCmdTimeout) timeout = maxCmdTimeout;
@@ -1528,18 +1528,18 @@ Future<String> execToolExecuteCommand(Map<String, dynamic> args) async {
   var out = r.out;
   var prefix = '';
   if (shizukuDisabled && containsPermissionError(out)) {
-    prefix = '⚠️ [无系统权限] ';
-    out += '\n\n💡 提示：当前无系统级权限（Shizuku 已撤销），无法执行需要特权的系统命令。';
+    prefix = '⚠️ [システム権限なし] ';
+    out += '\n\n💡 ヒント: 現在システム権限がありません（Shizuku 取り消し済み）のため、特権が必要なシステムコマンドは実行できません。';
   }
-  if (r.code != 0 && out.isEmpty) return '${prefix}执行失败（退出码 ${r.code}）';
-  if (out.isEmpty) out = '(成功，无输出)';
+  if (r.code != 0 && out.isEmpty) return '${prefix}実行に失敗しました（終了コード ${r.code}）';
+  if (out.isEmpty) out = '(成功、出力なし)';
   if (out.length > 64 * 1024) out = '${out.substring(0, 64 * 1024)}\n...[截断]';
   return '$prefix$out';
 }
 
 Future<String> execToolRunBackground(Map<String, dynamic> args) async {
   final cmdStr = mStr(args, 'command');
-  if (cmdStr.trim().isEmpty) return 'command 不能为空';
+  if (cmdStr.trim().isEmpty) return 'command は必須です';
   var logFile = mStr(args, 'log_file');
   if (logFile.isEmpty) {
     logFile = '$dsWorkspaceDir/bg_${DateTime.now().microsecondsSinceEpoch}.log';
@@ -1561,26 +1561,26 @@ Future<String> execToolListProcesses(Map<String, dynamic> args) async {
     cmd = 'ps -ef | grep -F ${shellQuote(filter)} | grep -v grep';
   }
   var out = await runShellCtx('', cmd, timeout: const Duration(seconds: 3));
-  if (out.isEmpty) return '(无匹配进程)';
+  if (out.isEmpty) return '(一致するプロセスなし)';
   if (out.length > 64 * 1024) out = '${out.substring(0, 64 * 1024)}\n...[截断]';
   return out;
 }
 
 Future<String> execToolKillProcess(Map<String, dynamic> args) async {
   final pid = intArg(args, 'pid');
-  if (pid == null || pid <= 0) return 'pid 必须正整数';
+  if (pid == null || pid <= 0) return 'pid は正の整数である必要があります';
   var sig = mStr(args, 'signal');
   if (sig.isEmpty) sig = 'TERM';
   if (sig.startsWith('SIG')) sig = sig.substring(3);
   sig = sig.toUpperCase();
   final out = await runShellCtx('', 'kill -${shellQuote(sig)} $pid',
       timeout: const Duration(seconds: 3));
-  return '✅ 向 $pid 发送 SIG$sig${out.isNotEmpty ? "\n$out" : ""}';
+  return '✅ $pid に SIG$sig を送信${out.isNotEmpty ? "\n$out" : ""}';
 }
 
 Future<String> execToolWaitSeconds(Map<String, dynamic> args) async {
   final sec = intArg(args, 'seconds');
-  if (sec == null || sec <= 0) return 'seconds 必须正整数';
+  if (sec == null || sec <= 0) return 'seconds は正の整数である必要があります';
   final s = sec > maxWaitSeconds ? maxWaitSeconds : sec;
   await Future.delayed(Duration(seconds: s));
   return '✅ 等待 $s 秒';
@@ -1618,7 +1618,7 @@ Future<String> execToolHTTPRequest(Map<String, dynamic> args) async {
     }
     return out;
   } catch (e) {
-    return '请求失败: $e';
+    return 'リクエストに失敗しました: $e';
   }
 }
 
@@ -1629,12 +1629,12 @@ Future<String> execToolTorch(Map<String, dynamic> args) async {
   final action = mStr(args, 'action').trim().toLowerCase();
   if (action != 'on' && action != 'off') return 'action 只能是 on/off';
   final r = await runTermuxAPI(const Duration(seconds: 6), 'termux-torch', [action]);
-  return '✅ 手电筒 $action${r.out.isNotEmpty ? "\n${r.out}" : ""}';
+  return '✅ フラッシュライト $action${r.out.isNotEmpty ? "\n${r.out}" : ""}';
 }
 
 Future<String> execToolCameraPhoto(Map<String, dynamic> args) async {
   final savePath = mStr(args, 'save_path');
-  if (savePath.isEmpty) return 'save_path 不能为空';
+  if (savePath.isEmpty) return 'save_path は必須です';
   final cameraID = intArgDefault(args, 'camera_id', 0);
   final absPath = resolveToolPath(savePath);
   ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
@@ -1644,7 +1644,7 @@ Future<String> execToolCameraPhoto(Map<String, dynamic> args) async {
   try {
     size = File(absPath).lengthSync();
   } catch (_) {}
-  return '✅ 拍照 $absPath ($size 字节)${r.out.isNotEmpty ? "\n${r.out}" : ""}';
+  return '✅ 撮影 $absPath ($size バイト)${r.out.isNotEmpty ? "\n${r.out}" : ""}';
 }
 
 Future<String> execToolCameraInfo() async =>
@@ -1652,9 +1652,9 @@ Future<String> execToolCameraInfo() async =>
 
 Future<String> execToolVolumeSet(Map<String, dynamic> args) async {
   final stream = mStr(args, 'stream').trim().toLowerCase();
-  if (stream.isEmpty) return 'stream 不能为空';
+  if (stream.isEmpty) return 'stream は必須です';
   final vol = intArg(args, 'volume');
-  if (vol == null) return 'volume 不能为空';
+  if (vol == null) return 'volume は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 6), 'termux-volume', [stream, '$vol']))
       .out;
@@ -1686,7 +1686,7 @@ Future<String> execToolClipboard(Map<String, dynamic> args) async {
   if (action == 'get') {
     final r = await runTermuxAPI(
         const Duration(seconds: 6), 'termux-clipboard-get', []);
-    return '剪贴板: ${r.out}';
+    return 'クリップボード: ${r.out}';
   }
   if (action == 'set') {
     final text = mStr(args, 'text');
@@ -1701,7 +1701,7 @@ Future<String> execToolClipboard(Map<String, dynamic> args) async {
 Future<String> execToolNotify(Map<String, dynamic> args) async {
   final title = mStr(args, 'title');
   final content = mStr(args, 'content');
-  if (title.isEmpty) return 'title 不能为空';
+  if (title.isEmpty) return 'title は必須です';
   final cmdArgs = ['-t', title];
   if (content.isNotEmpty) cmdArgs.addAll(['-c', content]);
   return (await runTermuxAPI(
@@ -1711,7 +1711,7 @@ Future<String> execToolNotify(Map<String, dynamic> args) async {
 
 Future<String> execToolToast(Map<String, dynamic> args) async {
   final text = mStr(args, 'text');
-  if (text.isEmpty) return 'text 不能为空';
+  if (text.isEmpty) return 'text は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 6), 'termux-toast', [text]))
       .out;
@@ -1726,7 +1726,7 @@ Future<String> execToolVibrate(Map<String, dynamic> args) async {
 
 Future<String> execToolTTSSpeak(Map<String, dynamic> args) async {
   final text = mStr(args, 'text');
-  if (text.isEmpty) return 'text 不能为空';
+  if (text.isEmpty) return 'text は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 30), 'termux-tts-speak', [text]))
       .out;
@@ -1742,7 +1742,7 @@ Future<String> execToolLocation(Map<String, dynamic> args) async {
 
 Future<String> execToolBrightness(Map<String, dynamic> args) async {
   final v0 = intArg(args, 'value');
-  if (v0 == null) return 'value 不能为空';
+  if (v0 == null) return 'value は必須です';
   final v = v0.clamp(0, 255);
   return (await runTermuxAPI(
           const Duration(seconds: 6), 'termux-brightness', ['$v']))
@@ -1754,7 +1754,7 @@ Future<String> execToolListSensors() async =>
 
 Future<String> execToolReadSensor(Map<String, dynamic> args) async {
   final sensor = mStr(args, 'sensor');
-  if (sensor.isEmpty) return 'sensor 不能为空';
+  if (sensor.isEmpty) return 'sensor は必須です';
   return (await runProcess('termux-sensor', ['-s', sensor, '-n', '1'],
           timeout: const Duration(seconds: 3)))
       .out;
@@ -1781,7 +1781,7 @@ Future<String> execToolAudioInfo() async =>
 
 Future<String> execToolMicrophoneRecord(Map<String, dynamic> args) async {
   final savePath = mStr(args, 'save_path');
-  if (savePath.isEmpty) return 'save_path 不能为空';
+  if (savePath.isEmpty) return 'save_path は必須です';
   final dur = intArgDefault(args, 'duration_ms', 5000);
   final absPath = resolveToolPath(savePath);
   ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
@@ -1794,11 +1794,11 @@ Future<String> execToolMicrophoneRecord(Map<String, dynamic> args) async {
   try {
     size = File(absPath).lengthSync();
   } catch (_) {}
-  return '✅ 录音 $absPath ($size 字节)\n启动:${start.out}\n停止:${stop.out}';
+  return '✅ 録音 $absPath ($size バイト)\n開始:${start.out}\n停止:${stop.out}';
 }
 
 // ------------------------------------------------------------
-// 应用 / 权限 / 设置
+// 应用 / 権限 / 设置
 // ------------------------------------------------------------
 Future<String> execToolListPackages(Map<String, dynamic> args) async {
   final filter = mStr(args, 'filter');
@@ -1813,7 +1813,7 @@ Future<String> execToolListPackages(Map<String, dynamic> args) async {
 
 Future<String> execToolInstallApk(Map<String, dynamic> args) async {
   final apk = mStr(args, 'apk_path');
-  if (apk.isEmpty) return 'apk_path 不能为空';
+  if (apk.isEmpty) return 'apk_path は必須です';
   final abs = resolveToolPath(apk);
   if (!File(abs).existsSync()) return 'APK 不存在: $abs';
   final r = await runSmartShell('', 'pm install -r ${shellQuote(abs)}',
@@ -1822,21 +1822,21 @@ Future<String> execToolInstallApk(Map<String, dynamic> args) async {
     return '✅ 安装 $abs\n${truncate(r.out, 300)}';
   }
   final o = await runTermuxAPI(const Duration(seconds: 60), 'termux-open', [abs]);
-  return '✅ 已请求系统安装器打开 $abs\n${o.out}';
+  return '✅ システムインストーラで $abs を開くよう要求しました\n${o.out}';
 }
 
 Future<String> execToolUninstallApp(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
-  if (pkg.isEmpty) return 'package 不能为空';
+  if (pkg.isEmpty) return 'package は必須です';
   final r = await runSmartShell('', 'pm uninstall ${shellQuote(pkg)}',
       timeout: const Duration(seconds: 30));
-  return '✅ 卸载 $pkg\n${r.out}';
+  return '✅ $pkg をアンインストールしました\n${r.out}';
 }
 
 Future<String> execToolGrantPermission(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
   final perm = mStr(args, 'permission');
-  if (pkg.isEmpty || perm.isEmpty) return 'package 和 permission 不能为空';
+  if (pkg.isEmpty || perm.isEmpty) return 'package と permission は必須です';
   final r = await runSmartShell(
       '', 'pm grant ${shellQuote(pkg)} ${shellQuote(perm)}',
       timeout: const Duration(seconds: 15));
@@ -1846,16 +1846,16 @@ Future<String> execToolGrantPermission(Map<String, dynamic> args) async {
 Future<String> execToolRevokePermission(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
   final perm = mStr(args, 'permission');
-  if (pkg.isEmpty || perm.isEmpty) return 'package 和 permission 不能为空';
+  if (pkg.isEmpty || perm.isEmpty) return 'package と permission は必須です';
   final r = await runSmartShell(
       '', 'pm revoke ${shellQuote(pkg)} ${shellQuote(perm)}',
       timeout: const Duration(seconds: 15));
-  return '✅ 撤销 $pkg 的 $perm\n${r.out}';
+  return '✅ $pkg の $perm を取り消しました\n${r.out}';
 }
 
 Future<String> execToolListPermissions(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
-  if (pkg.isEmpty) return 'package 不能为空';
+  if (pkg.isEmpty) return 'package は必須です';
   final r = await runSmartShell(
       '',
       'dumpsys package ${shellQuote(pkg)} | grep -iE \'permission|granted\' | head -100',
@@ -1867,7 +1867,7 @@ Future<String> execToolAppopsSet(Map<String, dynamic> args) async {
   final pkg = mStr(args, 'package');
   final op = mStr(args, 'op');
   final mode = mStr(args, 'mode');
-  if (pkg.isEmpty || op.isEmpty || mode.isEmpty) return '参数不能为空';
+  if (pkg.isEmpty || op.isEmpty || mode.isEmpty) return '引数は必須です';
   final r = await runSmartShell(
       '', 'appops set ${shellQuote(pkg)} ${shellQuote(op)} ${shellQuote(mode)}',
       timeout: const Duration(seconds: 15));
@@ -1877,7 +1877,7 @@ Future<String> execToolAppopsSet(Map<String, dynamic> args) async {
 Future<String> execToolSettingsGet(Map<String, dynamic> args) async {
   final ns = mStr(args, 'namespace');
   final key = mStr(args, 'key');
-  if (ns.isEmpty || key.isEmpty) return '参数不能为空';
+  if (ns.isEmpty || key.isEmpty) return '引数は必須です';
   final r = await runSmartShell(
       '', 'settings get ${shellQuote(ns)} ${shellQuote(key)}',
       timeout: const Duration(seconds: 6));
@@ -1888,7 +1888,7 @@ Future<String> execToolSettingsPut(Map<String, dynamic> args) async {
   final ns = mStr(args, 'namespace');
   final key = mStr(args, 'key');
   final val = mStr(args, 'value');
-  if (ns.isEmpty || key.isEmpty) return '参数不能为空';
+  if (ns.isEmpty || key.isEmpty) return '引数は必須です';
   await runSmartShell(
       '', 'settings put ${shellQuote(ns)} ${shellQuote(key)} ${shellQuote(val)}',
       timeout: const Duration(seconds: 6));
@@ -1903,7 +1903,7 @@ Future<String> execToolOpenURL(Map<String, dynamic> args) async {
 
 Future<String> execToolOpenFile(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 10), 'termux-open', [resolveToolPath(p)]))
       .out;
@@ -1911,7 +1911,7 @@ Future<String> execToolOpenFile(Map<String, dynamic> args) async {
 
 Future<String> execToolShareFile(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 30), 'termux-share', [resolveToolPath(p)]))
       .out;
@@ -1919,7 +1919,7 @@ Future<String> execToolShareFile(Map<String, dynamic> args) async {
 
 Future<String> execToolMediaScan(Map<String, dynamic> args) async {
   final p = mStr(args, 'path');
-  if (p.isEmpty) return 'path 不能为空';
+  if (p.isEmpty) return 'path は必須です';
   return (await runTermuxAPI(const Duration(seconds: 30), 'termux-media-scan',
           ['-r', resolveToolPath(p)]))
       .out;
@@ -1927,7 +1927,7 @@ Future<String> execToolMediaScan(Map<String, dynamic> args) async {
 
 Future<String> execToolMediaPlayer(Map<String, dynamic> args) async {
   final action = mStr(args, 'action').trim().toLowerCase();
-  if (action.isEmpty) return 'action 不能为空';
+  if (action.isEmpty) return 'action は必須です';
   if (action == 'play') {
     final file = mStr(args, 'file');
     if (file.isEmpty) return 'play 需要 file';
@@ -1955,7 +1955,7 @@ Future<String> execToolSMSList(Map<String, dynamic> args) async {
 Future<String> execToolSMSSend(Map<String, dynamic> args) async {
   final number = mStr(args, 'number');
   final text = mStr(args, 'text');
-  if (number.isEmpty || text.isEmpty) return 'number 和 text 不能为空';
+  if (number.isEmpty || text.isEmpty) return 'number と text は必須です';
   return (await runTermuxAPI(
           const Duration(seconds: 15), 'termux-sms-send', ['-n', number, text]))
       .out;
@@ -1992,7 +1992,7 @@ Future<String> execToolTermuxDownload(Map<String, dynamic> args) async {
 // ------------------------------------------------------------
 Future<String> execToolWebSearch(Map<String, dynamic> args) async {
   final query = mStr(args, 'query').trim();
-  if (query.isEmpty) return 'query 不能为空';
+  if (query.isEmpty) return 'query は必須です';
   final count = intArgDefault(args, 'count', 10);
   final needContent = mBool(args, 'need_content');
   final cfg = getDsConfig();
@@ -2004,12 +2004,12 @@ Future<String> execToolWebSearch(Map<String, dynamic> args) async {
     for (var i = 0; i < results.length; i++) {
       final r = results[i];
       sb.write('${i + 1}. [${r.source}] ${r.title}\n');
-      sb.write('   链接：${r.url}\n');
+      sb.write('   リンク：${r.url}\n');
       if (r.snippet.isNotEmpty) sb.write('   摘要：${r.snippet}\n');
     }
     return sb.toString();
   } catch (e) {
-    return '搜索失败: $e';
+    return '検索に失敗しました: $e';
   }
 }
 
@@ -2024,9 +2024,9 @@ Future<String> execToolFetch(Map<String, dynamic> args) async {
     if (content.length > 60000) {
       content = '${content.substring(0, 60000)}\n...[截断]';
     }
-    return '✅ 已抓取 $url\n标题：${r.title}\n\n$content';
+    return '✅ $url を取得しました\nタイトル: ${r.title}\n\n$content';
   } catch (e) {
-    return '抓取失败: $e';
+    return '取得に失敗しました: $e';
   }
 }
 
@@ -2041,7 +2041,7 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
     case 'shizuku_auto_setup':
     case 'shizuku_exec':
     case 'shizuku_install_rish':
-      return '🚫 Shizuku 权限已撤销，AI 无系统级权限';
+      return '🚫 Shizuku 権限は取り消し済みのため、AI にシステム権限がありません';
 
     case 'batch_tap':
       return execToolBatchTap(args);
@@ -2221,5 +2221,5 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
 void initDsWorkspace() {
   ensureDir(dsWorkspaceDir);
   logp('🔧 工具工作区: $dsWorkspaceDir');
-  logp('🚫 [Shizuku] 权限已撤销，跳过自动提权');
+  logp('🚫 [Shizuku] 権限は取り消し済みのため、自動昇格をスキップします');
 }

@@ -1,25 +1,25 @@
 /* =====================================================================
- * dsc-swipe.js —— 底部工具栏「任意位置横向滑动」修复 (v1)
+ * dsc-swipe.js —— 下部ツールバー「任意の位置で横スワイプ」の修正 (v1)
  * ---------------------------------------------------------------------
  * 背景 / 真正根因：
- *   index.html 里有一段早期脚本，在 document 的 capture 阶段监听
- *   touchstart/touchmove，选择器包含了 .dsc-switch-btn / .dsc-level-btn /
- *   .dsc-plus-btn / .dsc-send-btn 等按钮。命中后：
- *     1) touchstart 立刻 e.preventDefault()  → 原生横向滚动被彻底取消
- *     2) touchmove 把位移映射到 scroller.scrollTop（纵向）→ 横向位移被丢弃
- *   而工具栏几乎整条都是按钮，所以「在工具栏任何位置左右滑动」全部被
- *   这段逻辑接管并失败，CSS 的 touch-action / overflow-x 都救不回来。
+ * index.html に初期のスクリプトがあり、document の capture 段階で監視している
+ *   touchstart/touchmove，選択器包含了 .dsc-switch-btn / .dsc-level-btn /
+ *   .dsc-plus-btn / .dsc-send-btn 等ボタン。命中后：
+ *     1) touchstart で即座に e.preventDefault() → ネイティブの横スクロールは完全にキャンセルされる
+ * 2) touchmove が移動量を scroller.scrollTop（縦方向）に割り当てる → 横方向の移動量は捨てられる
+ * しかもツールバーはほぼ全体がボタンなので、「ツールバーのどこでも左右スワイプ」がすべて
+ * このロジックに奪われて失敗する。CSS の touch-action / overflow-x でも救えない。
  *
- * 本文件的解决办法：
- *   - 在 **window 的 capture 阶段**绑定（window 早于 document 进入捕获流），
- *     因此一定能先拿到手势；
- *   - 手指落点只要在 .dsc-action-bar 内部任意位置（按钮上、空隙、空白处），
- *     都统一把横向位移映射到 .dsc-switch-group 的 scrollLeft；
- *   - 只接管「明确横向」的手势（|dx| > |dy|），纵向手势原样放行，
- *     不破坏原有的纵向行为；
- *   - 带惯性滑动与「拖动后抑制误点击」，点按钮的手感不变；
- *   - 没有可滚内容时（scrollWidth ≈ clientWidth）不做任何拦截，
- *     保证按钮点击 100% 正常。
+ * このファイルでの解決策：
+ * - **window の capture 段階**でバインド（window は document より早く捕捉フローに入る）、
+ * そのため必ず先にジェスチャを取得できる；
+ *   - 指の着地点が .dsc-action-bar 内部の任意の位置（ボタンの上、すき間、空白部分）であれば、
+ *     いずれも横方向の移動量を .dsc-switch-group の scrollLeft に一括で対応付ける；
+ * - 「明確に横向き」のジェスチャ（|dx| > |dy|）のみ受け取り、縦ジェスチャはそのまま通す、
+ * 既存の縦方向の挙動を壊さない；
+ *   - 慣性スクロールと「ドラッグ後の誤タップ抑止」を備え、ボタンを押した感触は変わらない；
+ * - スクロール可能な内容がないとき（scrollWidth ≈ clientWidth）は何も遮断しない、
+ *     保证ボタン点击 100% 正常。
  * ===================================================================== */
 (function () {
     'use strict';
@@ -29,9 +29,9 @@
 
     var BAR_SEL = '.dsc-action-bar';
     var GROUP_SEL = '.dsc-switch-group';
-    var AXIS_LOCK = 4;      // 方向判定最小位移(px)
-    var CLICK_GUARD = 320;  // 拖动后抑制点击的时长(ms)
-    var MIN_SCROLL = 2;     // 真正产生位移才抑制点击(px)
+    var AXIS_LOCK = 4;      // 方向判定の最小移動量(px)
+    var CLICK_GUARD = 320;  // ドラッグ後にクリックを抑止する時間(ms)
+    var MIN_SCROLL = 2;     // 実際に移動が発生したときだけクリックを抑止(px)
 
     var bar = null;
     var group = null;
@@ -59,7 +59,7 @@
         return !!group;
     }
 
-    /* 向上走 parentElement 链判断是否落在工具栏内部（不依赖 closest） */
+    /* parentElement のチェーンを辿ってツールバー内部かを判定（closest に依存しない） */
     function inBar(node) {
         var n = node;
         var guard = 0;
@@ -119,8 +119,8 @@
         baseScroll = group.scrollLeft || 0;
         lastT = Date.now();
         vel = 0;
-        /* 注意：这里刻意不调用 preventDefault，
-           以免破坏其他已存在的触摸逻辑（如按钮点击兜底）。 */
+        /* 注意：ここでは意図的に preventDefault を呼ばない。
+           以免破坏その他已存在的触摸逻辑（如ボタン点击兜底）。 */
     }
 
     function onMove(e) {
@@ -131,7 +131,7 @@
 
         if (!locked) {
             if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) { return; }
-            /* 纵向意图（或无可滚内容）→ 立刻放弃，交还原有逻辑 */
+            /* 縦方向の意図（またはスクロール可能な内容なし）→ 即座に諦め、元のロジックに返す */
             if (Math.abs(dy) > Math.abs(dx) || maxScroll() <= 0) {
                 active = false;
                 return;
@@ -186,7 +186,7 @@
         return false;
     }
 
-    /* 桌面/触控板横向滚轮也支持 */
+    /* デスクトップ/トラックパッドの横スクロールにも対応 */
     function onWheel(e) {
         if (!refresh()) { return; }
         if (Math.abs(e.deltaX) <= Math.abs(e.deltaY || 0)) { return; }
@@ -201,7 +201,7 @@
     window.addEventListener('click', onClickCapture, true);
     window.addEventListener('wheel', onWheel, { capture: true, passive: true });
 
-    /* 调试用入口，便于在控制台核对状态 */
+    /* デバッグ用入口。コンソールで状態を確認できる */
     window.dscSwipe = {
         version: 'v1',
         refresh: refresh,

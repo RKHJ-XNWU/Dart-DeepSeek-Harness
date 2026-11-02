@@ -54,7 +54,7 @@ Future<void> handleDsChatSendStream(
     ];
     var maxIter = DS_TOOL_MAX_ITERATIONS;
     if (rounds > maxIter) maxIter = rounds;
-    logp('🔧 工具模式启动：最大迭代 $maxIter 次（Agent 系统提示已注入）');
+    logp('🔧 ツールモード起動: 最大 $maxIter 回の反復（Agent システムプロンプト注入済み）');
 
     final toolReasoningBuf = StringBuffer();
 
@@ -100,7 +100,7 @@ Future<void> handleDsChatSendStream(
         final t = line.trim();
         if (t.startsWith('🔧') ||
             t.startsWith('参数:') ||
-            t.startsWith('结果:') ||
+            t.startsWith('結果:') ||
             t.startsWith('✅')) {
           continue;
         }
@@ -109,7 +109,7 @@ Future<void> handleDsChatSendStream(
       }
       final r = cleaned.toString().trim();
       if (r.isNotEmpty) {
-        logp('⚠️ 工具模式 content 为空，回退使用纯 reasoning（${runeLen(r)} 字）');
+        logp('⚠️ ツールモードの content が空です。純粋な reasoning にフォールバックします（${runeLen(r)} 文字）');
         firstContentAt ??= DateTime.now();
         contentBuf.clear();
         contentBuf.write(r);
@@ -122,7 +122,7 @@ Future<void> handleDsChatSendStream(
 
     if (toolLogs.isEmpty && contentBuf.toString().trim().isEmpty) {
       await sse.send('reasoning', {
-        'delta': 'AI 判断此问题无需调用工具，且未返回正文内容。\n',
+        'delta': 'AI はこの質問にツール呼び出しが不要と判断し、本文も返しませんでした。\n',
       });
     }
 
@@ -156,7 +156,7 @@ Future<void> handleDsChatSendStream(
       if (title.isEmpty || title == '新对话') {
         final runes = content.runes.toList();
         if (runes.isEmpty) {
-          title = '[工具对话]';
+          title = '[ツール対話]';
         } else if (runes.length > 18) {
           title = '${String.fromCharCodes(runes.sublist(0, 18))}…';
         } else {
@@ -264,7 +264,7 @@ Future<void> handleDsChatSendStream(
     if (title.isEmpty || title == '新对话') {
       final runes = content.runes.toList();
       if (runes.isEmpty) {
-        title = '[文件对话]';
+        title = '[ファイル対話]';
       } else if (runes.length > 18) {
         title = '${String.fromCharCodes(runes.sublist(0, 18))}…';
       } else {
@@ -320,10 +320,10 @@ Future<void> handleDsNovelGeneration(
   final tg = tags.trim();
   final st = story.trim();
 
-  logp('📖 小说模式启动：分类=$g 主题=$th 标签=$tg 目标=$target 字');
+  logp('📖 小説モード起動: 分類=$g テーマ=$th タグ=$tg 目標=$target 文字');
 
-  var userContent = '📖 小说创作\n分类：$g\n主题：$th\n标签：$tg\n目标字数：$target';
-  if (st.isNotEmpty) userContent += '\n故事设定：$st';
+  var userContent = '📖 小説創作\n分類: $g\nテーマ: $th\nタグ: $tg\n目標文字数: $target';
+  if (st.isNotEmpty) userContent += '\nストーリー設定: $st';
 
   final userMsg = DsMessage(
     id: 'dsm_${fmtStamp14(DateTime.now())}_${randomHex(6)}',
@@ -338,7 +338,7 @@ Future<void> handleDsNovelGeneration(
   final usageAcc = DsUsageAcc();
   final gen = await generateNovel(apiKey, model, basePrompt, target, usageAcc);
   if (gen.error != null && gen.text.trim().isEmpty) {
-    await dsJSONErr(res, 500, '小说生成失败: ${gen.error}');
+    await dsJSONErr(res, 500, '小説の生成に失敗しました: ${gen.error}');
     return;
   }
 
@@ -352,7 +352,7 @@ Future<void> handleDsNovelGeneration(
   );
   appendDsMessage(aiMsg);
 
-  var title = '小说创作';
+  var title = '小説創作';
   if (th.isNotEmpty) {
     final runes = th.runes.toList();
     title = runes.length > 15
@@ -363,12 +363,12 @@ Future<void> handleDsNovelGeneration(
   if (sess != null &&
       sess.title.isNotEmpty &&
       sess.title != '新对话' &&
-      sess.title != '小说创作') {
+      sess.title != '小説創作') {
     title = sess.title;
   }
   updateDsSession(sessionID, title, rfc3339(DateTime.now()));
 
-  logp('✅ 小说生成完成，共 ${runeLen(gen.text)} 字');
+  logp('✅ 小説の生成が完了しました。計 ${runeLen(gen.text)} 文字');
   await dsJSONOk(res, 200, {
     'success': true,
     'userMessage': userMsg.toJson(),
@@ -407,8 +407,8 @@ Future<void> handleDsNovelGenerationStream(
 
   final sse = Sse(req.response);
 
-  var userContent = '📖 小说创作\n分类：$g\n主题：$th\n标签：$tg\n目标字数：$target';
-  if (st.isNotEmpty) userContent += '\n故事设定：$st';
+  var userContent = '📖 小説創作\n分類: $g\nテーマ: $th\nタグ: $tg\n目標文字数: $target';
+  if (st.isNotEmpty) userContent += '\nストーリー設定: $st';
   final userMsg = DsMessage(
     id: 'dsm_${fmtStamp14(DateTime.now())}_${randomHex(6)}',
     sessionId: sessionID,
@@ -419,7 +419,7 @@ Future<void> handleDsNovelGenerationStream(
   appendDsMessage(userMsg);
   await sse.send('user_message', userMsg.toJson());
 
-  logp('📖 小说模式（流式）启动：分类=$g 主题=$th 标签=$tg 目标=$target 字');
+  logp('📖 小説モード（ストリーミング）起動: 分類=$g テーマ=$th タグ=$tg 目標=$target 文字');
 
   final basePrompt = buildNovelBasePrompt(th, tg, g, st, target);
   final usageAcc = DsUsageAcc();
@@ -450,7 +450,7 @@ Future<void> handleDsNovelGenerationStream(
   );
   appendDsMessage(aiMsg);
 
-  var title = '小说创作';
+  var title = '小説創作';
   if (th.isNotEmpty) {
     final runes = th.runes.toList();
     title = runes.length > 15
@@ -461,7 +461,7 @@ Future<void> handleDsNovelGenerationStream(
   if (sess != null &&
       sess.title.isNotEmpty &&
       sess.title != '新对话' &&
-      sess.title != '小说创作') {
+      sess.title != '小説創作') {
     title = sess.title;
   }
   updateDsSession(sessionID, title, rfc3339(DateTime.now()));
@@ -530,7 +530,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   var model = mStr(body, 'model').trim();
   if (model.isEmpty) model = cfg.model;
   if (model.isEmpty) model = DS_DEFAULT_MODEL;
-  logp('🚀 使用模型: $model (请求=${mStr(body, 'model')}, 配置=${cfg.model})');
+  logp('🚀 使用モデル: $model (リクエスト=${mStr(body, 'model')}, 設定=${cfg.model})');
 
   // ========== 小说模式分流 ==========
   if (novelMode) {
@@ -555,7 +555,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     maxTokens = DS_MAX_OUTPUT_TOKENS;
     rounds = 1;
     temperature = 1.0;
-    logp('📚 超长文本模式启用：maxTokens=$maxTokens, 目标字数=$targetChars');
+    logp('📚 超長文モード有効: maxTokens=$maxTokens, 目標文字数=$targetChars');
   }
   if (enableTools) temperature = 0.0;
 
@@ -566,7 +566,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     if (p.isNotEmpty) injected.add(p);
   }
   if (injected.isNotEmpty) {
-    logp('💉 [开发者工具] 已注入 ${injected.length} 条提示词作为系统指令（共 ${runeLen(injected.join('\n'))} 字）');
+    logp('💉 [開発者ツール] ${injected.length} 件のプロンプトをシステム指示として注入しました（計 ${runeLen(injected.join('\n'))} 文字）');
   }
 
   final fileCtx = buildFileContext(fileIDs);
@@ -581,10 +581,10 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       hasImage: fileCtx.imageFileIds.isNotEmpty, settings: routeSettings);
   if (route.hasImage || route.routed || route.reason == 'router-disabled') {
     recordModelRoute(route);
-    logp('🔀 模型路由: ${route.summary} · 视觉提取模型=${route.visionModel}');
+    logp('🔀 モデルルーティング: ${route.summary} · 視覚抽出モデル=${route.visionModel}');
   }
   if (route.routed) {
-    logp('🔀 主请求模型切为 ${route.effective}（原选 ${route.requested}）');
+    logp('🔀 メインリクエストのモデルを ${route.effective} に切替（元の選択 ${route.requested}）');
     model = route.effective;
   }
 
@@ -598,19 +598,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     final ctx = await buildWebSearchContext(content);
     if (ctx.isNotEmpty) userPrompt += ctx;
   }
-  if (userPrompt.trim().isEmpty) userPrompt = '请查看我上传的文件。';
+  if (userPrompt.trim().isEmpty) userPrompt = 'アップロードしたファイルを確認してください。';
 
   if (longTextMode) {
     final target = targetChars <= 0 ? DS_TARGET_CHARS_5M : targetChars;
-    userPrompt += '''
-
-【重要指令 · 超长文本模式】
-请直接输出一篇完整的长文，目标字数 $target 字（约 $target 个中文字符）。
-要求：
-1. 不要写任何"我将..."、"以下是..."、"总结"之类的铺垫或收尾语
-2. 直接从正文开始，章节分明，内容详实
-3. 不要因为长度限制而提前结束，尽可能写满
-4. 保持内容质量，避免重复堆砌''';
+    userPrompt += '''\n\n【重要指令 · 超長文モード】\n完全な長文をそのまま出力してください。目標文字数は $target 文字（約 $target 文字相当）。\n要件:\n1. 「これから...」「以下は...」「まとめ」といった前置きや結びは一切書かないこと\n2. 本文から直接始め、章立てを明確にし、内容を充実させること\n3. 長さ制限を理由に早く終わらせず、可能な限り書き切ること\n4. 内容の質を保ち、繰り返しの水増しを避けること''';
   }
 
   // 图片内容提取（视觉模型）
@@ -620,32 +612,32 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       final imgID = fileCtx.imageFileIds[i];
       final b64 = dsFileToBase64(imgID);
       if (b64.error == null && b64.b64.isNotEmpty) {
-        logp('🖼️ 检测到第 ${i + 1}/${fileCtx.imageFileIds.length} 张图片，提取内容...');
+        logp('🖼️ ${i + 1}/${fileCtx.imageFileIds.length} 枚目の画像を検出しました。内容を抽出します...');
         final visionPrompt =
-            '请详细描述第 ${i + 1} 张图片的内容，提取其中的所有文字，并给出关键信息的总结。';
+            '${i + 1} 枚目の画像の内容を詳しく説明し、含まれるすべての文字を抽出し、要点をまとめてください。';
         try {
           final desc = await callDsVisionAPI(
               cfg.apiKey, visionPrompt, b64.b64, b64.mime, 4096, 1.0,
               model: route.visionModel);
           if (desc.trim().isNotEmpty) {
-            visionDescs.add('【第 ${i + 1} 张图片内容提取结果】\n$desc');
-            logp('✅ 第 ${i + 1} 张图片内容提取成功');
+            visionDescs.add('【${i + 1} 枚目の画像の内容抽出結果】\n$desc');
+            logp('✅ ${i + 1} 枚目の画像の内容抽出に成功しました');
           } else {
-            visionDescs.add('【第 ${i + 1} 张图片内容提取结果为空】');
+            visionDescs.add('【${i + 1} 枚目の画像の内容抽出結果は空です】');
           }
         } catch (e) {
-          logp('⚠️ 第 ${i + 1} 张图片提取失败: $e');
-          visionDescs.add('【第 ${i + 1} 张图片内容提取失败】');
+          logp('⚠️ ${i + 1} 枚目の画像の抽出に失敗しました: $e');
+          visionDescs.add('【${i + 1} 枚目の画像の内容抽出に失敗しました】');
         }
       } else {
-        logp('⚠️ 第 ${i + 1} 张图片读取失败: ${b64.error}');
-        visionDescs.add('【第 ${i + 1} 张图片无法读取】');
+        logp('⚠️ ${i + 1} 枚目の画像の読み込みに失敗しました: ${b64.error}');
+        visionDescs.add('【${i + 1} 枚目の画像を読み込めません】');
       }
     }
     if (visionDescs.isNotEmpty) {
-      userPrompt += '\n\n【图片内容提取结果（由视觉模型生成）】\n'
+      userPrompt += '\n\n【画像内容の抽出結果（視覚モデルが生成）】\n'
           '${visionDescs.join('\n\n')}';
-      logp('✅ 所有图片内容提取完成，已拼接进 Prompt');
+      logp('✅ すべての画像の内容抽出が完了し、プロンプトに結合しました');
     }
   }
 
@@ -658,11 +650,12 @@ Future<void> handleDsChatSend(HttpRequest req) async {
 
   final apiMessages = <Map<String, dynamic>>[];
   final sysParts = <String>[];
+  sysParts.add(DS_JA_ONLY_SYSTEM_PROMPT);
   if (deepThink) {
-    sysParts.add('你可以进行深度的、多步骤的推理，请充分展示你的思考过程。');
+    sysParts.add('深い多段階の推論が可能です。思考プロセスを十分に示してください。');
   }
   if (longTextMode) {
-    sysParts.add('你是一位擅长撰写长篇内容的专业作家。请直接输出完整的长文，不要有任何铺垫或总结。');
+    sysParts.add('あなたは長文執筆を得意とするプロの作家です。前置きやまとめを一切入れず、完成した長文を直接出力してください。');
   }
   sysParts.addAll(injected);
   final cp = renderActiveCosplayPersona();
@@ -692,7 +685,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
 
   // ============ 工具模式（非流式） ============
   if (enableTools) {
-    logp('🔧 启用工具模式，开启多轮 function calling（最大 $DS_TOOL_MAX_ITERATIONS 轮）');
+    logp('🔧 ツールモードを有効化し、マルチターンの function calling を開始します（最大 $DS_TOOL_MAX_ITERATIONS ラウンド）');
     final usageAcc = DsUsageAcc();
     final agentMsgs = <Map<String, dynamic>>[
       {'role': 'system', 'content': DS_TOOL_AGENT_SYSTEM_PROMPT},
@@ -703,7 +696,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       outcome = await callDsWithTools(cfg.apiKey, model, agentMsgs, maxTokens,
           temperature, DS_TOOL_MAX_ITERATIONS, usageAcc);
     } catch (e) {
-      await dsJSONErr(res, 500, '工具调用失败: $e');
+      await dsJSONErr(res, 500, 'ツール呼び出しに失敗しました: $e');
       return;
     }
 
@@ -722,9 +715,9 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     var fullReasoning = outcome.reasoning;
     if (outcome.toolLogs.isNotEmpty) {
       fullReasoning =
-          '【工具调用记录】\n${outcome.toolLogs.join('\n\n───────────────\n\n')}';
+          '【ツール呼び出し記録】\n${outcome.toolLogs.join('\n\n───────────────\n\n')}';
       if (outcome.reasoning.isNotEmpty) {
-        fullReasoning += '\n\n【模型思考过程】\n${outcome.reasoning}';
+        fullReasoning += '\n\n【モデルの思考プロセス】\n${outcome.reasoning}';
       }
     }
 
@@ -779,7 +772,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     reply = r.content;
     reasoning = r.reasoning;
   } catch (e) {
-    await dsJSONErr(res, 500, 'API 调用失败: $e');
+    await dsJSONErr(res, 500, 'API 呼び出しに失敗しました: $e');
     return;
   }
 
@@ -813,7 +806,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     if (title.isEmpty || title == '新对话') {
       final runes = content.runes.toList();
       if (runes.isEmpty) {
-        title = '[文件对话]';
+        title = '[ファイル対話]';
       } else if (runes.length > 18) {
         title = '${String.fromCharCodes(runes.sublist(0, 18))}…';
       } else {
