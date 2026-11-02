@@ -2214,12 +2214,12 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
     case 'cosplay_remove':
       return execToolCosplayRemove(args);
     default:
-      return '未知工具: $name';
+      return '不明なツール: $name';
   }
 }
 
 void initDsWorkspace() {
   ensureDir(dsWorkspaceDir);
-  logp('🔧 工具工作区: $dsWorkspaceDir');
+  logp('🔧 ツールワークスペース: $dsWorkspaceDir');
   logp('🚫 [Shizuku] 権限は取り消し済みのため、自動昇格をスキップします');
 }
