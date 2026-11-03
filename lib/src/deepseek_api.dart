@@ -307,7 +307,7 @@ Future<({String content, String reasoning})> callDsChatAPI(
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
-  if (mt > 120000) mt = 120000;
+  if (mt > 300000) mt = 300000;
   var temp = temperature;
   if (temp <= 0) temp = 1.0;
 
@@ -364,7 +364,7 @@ Future<DsRawResponse> callDsChatAPIRaw(
 ) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
-  if (mt > 120000) mt = 120000;
+  if (mt > 300000) mt = 300000;
   if (temperature < 0) temperature = 0;
 
   final body = <String, dynamic>{
@@ -422,7 +422,7 @@ Future<void> callDsChatAPIStream(
 ) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
-  if (mt > 120000) mt = 120000;
+  if (mt > 300000) mt = 300000;
   var temp = temperature;
   if (temp <= 0) temp = 1.0;
 
@@ -793,7 +793,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
 Future<String> callDsVisionAPI(String apiKey, String textPrompt,
     String imageBase64, String mime, int maxTokens, double temperature,
     {String model = ''}) async {
-  var mt = maxTokens <= 0 ? 8192 : maxTokens;
+  var mt = maxTokens <= 0 ? 300000 : maxTokens;
   var temp = temperature <= 0 ? 1.0 : temperature;
   final content = <Map<String, dynamic>>[];
   if (imageBase64.isNotEmpty) {

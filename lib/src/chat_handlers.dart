@@ -897,7 +897,7 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
   try {
     String out = '';
     try {
-      final r = await callDsChatAPI(cfg.apiKey, model, messages, 8192, 0.2, null);
+      final r = await callDsChatAPI(cfg.apiKey, model, messages, 300000, 0.2, null);
       out = r.content.trim();
     } catch (e1) {
       // 非流式呼び出しが失敗した場合はストリーミングへ自動フォールバック
@@ -907,7 +907,7 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
         cfg.apiKey,
         model,
         messages,
-        8192,
+        300000,
         0.2,
         null,
         (s) => buf.write(s),
