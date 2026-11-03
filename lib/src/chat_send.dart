@@ -117,7 +117,7 @@ Future<void> handleDsChatSendStream(
       }
     }
 
-    logp('🔧 工具模式完成: content=${runeLen(contentBuf.toString())} 字, '
+    logp('🔧 ツールモード完了: content=${runeLen(contentBuf.toString())} 字, '
         'reasoning=${runeLen(toolReasoningBuf.toString())} 字, toolLogs=${toolLogs.length} 条');
 
     if (toolLogs.isEmpty && contentBuf.toString().trim().isEmpty) {

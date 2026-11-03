@@ -1207,6 +1207,17 @@
         if (typeof idx === 'number') {
             copyBtnHtml = '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>';
         }
+        // ★ 翻訳ボタン（AI の返信のみ／コピーボタンの直前）と翻訳結果ブロック
+        var translateBtnHtml = '';
+        var translationHtml = '';
+        if (!isUser && typeof idx === 'number') {
+            translateBtnHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="この返信を中国語に翻訳">🌐 翻訳</button>';
+            if (m._translation) {
+                translationHtml = '<div class="dsc-msg-translation">' + renderMarkdown(m._translation) + '</div>';
+            } else {
+                translationHtml = '<div class="dsc-msg-translation" style="display:none"></div>';
+            }
+        }
         var speakBtnHtml = '';
         if (!isUser && typeof idx === 'number') {
             speakBtnHtml = '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
@@ -1220,9 +1231,10 @@
             thinkHtml +
             '<div class="dsc-msg-bubble">' + renderMarkdown(m.content) + attachHtml + '</div>' +
             usageHtml +
+            translationHtml +
             '<div class="dsc-msg-meta">' +
             '<span class="dsc-msg-time">' + formatTime(m.createdAt) + '</span>' +
-            copyBtnHtml + speakBtnHtml +
+            translateBtnHtml + copyBtnHtml + speakBtnHtml +
             '</div>' +
             '</div>';
         return wrap;
@@ -1651,9 +1663,24 @@
             if (thinkingTimeMs != null && thinkingTimeMs >= 0) {
                 thinkTimeHtml = '<span class="dsc-think-time" title="モデル思考(reasoning)の総所要時間（複数ラウンドは全ラウンド累積、ツールモードは初回本文前の所要時間）">⏱ 思考 ' + (thinkingTimeMs / 1000).toFixed(1) + 's</span>';
             }
+            var streamTranslateHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="この返信を中国語に翻訳">🌐 翻訳</button>';
+            if (aiMessage._translation) {
+                streamTranslateHtml = '<button class="dsc-msg-translate-btn translated" data-idx="' + idx + '" title="翻訳を隠す">🌐 原文</button>';
+            }
+            if (!aiMsgEl.querySelector('.dsc-msg-translation')) {
+                var trBox = document.createElement('div');
+                trBox.className = 'dsc-msg-translation';
+                if (aiMessage._translation) {
+                    trBox.innerHTML = renderMarkdown(aiMessage._translation);
+                } else {
+                    trBox.style.display = 'none';
+                }
+                meta.parentNode.insertBefore(trBox, meta);
+            }
             meta.innerHTML =
                 '<span class="dsc-msg-time">' + formatTime(aiMessage.createdAt) + '</span>' +
                 thinkTimeHtml +
+                streamTranslateHtml +
                 '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>' +
                 '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
         }
@@ -3685,6 +3712,60 @@
         }
     }
 
+    // ★ AI の返信を中国語（簡体字）へ翻訳する。結果はメッセージ直下のブロックに表示する。
+    async function translateMessage(idx, btnElement) {
+        var m = state.messages[idx];
+        if (!m || !m.content || !m.content.trim()) { toast('翻訳する内容がありません', 'info'); return; }
+        var host = btnElement ? btnElement.closest('.dsc-msg-content') : null;
+        var box = host ? host.querySelector('.dsc-msg-translation') : null;
+        if (!box) { toast('翻訳欄が見つかりません', 'error'); return; }
+
+        // 既に翻訳済みなら表示／非表示を切り替える
+        if (m._translation) {
+            var visible = box.style.display !== 'none' && box.innerHTML !== '';
+            if (visible) {
+                box.style.display = 'none';
+                btnElement.textContent = '🌐 翻訳';
+                btnElement.title = 'この返信を中国語に翻訳';
+                btnElement.classList.remove('translated');
+            } else {
+                box.style.display = '';
+                btnElement.textContent = '🌐 原文';
+                btnElement.title = '翻訳を隠す';
+                btnElement.classList.add('translated');
+                if (typeof renderMath === 'function') requestAnimationFrame(function () { renderMath(box); });
+            }
+            return;
+        }
+
+        btnElement.disabled = true;
+        btnElement.textContent = '⏳ 翻訳中…';
+        try {
+            var res = await fetch('/api/ds-chat/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: m.content, target: '簡体字中国語（简体中文）' })
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok) throw new Error(data && data.error ? data.error : ('HTTP ' + res.status));
+            var tr = (data.translation || '').trim();
+            if (!tr) throw new Error('翻訳結果が空でした');
+            m._translation = tr;
+            box.innerHTML = renderMarkdown(tr);
+            box.style.display = '';
+            btnElement.textContent = '🌐 原文';
+            btnElement.title = '翻訳を隠す';
+            btnElement.classList.add('translated');
+            if (typeof renderMath === 'function') requestAnimationFrame(function () { renderMath(box); });
+        } catch (err) {
+            console.error('[DSC] 翻訳失敗:', err);
+            toast('翻訳に失敗：' + err.message, 'error');
+            btnElement.textContent = '🌐 翻訳';
+        } finally {
+            btnElement.disabled = false;
+        }
+    }
+
     async function speakMessage(text, btnElement) {
         if (state.currentSpeakBtn === btnElement) {
             state.ttsCancelled = true;
@@ -3979,6 +4060,13 @@
                     e.stopPropagation();
                     var cIdx = parseInt(continueBtn.dataset.idx, 10);
                     if (!isNaN(cIdx)) continueGeneration(cIdx);
+                    return;
+                }
+                var trBtn = e.target.closest('.dsc-msg-translate-btn');
+                if (trBtn) {
+                    e.stopPropagation();
+                    var tIdx = parseInt(trBtn.dataset.idx, 10);
+                    if (!isNaN(tIdx)) translateMessage(tIdx, trBtn);
                     return;
                 }
                 var copyBtn = e.target.closest('.dsc-msg-copy-btn');

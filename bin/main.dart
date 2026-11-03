@@ -110,6 +110,7 @@ void registerRoutes() {
   _register('/api/ds-chat/test', handleDsChatTest);
   _register('/api/ds-chat/tts', handleDsChatTTS);
   _register('/api/ds-chat/stt', handleDsChatSTT);
+  _register('/api/ds-chat/translate', handleDsChatTranslate);
   _register('/api/ds-chat/generate-image', handleDsGenerateImage);
 
   // ---------- DeepSeek 文件管理 ----------

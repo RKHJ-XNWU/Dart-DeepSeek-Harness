@@ -317,7 +317,6 @@ Future<({String content, String reasoning})> callDsChatAPI(
     'stream': false,
     'max_tokens': mt,
     'temperature': temp,
-    'stream_options': dsUsageStreamOptions(),
   };
   final client = globalHTTPClientWithTimeout;
   final req = await client.postUrl(Uri.parse(DS_API_URL));

@@ -852,3 +852,81 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   });
   await sse.done();
 }
+
+// ------------------------------------------------------------
+// /api/ds-chat/translate（AI 返信を簡体字中国語へ翻訳／履歴には保存しない）
+// ------------------------------------------------------------
+Future<void> handleDsChatTranslate(HttpRequest req) async {
+  final res = req.response;
+  if (req.method != 'POST') {
+    await dsJSONErr(res, 405, 'Method not allowed');
+    return;
+  }
+  Map<String, dynamic> body;
+  try {
+    body = await readJsonBody(req);
+  } catch (_) {
+    await dsJSONErr(res, 400, '無効なリクエストボディです');
+    return;
+  }
+  final text = mStr(body, 'text');
+  final target = trimOr(mStr(body, 'target'), '簡体字中国語（简体中文）');
+  if (text.trim().isEmpty) {
+    await dsJSONErr(res, 400, '翻訳するテキストが空です');
+    return;
+  }
+  final cfg = getDsConfig();
+  if (cfg.apiKey.isEmpty) {
+    await dsJSONErr(res, 400, '先に DeepSeek API Key を設定してください');
+    return;
+  }
+  var model = mStr(body, 'model').trim();
+  if (model.isEmpty) model = cfg.model;
+  if (model.isEmpty) model = DS_DEFAULT_MODEL;
+
+  const systemPrompt = 'あなたは優秀な翻訳者です。入力されたテキストを指定された言語へ翻訳してください。'
+      '元の Markdown 構造（見出し・箇条書き・番号付きリスト・表・強調）はそのまま保ち、'
+      'コードブロック・コマンド・URL・ファイルパス・API 名・パッケージ名・変数名は翻訳せず原文のまま残してください。'
+      '出力は翻訳結果のみとし、前置き・解説・注釈・原文の繰り返しは一切付けないでください。';
+
+  final messages = <Map<String, dynamic>>[
+    {'role': 'system', 'content': systemPrompt},
+    {'role': 'user', 'content': '以下の内容を$targetに翻訳してください。\n\n$text'},
+  ];
+
+  try {
+    String out = '';
+    try {
+      final r = await callDsChatAPI(cfg.apiKey, model, messages, 8192, 0.2, null);
+      out = r.content.trim();
+    } catch (e1) {
+      // 非流式呼び出しが失敗した場合はストリーミングへ自動フォールバック
+      logp('⚠️ 翻訳（非流式）失敗、ストリーミングで再試行: $e1');
+      final buf = StringBuffer();
+      await callDsChatAPIStream(
+        cfg.apiKey,
+        model,
+        messages,
+        8192,
+        0.2,
+        null,
+        (s) => buf.write(s),
+        null,
+      );
+      out = buf.toString().trim();
+    }
+    if (out.isEmpty) {
+      await dsJSONErr(res, 502, '翻訳結果が空でした');
+      return;
+    }
+    logp('🌐 翻訳完了: ${runeLen(text)} → ${runeLen(out)} 文字 (model=$model)');
+    await dsJSONOk(res, 200, {
+      'translation': out,
+      'model': model,
+      'target': target,
+    });
+  } catch (e) {
+    logp('❌ 翻訳失敗: $e');
+    await dsJSONErr(res, 502, '翻訳に失敗しました：$e');
+  }
+}
