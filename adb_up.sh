@@ -16,9 +16,9 @@ sleep 1
 # 3. 校验身份
 UID_LINE=$(adb -s "$D" shell id 2>/dev/null)
 if echo "$UID_LINE" | grep -q "uid=2000"; then
-  echo "✅ 已连接 $D  ($(echo "$UID_LINE" | grep -o 'uid=2000(shell)'))"
+  echo "✅ 接続済み $D  ($(echo "$UID_LINE" | grep -o 'uid=2000(shell)'))"
   exit 0
 fi
 
-echo "❌ 未连上，请确认：设置 → 开发者选项 → 无线调试 已开启"
+echo "❌ 接続できませんでした。以下を確認してください：設定 → デベロッパー向けオプション → ワイヤレスデバッグが有効になっているか"
 exit 1

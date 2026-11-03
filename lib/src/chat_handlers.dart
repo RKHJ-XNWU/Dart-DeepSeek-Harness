@@ -752,8 +752,10 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   if (level > 50) level = 50;
   final params = levelToParams(level);
 
+  // i18n：継続生成でも UI 言語に一致した言語固定プロンプトを注入
+  final uiLang = dsRequestLang(req, body);
   final sysParts = <String>[
-    DS_JA_ONLY_SYSTEM_PROMPT,
+    dsLangSystemPrompt(uiLang),
     'あなたは同じ回答の残りを続けて書いています。直前の assistant メッセージの最後の文字に続けて出力してください。既出の内容の繰り返し、書き直し、説明・見出し・まとめの出力は禁止です。'
   ];
   if (deepThink) sysParts.add('深い多段階の推論が可能です。思考プロセスを十分に示してください。');
@@ -856,6 +858,49 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
 // ------------------------------------------------------------
 // /api/ds-chat/translate（AI 返信を簡体字中国語へ翻訳／履歴には保存しない）
 // ------------------------------------------------------------
+/// 翻訳結果の Markdown を壊さないための後処理。
+/// - モデルが付けた「訳文：」等のラベルを除去
+/// - 出力全体を包む ```lang ... ``` を剥がす（本文ではないため）
+/// - コードフェンスが奇数個なら閉じる
+/// - CRLF 統一・ゼロ幅文字除去・行末空白除去・空行圧縮
+String dsSanitizeTranslatedMarkdown(String raw) {
+  var s = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  s = s.replaceAll('\u200B', '').replaceAll('\uFEFF', '');
+  s = s.trim();
+
+  // 先頭ラベル（「翻訳：」「译文：」「訳文：」…）を除去
+  final label = RegExp(
+      r'^(?:翻訳|翻譯|訳文|译文|譯文|中文翻译|中文翻譯|翻訳結果|译文如下)\s*[:：]\s*');
+  s = s.replaceFirst(label, '').trim();
+
+  // 出力全体が 1 個のコードフェンスで包まれている場合のみ剥がす
+  final wrapped = RegExp(r'^```[a-zA-Z0-9_+\-]*[ \t]*\n([\s\S]*?)\n?```$');
+  final m = wrapped.firstMatch(s);
+  if (m != null) {
+    final inner = (m.group(1) ?? '').trim();
+    if (inner.isNotEmpty && !inner.contains('```')) {
+      // 中身が Markdown 構造を含むなら「包み直された本文」と判断して剥がす
+      final mdLike = RegExp(
+              r'(^#{1,6}\s)|(^\s*[-*+]\s)|(^\s*\d+\.\s)|(^\s*\|)|(^>)',
+              multiLine: true)
+          .hasMatch(inner);
+      if (mdLike) s = inner;
+    }
+  }
+
+  // コードフェンスが奇数個なら閉じる（レンダラの閉じ忘れ対策）
+  final fences = RegExp(r'```').allMatches(s).length;
+  if (fences.isOdd) s = '$s\n```';
+
+  // 行末空白を除去し、3 連以上の空行を 2 連へ圧縮
+  s = s
+      .split('\n')
+      .map((l) => l.replaceAll(RegExp(r'[ \t]+$'), ''))
+      .join('\n');
+  s = s.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  return s.trim();
+}
+
 Future<void> handleDsChatTranslate(HttpRequest req) async {
   final res = req.response;
   if (req.method != 'POST') {
@@ -884,21 +929,38 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
   if (model.isEmpty) model = cfg.model;
   if (model.isEmpty) model = DS_DEFAULT_MODEL;
 
-  const systemPrompt = 'あなたは優秀な翻訳者です。入力されたテキストを指定された言語へ翻訳してください。'
-      '元の Markdown 構造（見出し・箇条書き・番号付きリスト・表・強調）はそのまま保ち、'
-      'コードブロック・コマンド・URL・ファイルパス・API 名・パッケージ名・変数名は翻訳せず原文のまま残してください。'
-      '出力は翻訳結果のみとし、前置き・解説・注釈・原文の繰り返しは一切付けないでください。';
+  // ★ Markdown を 1 文字も壊さないための厳格プロンプト
+  const systemPrompt = 'あなたは Markdown に精通した優秀な翻訳者です。入力テキストを指定された言語へ翻訳します。\n'
+      '【厳守事項】\n'
+      '1. 出力は翻訳後の本文のみ。前置き・解説・注釈・「訳文：」等のラベル・原文の繰り返しは一切禁止。\n'
+      '2. Markdown 記法を 1 文字も崩さない：見出しの #、箇条書きの - / * / +、番号付きリストの 1.、'
+      '引用の >、表の | と区切り行 |---|、強調の ** / * / ~~、リンク [text](url) はすべて保持する。\n'
+      '3. 表は列数・行数を原文と完全に同一に保つ。区切り行（|---|）は翻訳せずそのまま維持する。'
+      'セル内の改行やパイプの追加・削除も禁止。\n'
+      '4. 段落間の空行を維持し、複数のブロックを 1 行に連結しない。リスト項目を段落に潰さない。\n'
+      '5. 入れ子リストのインデント（半角スペース 2 個単位）を維持する。\n'
+      '6. コードブロック・インラインコード・コマンド・URL・ファイルパス・API 名・パッケージ名・'
+      '変数名・数式（\$...\$ / \$\$...\$\$）は翻訳せず原文のまま残す。\n'
+      '7. 出力全体を ``` で囲まない（コードフェンスを付けない）。HTML タグを追加しない。\n'
+      '8. 原文が Markdown でない平文なら、平文のまま翻訳する。';
 
   final messages = <Map<String, dynamic>>[
     {'role': 'system', 'content': systemPrompt},
-    {'role': 'user', 'content': '以下の内容を$targetに翻訳してください。\n\n$text'},
+    {
+      'role': 'user',
+      'content': '以下の内容を$targetに翻訳してください。'
+          'Markdown 記法と行構造・空行・インデントは原文のまま保持し、翻訳後の本文だけを返してください。\n\n$text'
+    },
   ];
 
+  // ★ 実際の usage を集計（料金表示用・永続化はしない）
+  final usageAcc = DsUsageAcc();
   try {
     String out = '';
+    var streamed = false;
     try {
-      final r = await callDsChatAPI(cfg.apiKey, model, messages, 300000, 0.2, null);
-      out = r.content.trim();
+      final r = await callDsChatAPI(cfg.apiKey, model, messages, 300000, 0.2, usageAcc);
+      out = r.content;
     } catch (e1) {
       // 非流式呼び出しが失敗した場合はストリーミングへ自動フォールバック
       logp('⚠️ 翻訳（非流式）失敗、ストリーミングで再試行: $e1');
@@ -911,19 +973,38 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
         0.2,
         null,
         (s) => buf.write(s),
-        null,
+        usageAcc,
       );
-      out = buf.toString().trim();
+      out = buf.toString();
+      streamed = true;
     }
-    if (out.isEmpty) {
+    final clean = dsSanitizeTranslatedMarkdown(out);
+    if (clean.isEmpty) {
       await dsJSONErr(res, 502, '翻訳結果が空でした');
       return;
     }
-    logp('🌐 翻訳完了: ${runeLen(text)} → ${runeLen(out)} 文字 (model=$model)');
+    // 壊れ検知：構造カウントがずれたらログに残す（表示側は原文を壊さない）
+    try {
+      int cnt(String s, String pat) =>
+          RegExp(pat, multiLine: true).allMatches(s).length;
+      final srcH = cnt(text, r'^#{1,6}\s');
+      final dstH = cnt(clean, r'^#{1,6}\s');
+      final srcF = cnt(text, r'```');
+      final dstF = cnt(clean, r'```');
+      final srcT = cnt(text, r'^\s*\|');
+      final dstT = cnt(clean, r'^\s*\|');
+      if (srcH != dstH || srcF != dstF || srcT != dstT) {
+        logp('⚠️ 翻訳後の Markdown 構造差: 見出し $srcH→$dstH / フェンス $srcF→$dstF / 表行 $srcT→$dstT');
+      }
+    } catch (_) {}
+    final usage = usageAcc.snapshot();
+    logp('🌐 翻訳完了: ${runeLen(text)} → ${runeLen(clean)} 文字 (model=$model, stream=$streamed)');
     await dsJSONOk(res, 200, {
-      'translation': out,
+      'translation': clean,
       'model': model,
       'target': target,
+      'streamed': streamed,
+      'usage': usage?.toJson(),
     });
   } catch (e) {
     logp('❌ 翻訳失敗: $e');

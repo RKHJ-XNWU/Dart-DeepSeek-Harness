@@ -649,8 +649,10 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   history = pickHistoryWindow(history);
 
   final apiMessages = <Map<String, dynamic>>[];
+  // i18n：UI 言語に一致した言語固定プロンプトを注入
+  final uiLang = dsRequestLang(req, body);
   final sysParts = <String>[];
-  sysParts.add(DS_JA_ONLY_SYSTEM_PROMPT);
+  sysParts.add(dsLangSystemPrompt(uiLang));
   if (deepThink) {
     sysParts.add('深い多段階の推論が可能です。思考プロセスを十分に示してください。');
   }

@@ -205,35 +205,39 @@
 }
 
 /* ---- メッセージ内 Markdown スタイル ---- */
-.dsc-msg-bubble p { margin: 0 0 0.85em; padding: 0; }
-.dsc-msg-bubble p:last-child { margin-bottom: 0; }
-.dsc-msg-bubble p:empty { display: none; }
-.dsc-msg-bubble h1, .dsc-msg-bubble h2, .dsc-msg-bubble h3, .dsc-msg-bubble h4 { color: #4f46e5; font-weight: 700; line-height: 1.4; margin: 1.1em 0 0.55em; letter-spacing: 0.01em; position: relative; padding-left: 12px; }
-.dsc-msg-bubble h1::before, .dsc-msg-bubble h2::before, .dsc-msg-bubble h3::before, .dsc-msg-bubble h4::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 70%; background: linear-gradient(180deg, #818cf8, #4f46e5); border-radius: 2px; }
-.dsc-msg-bubble h1 { font-size: 1.18rem; }
-.dsc-msg-bubble h2 { font-size: 1.08rem; }
-.dsc-msg-bubble h3 { font-size: 1rem; }
-.dsc-msg-bubble h4 { font-size: 0.94rem; }
-.dsc-msg-bubble h1:first-child, .dsc-msg-bubble h2:first-child, .dsc-msg-bubble h3:first-child, .dsc-msg-bubble h4:first-child { margin-top: 0; }
-.dsc-msg-bubble ul, .dsc-msg-bubble ol { margin: 0.55em 0 0.85em; padding-left: 1.5em; }
-.dsc-msg-bubble ul li, .dsc-msg-bubble ol li { margin: 0.4em 0; line-height: 1.8; position: relative; }
-.dsc-msg-bubble ul li::marker { color: #6366f1; font-size: 0.9em; }
-.dsc-msg-bubble ol li::marker { color: #6366f1; font-weight: 600; }
-.dsc-msg-bubble a { color: #4f46e5; text-decoration: none; border-bottom: 1px dashed rgba(79, 70, 229, 0.4); transition: all 0.18s; padding: 1px 3px; border-radius: 3px; }
-.dsc-msg-bubble a:hover { color: #3730a3; background: rgba(79, 70, 229, 0.08); border-bottom-style: solid; }
-.dsc-msg-bubble blockquote { border-left: 3px solid #c7d2fe; background: linear-gradient(90deg, rgba(79, 70, 229, 0.05) 0%, transparent 100%); padding: 10px 16px; margin: 0.85em 0; color: #4b5563; font-style: italic; border-radius: 0 10px 10px 0; line-height: 1.75; }
-.dsc-msg-bubble blockquote p:last-child { margin-bottom: 0; }
-.dsc-msg-bubble code { background: #f3f4f6; padding: 2px 7px; border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; color: #7c3aed; border: 1px solid #e5e7eb; }
-.dsc-msg-bubble pre { background: #f8f9fb; padding: 14px 16px; border-radius: 12px; overflow-x: auto; margin: 0.85em 0; border: 1px solid #e5e7eb; font-size: 0.83rem; line-height: 1.7; position: relative; }
-.dsc-msg-bubble pre::-webkit-scrollbar { height: 5px; }
-.dsc-msg-bubble pre::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
-.dsc-msg-bubble pre code { background: transparent; padding: 0; color: #1f2937; border: none; font-size: 0.9em; line-height: 1.7; letter-spacing: 0; }
-.dsc-msg-bubble strong { color: #4f46e5; font-weight: 700; }
-.dsc-msg-bubble em { color: #db2777; font-style: italic; }
-.dsc-msg-bubble hr { border: none; height: 1px; background: linear-gradient(90deg, transparent, #e5e7eb 30%, #e5e7eb 70%, transparent); margin: 1.2em 0; }
-.dsc-msg-bubble table { border-collapse: collapse; margin: 0.85em 0; font-size: 0.85em; width: 100%; border-radius: 10px; overflow: hidden; display: block; overflow-x: auto; }
-.dsc-msg-bubble th, .dsc-msg-bubble td { border: 1px solid #e5e7eb; padding: 8px 13px; text-align: left; line-height: 1.65; }
-.dsc-msg-bubble th { background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: #4f46e5; font-weight: 600; }
+.dsc-msg-bubble p, .dsc-msg-translation p { margin: 0 0 0.85em; padding: 0; }
+.dsc-msg-bubble p:last-child, .dsc-msg-translation p:last-child { margin-bottom: 0; }
+.dsc-msg-bubble p:empty, .dsc-msg-translation p:empty { display: none; }
+.dsc-msg-bubble h1, .dsc-msg-translation h1, .dsc-msg-bubble h2, .dsc-msg-translation h2, .dsc-msg-bubble h3, .dsc-msg-translation h3, .dsc-msg-bubble h4, .dsc-msg-translation h4 { color: #4f46e5; font-weight: 700; line-height: 1.4; margin: 1.1em 0 0.55em; letter-spacing: 0.01em; position: relative; padding-left: 12px; }
+.dsc-msg-bubble h1::before, .dsc-msg-translation h1::before, .dsc-msg-bubble h2::before, .dsc-msg-translation h2::before, .dsc-msg-bubble h3::before, .dsc-msg-translation h3::before, .dsc-msg-bubble h4::before, .dsc-msg-translation h4::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 70%; background: linear-gradient(180deg, #818cf8, #4f46e5); border-radius: 2px; }
+.dsc-msg-bubble h1, .dsc-msg-translation h1 { font-size: 1.18rem; }
+.dsc-msg-bubble h2, .dsc-msg-translation h2 { font-size: 1.08rem; }
+.dsc-msg-bubble h3, .dsc-msg-translation h3 { font-size: 1rem; }
+.dsc-msg-bubble h4, .dsc-msg-translation h4 { font-size: 0.94rem; }
+.dsc-msg-bubble h1:first-child, .dsc-msg-translation h1:first-child, .dsc-msg-bubble h2:first-child, .dsc-msg-translation h2:first-child, .dsc-msg-bubble h3:first-child, .dsc-msg-translation h3:first-child, .dsc-msg-bubble h4:first-child, .dsc-msg-translation h4:first-child { margin-top: 0; }
+.dsc-msg-bubble ul, .dsc-msg-translation ul, .dsc-msg-bubble ol, .dsc-msg-translation ol { margin: 0.55em 0 0.85em; padding-left: 1.5em; }
+.dsc-msg-bubble ul li, .dsc-msg-translation ul li, .dsc-msg-bubble ol li, .dsc-msg-translation ol li { margin: 0.4em 0; line-height: 1.8; position: relative; }
+.dsc-msg-bubble ul li::marker, .dsc-msg-translation ul li::marker { color: #6366f1; font-size: 0.9em; }
+.dsc-msg-bubble ol li::marker, .dsc-msg-translation ol li::marker { color: #6366f1; font-weight: 600; }
+.dsc-msg-bubble a, .dsc-msg-translation a { color: #4f46e5; text-decoration: none; border-bottom: 1px dashed rgba(79, 70, 229, 0.4); transition: all 0.18s; padding: 1px 3px; border-radius: 3px; }
+.dsc-msg-bubble a:hover, .dsc-msg-translation a:hover { color: #3730a3; background: rgba(79, 70, 229, 0.08); border-bottom-style: solid; }
+.dsc-msg-bubble blockquote, .dsc-msg-translation blockquote { border-left: 3px solid #c7d2fe; background: linear-gradient(90deg, rgba(79, 70, 229, 0.05) 0%, transparent 100%); padding: 10px 16px; margin: 0.85em 0; color: #4b5563; font-style: italic; border-radius: 0 10px 10px 0; line-height: 1.75; }
+.dsc-msg-bubble blockquote p:last-child, .dsc-msg-translation blockquote p:last-child { margin-bottom: 0; }
+.dsc-msg-bubble code, .dsc-msg-translation code { background: #f3f4f6; padding: 2px 7px; border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; color: #7c3aed; border: 1px solid #e5e7eb; }
+.dsc-msg-bubble pre, .dsc-msg-translation pre { background: #f8f9fb; padding: 14px 16px; border-radius: 12px; overflow-x: auto; margin: 0.85em 0; border: 1px solid #e5e7eb; font-size: 0.83rem; line-height: 1.7; position: relative; }
+.dsc-msg-bubble pre::-webkit-scrollbar, .dsc-msg-translation pre::-webkit-scrollbar { height: 5px; }
+.dsc-msg-bubble pre::-webkit-scrollbar-thumb, .dsc-msg-translation pre::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+.dsc-msg-bubble pre code, .dsc-msg-translation pre code { background: transparent; padding: 0; color: #1f2937; border: none; font-size: 0.9em; line-height: 1.7; letter-spacing: 0; }
+.dsc-msg-bubble strong, .dsc-msg-translation strong { color: #4f46e5; font-weight: 700; }
+.dsc-msg-bubble em, .dsc-msg-translation em { color: #db2777; font-style: italic; }
+.dsc-msg-bubble hr, .dsc-msg-translation hr { border: none; height: 1px; background: linear-gradient(90deg, transparent, #e5e7eb 30%, #e5e7eb 70%, transparent); margin: 1.2em 0; }
+.dsc-msg-bubble table, .dsc-msg-translation table { border-collapse: collapse; margin: 0.85em 0; font-size: 0.85em; width: 100%; border-radius: 10px; overflow: hidden; display: block; overflow-x: auto; }
+.dsc-msg-bubble th, .dsc-msg-translation th, .dsc-msg-bubble td, .dsc-msg-translation td { border: 1px solid #e5e7eb; padding: 8px 13px; text-align: left; line-height: 1.65; }
+.dsc-msg-bubble del, .dsc-msg-translation del { text-decoration: line-through; opacity: 0.72; }
+.dsc-msg-bubble img, .dsc-msg-translation img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 0.5em 0; }
+.dsc-msg-bubble input[type="checkbox"], .dsc-msg-translation input[type="checkbox"] { accent-color: #4f46e5; width: 1.05em; height: 1.05em; }
+.dsc-msg-bubble li > ul, .dsc-msg-bubble li > ol, .dsc-msg-translation li > ul, .dsc-msg-translation li > ol { margin: 0.25em 0 0.25em; }
+.dsc-msg-bubble th, .dsc-msg-translation th { background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: #4f46e5; font-weight: 600; }
 
 /* ---- 1通のメッセージの実際の token 消費（吹き出しの 0.2em 下に密着） ---- */
 .dsc-msg-usage { margin-top: 0.2em; padding: 0 4px; display: flex; }
@@ -278,6 +282,45 @@
 .dsc-msg-translate-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .dsc-msg-translation { margin-top: 6px; padding: 8px 12px; border-left: 3px solid #06b6d4; border-radius: 8px; background: #f8fafc; color: #374151; font-size: 0.9em; line-height: 1.7; word-break: break-word; }
 .dsc-msg-translation::before { content: '翻訳'; display: block; font-size: 0.66rem; letter-spacing: 0.08em; color: #0891b2; font-weight: 700; margin-bottom: 4px; }
+
+/* ---- 翻訳ブロック内：今回の翻訳の料金（本文の直下・ボックス最下部） ---- */
+.dsc-msg-translation .dsc-trans-cost-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45em;
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px dashed rgba(6, 182, 212, 0.38);
+    font-size: 0.72em;
+    line-height: 1.55;
+    color: #0e7490;
+    font-variant-numeric: tabular-nums;
+}
+.dsc-msg-translation .dsc-trans-cost-amt {
+    font-weight: 700;
+    color: #b45309;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    padding: 1px 9px;
+}
+.dsc-msg-translation .dsc-trans-cost-tag {
+    font-size: 0.92em;
+    font-weight: 600;
+    color: #92400e;
+    background: rgba(255, 255, 255, 0.78);
+    border-radius: 999px;
+    padding: 0 6px;
+}
+.dsc-msg-translation .dsc-trans-tok { color: #64748b; font-size: 0.95em; }
+.dsc-msg-translation .dsc-trans-cost-unknown { color: #94a3b8; }
+
+/* ---- 翻訳／本文ブロック内：入れ子リストの字下げ（data-depth は renderMarkdown が付与） ---- */
+.dsc-msg-translation li[data-depth="1"], .dsc-msg-bubble li[data-depth="1"], .dsc-msg-translation li[data-depth="1"] { margin-left: 1.15em; }
+.dsc-msg-translation li[data-depth="2"], .dsc-msg-bubble li[data-depth="2"], .dsc-msg-translation li[data-depth="2"] { margin-left: 2.30em; }
+.dsc-msg-translation li[data-depth="3"], .dsc-msg-bubble li[data-depth="3"], .dsc-msg-translation li[data-depth="3"] { margin-left: 3.45em; }
+.dsc-msg-translation li[data-depth="4"], .dsc-msg-bubble li[data-depth="4"], .dsc-msg-translation li[data-depth="4"] { margin-left: 4.60em; }
 
 /* ---- コードブロック ---- */
 .dsc-code-block { position: relative; margin: 0.85em 0; border-radius: 12px; overflow: hidden; }
@@ -546,7 +589,7 @@
     .dsc-sidebar.open { transform: translateX(0); }
     .dsc-title { font-size: 0.9rem; }
     .dsc-subtitle { display: none; }
-    .dsc-msg-bubble { max-width: 92%; font-size: 0.88rem; line-height: 1.78; padding: 10px 14px; }
+.dsc-msg-bubble, .dsc-msg-translation { max-width: 92%; font-size: 0.88rem; line-height: 1.78; padding: 10px 14px; }
     .dsc-icon-btn { width: 34px; height: 34px; font-size: 0.95rem; }
     .dsc-modal { padding: 18px 16px; }
     .dsc-topbar { gap: 6px; padding: 8px 10px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
@@ -574,7 +617,7 @@
     .dsc-icon-btn { width: 30px; height: 30px; font-size: 0.85rem; }
     .dsc-title { font-size: 0.82rem; }
     .dsc-msg-avatar { width: 30px; height: 30px; font-size: 0.9rem; }
-    .dsc-msg-bubble { padding: 9px 12px; font-size: 0.84rem; }
+.dsc-msg-bubble, .dsc-msg-translation { padding: 9px 12px; font-size: 0.84rem; }
     .dsc-switch-group { gap: 3px; }
     .dsc-switch-btn, .dsc-advanced-btn, .dsc-longtext-btn, .dsc-level-btn, .dsc-novel-btn { height: 32px; min-width: 32px; padding: 0 6px; }
     .dsc-switch-btn .ic, .dsc-advanced-btn .ic, .dsc-longtext-btn .ic, .dsc-level-btn .ic, .dsc-novel-btn .ic { font-size: 0.95rem; }
@@ -920,7 +963,7 @@
 .dsc-level-btn:hover { transform: none; }
 
 /* ストリーミング中の吹き出しは transition しない */
-.dsc-msg-bubble { transition: none; }
+.dsc-msg-bubble, .dsc-msg-translation { transition: none; }
 
 /* モバイルではさらに厳格に */
 @media (max-width: 720px) {
@@ -2635,4 +2678,65 @@ label[for],
     border-radius: 999px;
     padding: 0 5px;
     margin-left: 2px;
+}
+
+/* ============================================================
+ * i18n：言語切替 UI（⋯ メニュー内のサブパネル）
+ * ============================================================ */
+#dscLangBtn { flex-wrap: wrap; row-gap: 2px; }
+.dsc-lang-cur {
+    margin-left: auto;
+    font-size: 0.66rem;
+    color: #6b7280;
+    background: #f3f4f6;
+    border-radius: 999px;
+    padding: 2px 8px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+/* ⋯ メニューは max-height でスクロールするため、絶対配置だと切れる。
+   インライン展開にしてメニュー内スクロールに乗せる。 */
+.dsc-lang-panel {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 2px 0 4px;
+    padding: 4px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+.dsc-lang-panel.open { display: block; }
+.dsc-lang-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #1f2937;
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+.dsc-lang-item:hover { background: #f3f4f6; }
+.dsc-lang-item.active {
+    background: #eef2ff;
+    color: #3730a3;
+    font-weight: 600;
+}
+.dsc-lang-item .lf { font-size: 0.95rem; line-height: 1; }
+.dsc-lang-item .ln { flex: 1; min-width: 0; }
+.dsc-lang-item .lk {
+    font-size: 0.6rem;
+    color: #9ca3af;
+    letter-spacing: .04em;
+}
+.dsc-lang-item.active .lk { color: #6366f1; }
+@media (max-width: 420px) {
+    .dsc-lang-item { font-size: 0.76rem; padding: 7px 8px; }
+    .dsc-lang-cur { font-size: 0.6rem; padding: 2px 6px; }
 }

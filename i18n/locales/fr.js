@@ -1,0 +1,1108 @@
+/* i18n/locales/fr.js —— 日本語（ソース言語）→ FR 対訳表
+ * 形式: 「日本語|訳文」1 行 1 件。追加言語もこの形式で追記できます。
+ * 数字を含む原文は実行時に # へ正規化して照合されます。
+ */
+I18N.add('fr', `
+未踏の境地を探る・新版|Explorer l'inconnu · Nouvelle édition
+DeepSeek チャット · 左上をタップしてセッション切替|DeepSeek Chat · Touchez le coin supérieur gauche pour changer de session
+＋|＋
+フォーラム · 投稿広場|Forum · Place des publications
+日本語単語帳|Vocabulaire japonais
+ファイル管理|Gestion des fichiers
+ピーク／オフピーク通知|Alertes heures pleines／creuses
+データ復元|Restauration des données
+設定|Paramètres
+セッション検索|Rechercher des sessions
+お知らせ管理|Gestion des annonces
+正規表現|Expression régulière
+☑️ 複数選択|☑️ Sélection multiple
+🗑️ すべて消去|🗑️ Tout effacer
+すべて選択|Tout sélectionner
+選択 0 件|0 sélectionné
+選択を削除|Supprimer la sélection
+思考|Réflexion
+推論|Raisonnement
+画像|Image
+文書|Document
+動画|Vidéo
+任意のファイル|Fichier quelconque
+形式自由 · 最大 5GB|Format libre · jusqu'à 5GB
+📁 ファイル管理|📁 Gestion des fichiers
+画像 / 動画 / 文書 / コード · 最大 5GB|Image / Vidéo / Document / Code · jusqu'à 5GB
+🎨 AI 画像生成|🎨 Génération d'images IA
+🎨 生成|🎨 Générer
+🖼️ 画像|🖼️ Image
+🎬 動画|🎬 Vidéo
+📄 文書|📄 Document
+DeepSeek 設定|Paramètres DeepSeek
+接続情報 · モデル選択 · 画像自動ルーティング|Connexion · Modèle · Routage auto des images
+読み込み中...|Chargement...
+接続情報|Connexion
+対話モデル|Modèle de conversation
+deepseek-flash（現在利用可）|deepseek-flash（disponible actuellement）
+deepseek-v4-pro（V4 Pro）|deepseek-v4-pro（V4 Pro）
+deepseek-chat（旧称・サーバー側で flash へルーティング）|deepseek-chat（ancien nom · le serveur route vers flash）
+deepseek-reasoner（旧称・サーバー側で flash へルーティング）|deepseek-reasoner（ancien nom · le serveur route vers flash）
+追加|Ajouter
+画像生成キー|Clé de génération d'images
+任意|Facultatif
+設定を保存|Enregistrer les paramètres
+🧩 推論レベル|🧩 Niveau de raisonnement
+レベルが高いほど自己反省の回数が増え、回答がより正確で完全になります|Plus le niveau est élevé, plus les tours d'auto-réflexion sont nombreux et plus la réponse est précise et complète
+3 回推論|3 tours de raisonnement
+1 · 単一ラウンド|1 · Tour unique
+25 · 二重ラウンド|25 · Double tour
+50 · 四重ラウンド|50 · Quadruple tour
+推論 · 約|Raisonnement · env.
+Tokens/回|Tokens/tour
+回答 + 2 回の深い反省 · Token 消費は約 ~4x|Réponse + 2 réflexions profondes · consommation ~4x
+💾 保存|💾 Enregistrer
+✏️ セッション名を変更|✏️ Renommer la session
+このセッションに覚えやすい名前を付けましょう|Donnez à cette session un nom facile à retenir
+有効にすると、アシスタントは選択したキャラクターの身分・口調・思考法で応答します（次のメッセージから有効）|Une fois activé, l'assistant répond avec l'identité, le ton et la façon de penser du personnage choisi (à partir du message suivant)
+ロールプレイを有効化|Activer le jeu de rôle
+🧠 ニュートラル思考|🧠 Pensée neutre
+🎭 キャラ没入|🎭 Immersion du personnage
+読み込み中…|Chargement…
+名前 *|Nom *
+アイコン文字|Caractère d'icône
+身分と背景（私は誰か）|Identité et contexte (qui suis-je)
+性格|Personnalité
+話し方|Façon de parler
+行動規範|Règles de conduite
+場面 / 関係|Scène / Relation
+冒頭のセリフ|Réplique d'ouverture
+💾 キャラクターを保存|💾 Enregistrer le personnage
+＋ キャラクターを新規作成|＋ Nouveau personnage
+完了|Terminé
+📢 お知らせ管理|📢 Gestion des annonces
+最大 5 件のお知らせ · 優先度順に表示|Jusqu'à 5 annonces · triées par priorité
+＋ 追加公告|＋ Ajouter une annonce
+基本情報|Informations de base
+📌 お知らせタイトル（最大 500 字）|📌 Titre de l'annonce (500 caractères max)
+📝 お知らせ本文（最大 50000 字）|📝 Corps de l'annonce (50000 caractères max)
+表示期間|Période d'affichage
+🕐 開始日時|🕐 Début
+🕑 終了日時|🕑 Fin
+表示設定|Paramètres d'affichage
+🔢 優先度|🔢 Priorité
+数値が大きいほど優先して表示|Plus le nombre est grand, plus l'affichage est prioritaire
+⚡ 最上位|⚡ Priorité maximale
+優先度と時間を無視して強制表示|Ignorer la priorité et le temps, afficher toujours
+💬 フォーラム · 投稿広場|💬 Forum · Place des publications
+投稿一覧|Liste des publications
+投稿の詳細|Détails de la publication
+✍️ 投稿する|✍️ Nouvelle publication
+タイトル最大 5000 字 · 本文最大 500 万字|Titre 5000 caractères max · corps 5 000 000 caractères max
+公開|Publier
+📌 タイトル（|📌 Titre (
+/5000）|/5000)
+📝 本文（|📝 Corps (
+/5000000）|/5000000)
+改行と段落に対応。保存時に内容は切り詰められません。|Les sauts de ligne et les paragraphes sont pris en charge. Le contenu n'est jamais tronqué à l'enregistrement.
+📚 日本語単語帳|📚 Vocabulaire japonais
+その他|Plus
+復習待ちのみ|À réviser uniquement
+✍️ 単語を追加|✍️ Ajouter un mot
+単語の情報を入力|Saisir les informations du mot
+単語 *|Mot *
+かな読み|Lecture en kana
+発音（数字表記）|Prononciation (en chiffres)
+意味|Sens
+品詞|Nature du mot
+未分類|Non classé
+タグ（カンマ区切り）|Étiquettes (séparées par des virgules)
+例文|Exemple
+画像（4:3 サムネイル）|Image (vignette 4:3)
+📷 画像を選択|📷 Choisir une image
+🗑️ 画像を削除|🗑️ Supprimer l'image
+🎯 復習モード|🎯 Mode révision
+確認|Confirmer
+セッション一覧|Liste des sessions
+新規セッション|Nouvelle session
+その他の機能|Autres fonctions
+フォーラム · 投稿広場へ|Aller au forum · Place des publications
+データバックアップ（data + imgs）|Sauvegarde des données (data + imgs)
+バックアップから復元|Restaurer depuis une sauvegarde
+閉じる|Fermer
+セッションを検索...|Rechercher des sessions...
+複数選択|Sélection multiple
+すべて消去|Tout effacer
+メッセージを送信、または長押しで話す|Envoyez un message ou maintenez pour parler
+ウェブ検索|Recherche web
+深い思考|Réflexion profonde
+推論レベル（1-50）|Niveau de raisonnement (1-50)
+改行を挿入|Insérer un saut de ligne
+添付をアップロード|Téléverser une pièce jointe
+送信|Envoyer
+生成したい画像を描写...|Décrivez l'image que vous souhaitez générer...
+ファイル名を検索...|Rechercher un nom de fichier...
+カスタムモデルを追加|Ajouter un modèle personnalisé
+モデル名を入力（例：deepseek-v4-pro）|Saisir le nom du modèle (ex. deepseek-v4-pro)
+サードパーティの画像生成キー（空欄可）|Clé de génération d'images tierce (peut rester vide)
+新しいタイトルを入力...|Saisir un nouveau titre...
+思考スタイル|Style de pensée
+例：青い大きな太った魚|Ex. un gros poisson bleu et dodu
+例：🐋|Ex. 🐋
+キャラクターの身分・来歴・世界観……|Identité, passé et univers du personnage……
+お知らせのタイトルを入力...|Saisir le titre de l'annonce...
+お知らせの本文を入力...|Saisir le corps de l'annonce...
+戻る|Retour
+操作|Actions
+タイトルを入力...|Saisir un titre...
+本文を入力...|Saisir le corps...
+復習を開始|Commencer la révision
+単語を追加|Ajouter un mot
+単語／読み／意味を検索…|Rechercher mot／lecture／sens…
+日本語単語|Mot japonais
+例：たべる|Ex. たべる
+例：0 / [1] / [0,2]|Ex. 0 / [1] / [0,2]
+中国語の意味|Sens en chinois
+例：動詞／名詞／形容詞|Ex. verbe／nom／adjectif
+例：日常生活,動詞|Ex. vie quotidienne,verbe
+例文（任意）|Exemple (facultatif)
+終了|Terminé
+削除に失敗しました|Échec de la suppression
+削除|Supprimer
+読み込みに失敗|Échec du chargement
+無題|Sans titre
+ピン留め|Épingler
+注目|Suivre
+🔊 読み上げ|🔊 Lire à voix haute
+匿名|Anonyme
+元|yuans
+編集|Modifier
+件|éléments
+削除しました|Supprimé
+操作に失敗|Opération impossible
+ピン留めを解除|Désépingler
+注目を解除|Ne plus suivre
+非表示|Masquer
+非表示を解除|Afficher
+全|Tout
+選択した|Sélectionné
+保存に失敗しました|Échec de l'enregistrement
+OK要|OK
+この投稿ですか？|Est-ce cette publication ?
+一括選択|Sélection groupée
+内容が空です|Le contenu est vide
+🌐 翻訳|🌐 Traduire
+🌐 原文|🌐 Original
+翻訳を隠す|Masquer la traduction
+リクエスト失敗|Échec de la requête
+削除に失敗しました：|Échec de la suppression : 
+✅ 削除しました|✅ Supprimé
+削除に失敗:|Échec de la suppression: 
+✅ 保存しました|✅ Enregistré
+✅ 追加しました|✅ Ajouté
+タイトルを入力してください|Veuillez saisir un titre
+保存済み|Enregistré
+（無題）|(Sans titre)
+非表示中|Masqué
+（本文なし）|(Sans corps)
+件の投稿|publications
+さらに読み込む（表示中|Charger plus (affichage
+保存|Enregistrer
+文字、現在|caractères, actuellement
+字|caractères
+」を削除しますか？削除後は元に戻せません。|»? Cette action est irréversible.
+🗑️ 一括削除|🗑️ Suppression groupée
+削除しました：|Supprimé : 
+選択|Sélectionner
+一括選択を終了|Quitter la sélection groupée
+（意味なし）|(Sans sens)
+保存に失敗：|Échec de l'enregistrement : 
+送信に失敗|Échec de l'envoi
+消去に失敗|Échec de l'effacement
+MB）|MB)
+復元に失敗：|Échec de la restauration : 
+ピーク時間帯|Heures pleines
+オフピーク時間帯|Heures creuses
+DeepSeek ピーク時間帯が開始|Les heures pleines DeepSeek ont commencé
+ピーク時間帯の通知|Alerte heures pleines
+オフピーク時間帯の通知|Alerte heures creuses
+秒|s
+送信中…|Envoi…
+❌ 送信失敗：|❌ Échec de l'envoi : 
+不明なエラー|Erreur inconnue
+Server酱|Server酱
+発火に失敗：|Échec du déclenchement : 
+6. 出力の冒頭で「日本語で答えます」等の宣言や前置きを書く必要はありません。自然に日本語で応答してください。|6. Inutile d'ajouter une préface comme « Je répondrai en japonais » ; répondez simplement et naturellement en japonais.
+設定済み|Configuré
+音声：|Voix : 
+コピーに失敗|Échec de la copie
+コピーに失敗：|Échec de la copie : 
+0 元|0 yuan
+時間帯単価の計算（アイドル＝ピークの半額）：|Calcul du prix par tranche (creux = moitié du plein) : 
+命中|Touché
+/ 未命中|/ Manqué
+/ 出力|/ Sortie
+· 出力|· Sortie
+翻訳する内容がありません|Rien à traduire
+翻訳欄が見つかりません|Zone de traduction introuvable
+この返信を中国語に翻訳|Traduire cette réponse en chinois
+⏳ 翻訳中…|⏳ Traduction…
+簡体字中国語（简体中文）|Chinois simplifié (简体中文)
+翻訳結果が空でした|Le résultat de la traduction est vide
+翻訳に失敗：|Échec de la traduction : 
+読み上げる内容がありません|Rien à lire à voix haute
+⏳ 読み込み中...|⏳ Chargement...
+読み上げに失敗:|Échec de la lecture : 
+📚 長文モードは提供終了しました|📚 Le mode texte long n'est plus proposé
+🤖 自律エージェントをオンにしました（最大 50 億ラウンド）|🤖 Agent autonome activé (jusqu'à 5 milliards de tours)
+🤖 自律エージェントをオフにしました|🤖 Agent autonome désactivé
+⏳ バックアップ中です。お待ちください|⏳ Sauvegarde en cours, veuillez patienter
+📦 data と imgs をパッケージ化中です。お待ちください…|📦 Empaquetage de data et imgs, veuillez patienter…
+✅ バックアップを開始しました。ダウンロードフォルダをご確認ください|✅ Sauvegarde lancée. Vérifiez votre dossier de téléchargements
+🌐 ウェブ検索をオンにしました|🌐 Recherche web activée
+🌐 ウェブ検索をオフにしました|🌐 Recherche web désactivée
+🧠 深い思考をオンにしました|🧠 Réflexion profonde activée
+🧠 深い思考をオフにしました|🧠 Réflexion profonde désactivée
+メッセージを送信|Envoyer le message
+検索に失敗|Échec de la recherche
+読み込み失敗。スクロールで再試行できます|Échec du chargement. Faites défiler pour réessayer
+件ヒット|résultats
+（スクロールでさらに読み込み）|(Faites défiler pour charger plus)
+無題のセッション|Session sans titre
+スクロールでさらに読み込み…|Faites défiler pour charger plus…
+— ここが最後です —|— Fin de la liste —
+このセッション内で該当メッセージが見つかりません|Message introuvable dans cette session
+ジャンプ失敗：対象メッセージが未描画です|Échec du saut : le message cible n'est pas encore rendu
+ジャンプエラー：|Erreur de saut : 
+キャラクター未選択|Aucun personnage sélectionné
+✅ 演じています：|✅ Interprète : 
+⏸ 停止中（未使用）：|⏸ Arrêté (non utilisé) : 
+キャラクターが登録されていません。「＋ キャラクターを新規作成」から作成してください|Aucun personnage enregistré. Créez-en un via « ＋ Nouveau personnage »
+現在|Actuel
+✓ 選択済み|✓ Sélectionné
+ロールプレイパネルが未読み込み|Panneau de jeu de rôle non chargé
+⚠️ キャラクターの読み込みに失敗：|⚠️ Échec du chargement du personnage : 
+キャラクターの読み込みに失敗：|Échec du chargement du personnage : 
+🎭 キャラクターを選択しました：|🎭 Personnage sélectionné : 
+キャラクターの切替に失敗：|Échec du changement de personnage : 
+切り替えに失敗：|Échec du changement : 
+🎭 思考スタイル：キャラ没入|🎭 Style de pensée : immersion du personnage
+🧠 思考スタイル：ニュートラル|🧠 Style de pensée : neutre
+思考スタイルの保存に失敗：|Échec de l'enregistrement du style de pensée : 
+先にキャラクター名を入力してください|Veuillez d'abord saisir un nom de personnage
+✅ キャラクターを保存しました|✅ Personnage enregistré
+キャラクターの保存に失敗：|Échec de l'enregistrement du personnage : 
+キャラクターを削除|Supprimer le personnage
+」を削除しますか？この操作は元に戻せません。|»? Cette action est irréversible.
+🗑 キャラクターを削除しました|🗑 Personnage supprimé
+注入したプロンプトは送信メッセージの前に付加されて DeepSeek に送られます。|Les prompts injectés sont ajoutés avant le message envoyé à DeepSeek.
+追加・編集・削除・一括削除・すべて削除に対応|Prise en charge de l'ajout, la modification, la suppression, la suppression groupée et totale
+✕ 複数選択を終了|✕ Quitter la sélection multiple
+>🗑️ 選択を削除(|>🗑️ Supprimer la sélection(
+プロンプトがありません。「＋ 追加」から追加してください|Aucun prompt. Ajoutez-en via « ＋ Ajouter »
+先にプロンプトを選択してください|Veuillez d'abord sélectionner un prompt
+件のプロンプトですか？|prompts ?
+✅ 削除しました：|✅ Supprimé : 
+一括削除に失敗:|Échec de la suppression groupée: 
+件のプロンプトですか？この操作は元に戻せません！|prompts ? Cette action est irréversible !
+✅ すべてのプロンプトを消去しました|✅ Tous les prompts ont été effacés
+消去に失敗:|Échec de l'effacement: 
+注入を解除：|Retirer l'injection : 
+💉 注入済み：|💉 Injecté : 
+」を削除しますか？|»?
+placeholder="例：第一項 / 挨拶"|placeholder="Ex. premier élément / salutation"
+placeholder="例：こんにちは / 皆さんこんにちは">|placeholder="Ex. bonjour / bonjour à tous">
+プロンプト内容を入力してください|Veuillez saisir le contenu du prompt
+保存に失敗:|Échec de l'enregistrement: 
+ファイル一覧の読み込みに失敗|Échec du chargement de la liste des fichiers
+一致するファイルがありません|Aucun fichier correspondant
+このファイルを添付しました|Fichier joint
+添付は最大 50 ファイルまで|Jusqu'à 50 fichiers joints
+メッセージに添付しました|Joint au message
+ダウンロードを開始...|Démarrage du téléchargement...
+ファイルが 5GB の上限を超えています|Le fichier dépasse la limite de 5GB
+アップロード開始に失敗（サーバーが無効な応答を返しました）|Échec du démarrage du téléversement (le serveur a renvoyé une réponse invalide)
+アップロード開始に失敗|Échec du démarrage du téléversement
+分割|Fragment
+のアップロードに失敗|n'a pas pu être téléversé
+結合に失敗|Échec de la fusion
+アップロード成功:|Téléversement réussi : 
+アップロードに失敗:|Échec du téléversement : 
+画像の説明を入力してください|Veuillez saisir une description de l'image
+生成中...|Génération...
+生成に失敗|Échec de la génération
+画像の生成に成功しました！|Image générée avec succès !
+生成に失敗:|Échec de la génération: 
+表示中|Affichage
+未開始|Non commencé
+削除しますか?|Supprimer ?
+タイトルは最大 500 字|Le titre fait 500 caractères max
+本文は最大 50000 字|Le corps fait 50000 caractères max
+開始：|Début : 
+終了：|Fin : 
+今日|Aujourd'hui
+⚠️ 再確認|⚠️ Confirmer à nouveau
+この操作は元に戻せません。続行しますか？|Cette action est irréversible. Continuer ?
+確認削除|Confirmer la suppression
+件の投稿ファイルに異常があり、隔離してスキップしました。残りの投稿は正常に表示されます。|fichiers de publication étaient anormaux et ont été isolés puis ignorés. Les autres publications s'affichent normalement.
+🚫 この投稿は非表示です|🚫 Cette publication est masquée
+追加読み込みに失敗|Échec du chargement supplémentaire
+—— 全|—— Total
+件を読み込みました ——|chargés ——
+✏️ 投稿を編集|✏️ Modifier la publication
+タイトルは最大|Titre jusqu'à
+本文は最大|Corps jusqu'à
+公開に失敗|Échec de la publication
+✅ 変更を保存しました|✅ Modifications enregistrées
+✅ 公開しました|✅ Publié
+公開に失敗：|Échec de la publication : 
+操作に成功しました|Opération réussie
+🗑️ 投稿を削除|🗑️ Supprimer la publication
+削除する投稿を先に選択してください|Veuillez d'abord sélectionner les publications à supprimer
+件の投稿を削除しますか？削除後は元に戻せません。|publications ? Cette action est irréversible après suppression.
+現在投稿はありません|Aucune publication pour le moment
+💣 すべて削除|💣 Tout supprimer
+件の投稿を削除しますか？この操作は元に戻せません！|publications ? Cette action est irréversible !
+すべての投稿を削除しました|Toutes les publications ont été supprimées
+投稿する|Publier
+一括削除（選択|Suppression groupée (sélection
+すべて削除|Tout supprimer
+🔀 今回の画像を含むため自動ルーティング|🔀 Routage automatique car la requête contient des images
+モデル自動ルーティング|Routage automatique des modèles
+自動ルーティングを有効化|Activer le routage automatique
+画像を含み、かつ現在のモデルが画像認識非対応のときに自動切替|Basculer automatiquement si des images sont présentes et que le modèle actuel ne gère pas la vision
+メインリクエストも追従して切替|Basculer aussi la requête principale
+オフのときは画像抽出のみビジョンモデルを使用し、本文は選択したモデルのまま|Désactivé, seule l'extraction d'images utilise le modèle de vision ; le corps garde le modèle choisi
+ビジョン用フォールバックモデル|Modèle de vision de secours
+追加で画像に対応するモデル|Modèles supplémentaires compatibles vision
+my-gateway/vision-x, gpt-4o（カンマ区切り、空欄可）|my-gateway/vision-x, gpt-4o (séparés par des virgules, peut rester vide)
+追加で画像に非対応のモデル|Modèles supplémentaires sans vision
+deepseek-v4-pro（カンマ区切り、空欄可）|deepseek-v4-pro (séparés par des virgules, peut rester vide)
+ルーティング設定を保存|Enregistrer les paramètres de routage
+内蔵ビジョンモデル：|Modèle de vision intégré : 
+✅ 保存しました · ビジョンモデル=|✅ Enregistré · modèle de vision=
+· ルーティング有効|· routage activé
+· ルーティング無効|· routage désactivé
+· メインリクエスト追従|· la requête principale suit
+· メインリクエスト非追従|· la requête principale ne suit pas
+✅ モデルルーティング設定を保存しました|✅ Paramètres de routage des modèles enregistrés
+❌ 保存に失敗：|❌ Échec de l'enregistrement : 
+ルーティング設定の保存に失敗：|Échec de l'enregistrement du routage : 
+期限が到来|Échéance atteinte
+明日|Demain
+日後|jours
+単語帳の画面が未読み込み|Écran du vocabulaire non chargé
+🔍 かな検索|🔍 Recherche par kana
+かな一覧を開き、クリックでその仮名を含む単語に絞り込み|Ouvrez la liste des kana et cliquez sur un kana pour filtrer les mots qui le contiennent
+絞り込み中：含む「|Filtrage : contient «
+清音 (46)|Seion (46)
+濁音 / 半濁音|Dakuon / Handakuon
+拗音（清）|Yōon (seion)
+拗音（濁／半濁）|Yōon (daku/handaku)
+特殊 / 小文字|Spéciaux / petits kana
+語|mots
+復習待ち|À réviser
+習得済み|Maîtrisé
+復習を開始（|Commencer la révision (
+復習待ちなし|Rien à réviser
+条件に合う単語がありません|Aucun mot ne correspond aux conditions
+単語がまだありません。右上をタップ ＋ 追加|Aucun mot pour l'instant. Touchez ＋ en haut à droite pour ajouter
+次回|Suivant
+復習|Révision
+回|fois
+習得済みを解除|Retirer la marque « maîtrisé »
+習得済みにする|Marquer comme maîtrisé
+削除する単語を先に選択してください|Veuillez d'abord sélectionner les mots à supprimer
+語を削除しますか？元に戻せません！|mots ? Irréversible !
+✏️ 単語を編集|✏️ Modifier le mot
+画像は 10MB を超えられません|L'image ne peut pas dépasser 10MB
+⏳ 画像をアップロード中…|⏳ Téléversement de l'image…
+アップロードに失敗|Échec du téléversement
+✅ 画像をアップロードしました|✅ Image téléversée
+アップロードに失敗：|Échec du téléversement : 
+単語を入力してください|Veuillez saisir un mot
+🗑️ 単語を削除|🗑️ Supprimer le mot
+習得済みを解除しました|Marque « maîtrisé » retirée
+習得済みにしました|Marqué comme maîtrisé
+復習待ちの単語はありません|Aucun mot à réviser
+· 不正解|· Incorrect
+意味を考えてから、下のボタンをタップしてください|Réfléchissez au sens, puis touchez le bouton ci-dessous
+第|N°
+答えを表示|Afficher la réponse
+送信に失敗：|Échec de l'envoi : 
+一覧を更新|Actualiser la liste
+💣 すべて消去|💣 Tout effacer
+すべての単語を消去しますか？この操作は元に戻せません！|Effacer tous les mots ? Cette action est irréversible !
+すべての単語を消去しました|Tous les mots ont été effacés
+ファイルが 50TB の上限を超えています|Le fichier dépasse la limite de 50TB
+⏳ バックアップファイルをアップロード中…（|⏳ Téléversement du fichier de sauvegarde… (
+⏳ アップロード中|⏳ Téléversement
+%（|% (
+✅ 復元に成功しました！展開済み|✅ Restauration réussie ! Décompressé
+件のファイル。ページを再読み込みします…|fichiers. Rechargement de la page…
+♻️ バックアップから復元|♻️ Restaurer depuis une sauvegarde
+（推奨：先に「📦 データバックアップ」ボタンで現在のデータをダウンロードしてください）|(Recommandé : téléchargez d'abord vos données actuelles avec le bouton « 📦 Sauvegarde des données »)
+リクエストに失敗|Échec de la requête
+ピーク／オフピーク通知（タップで設定を開く）|Alertes heures pleines／creuses (touchez pour ouvrir les paramètres)
+DeepSeek オフピーク時間帯が開始|Les heures creuses DeepSeek ont commencé
+現在はピーク時間帯（09:00–12:00 / 14:00–18:00）|Actuellement heures pleines (09:00–12:00 / 14:00–18:00)
+現在はオフピーク時間帯（アイドル時間、料金はピークの約半額）|Actuellement heures creuses (période creuse, tarif environ moitié du plein)
+プッシュチャネルでピーク時間帯の通知を送信しました|Alerte heures pleines envoyée via le canal push
+プッシュチャネルでオフピーク時間帯の通知を送信しました|Alerte heures creuses envoyée via le canal push
+DeepSeek ピーク／オフピーク時間帯 · 枠の光効果 · プッシュ通知|DeepSeek heures pleines／creuses · Lueur de bordure · Notifications push
+すべて既定に戻す|Tout réinitialiser
+すべての外観と通知の設定を既定値に戻します（プッシュチャネルは保持）。よろしいですか？|Réinitialiser tous les réglages d'apparence et de notification (les canaux push sont conservés). Confirmer ?
+既定に戻しました|Réinitialisé aux valeurs par défaut
+読み込みに失敗：|Échec du chargement : 
+（サービスが起動しているか確認してください）|(Vérifiez que le service est démarré)
+現在の状態|État actuel
+現在の時間帯、次の切替までのカウントダウン、手動上書き。|Tranche actuelle, compte à rebours avant le prochain changement, remplacement manuel.
+ピーク／オフピーク通知を有効化|Activer les alertes heures pleines／creuses
+メインスイッチ。オフにすると枠・光効果・バッジ・プッシュ通知がすべて停止します。|Interrupteur principal. Désactivé, la bordure, la lueur, le badge et les notifications push s'arrêtent.
+適用範囲|Portée
+既定では DeepSeek チャット画面のみで有効になり、他のページに影響しません。|Actif uniquement sur l'écran de chat DeepSeek par défaut ; les autres pages ne sont pas affectées.
+判定モード|Mode de détection
+自動判定は下記の時間帯で計算します。強制モードは見た目の確認用です。|Le mode auto utilise les tranches ci-dessous. Le mode forcé sert à vérifier l'apparence.
+自動判定|Détection auto
+ピークを強制|Forcer plein
+オフピークを強制|Forcer creux
+状態更新の間隔|Intervalle de rafraîchissement
+ページを開いている間にサーバーへ段階を問い合わせる頻度（秒）。|Fréquence (en secondes) à laquelle la page interroge le serveur pendant qu'elle est ouverte.
+強制モードでは切替を計算しません|Aucun changement n'est calculé en mode forcé
+次の切替：—|Prochain changement : —
+時間|h
+分|min
+次の切替：|Prochain changement : 
+後）|)
+ピーク時間帯の設定|Paramètres des heures pleines
+既定の公式時間帯（北京時間、2026-08-17 から有効）。それ以外の時間は自動的にオフピーク時間帯とみなされます。|Horaires officiels par défaut (heure de Pékin, à partir du 2026-08-17). Les autres heures sont considérées comme creuses.
+時間帯がありません。少なくとも 1 つ追加してください|Aucune tranche. Ajoutez-en au moins une
+ピーク時間帯を少なくとも 1 つ残してください|Gardez au moins une tranche pleine
+＋ 時間帯を追加|＋ Ajouter une tranche
+公式の既定に戻す|Rétablir les valeurs officielles
+時間帯はこのタイムゾーンで換算されます。公式時間帯は北京時間です。|Les horaires sont convertis dans ce fuseau. Les horaires officiels sont en heure de Pékin.
+ピーク時の色|Couleur plein
+ピーク時間帯に使用する色。|Couleur utilisée pendant les heures pleines.
+オフピーク時の色|Couleur creux
+オフピーク時間帯に使用する色。|Couleur utilisée pendant les heures creuses.
+枠の幅|Épaisseur de bordure
+1～14 ピクセル。|1 à 14 pixels.
+グロー強度|Intensité de la lueur
+0 でグローなし。|0 signifie aucune lueur.
+不透明度|Opacité
+全体の透明度、0.2～1。|Opacité globale, 0,2 à 1.
+呼吸アニメーション|Animation de respiration
+呼吸 / 常時点灯 / オフ。|Respiration / Toujours allumé / Désactivé.
+呼吸|Respiration
+常時点灯|Toujours allumé
+呼吸の周期|Période de respiration
+呼吸 1 周期の秒数。|Secondes par cycle de respiration.
+光効果の方向|Direction de la lueur
+グローが外向きに広がるか内向きに収まるか。|La lueur s'étend vers l'extérieur ou se resserre vers l'intérieur.
+外向き|Vers l'extérieur
+内向き|Vers l'intérieur
+流れる光（コメット）|Lumière filante (comète)
+枠に沿って周回する光点。|Point lumineux qui parcourt la bordure.
+光の速さ|Vitesse de la lumière
+1 周にかかる秒数（2～24）。|Secondes par tour (2 à 24).
+ページ枠|Bordure de page
+ページ端の呼吸する枠線：ピークはオレンジ、オフピークはブルー。色と呼吸は調整できます。|Bordure respirante au bord de la page : orange en plein, bleu en creux. Couleur et respiration réglables.
+枠を有効化|Activer la bordure
+オフにするとページ端は表示されません。入力欄とバッジは独立して機能します。|Désactivé, le bord de page n'est pas affiché. La lueur du champ et le badge fonctionnent indépendamment.
+枠を既定に戻す|Rétablir la bordure
+入力欄の光効果|Lueur du champ de saisie
+DeepSeek チャットの入力欄に独立した光効果を追加します。設定はページ枠と完全に分離されています。|Ajoute une lueur indépendante au champ de saisie du chat DeepSeek. Ses réglages sont totalement séparés de la bordure de page.
+入力欄の光効果を有効化|Activer la lueur du champ
+チャット入力欄のコントロールに追従して配置。スクロールやキーボード表示時も自動で追従します。|Positionnée en suivant les contrôles du champ de saisie. Suit automatiquement au défilement ou à l'apparition du clavier.
+入力欄を既定に戻す|Rétablir le champ de saisie
+左上|En haut à gauche
+右上|En haut à droite
+左下|En bas à gauche
+右下|En bas à droite
+状態バッジ|Badge d'état
+独立した時間帯バッジ。枠のスイッチとは連動しません。PC とスマホで位置を別々に設定できます。|Badge de tranche indépendant. Non lié à l'interrupteur de bordure. Position réglable séparément sur PC et mobile.
+バッジを有効化|Activer le badge
+バッジをタップするとこの設定パネルを直接開けます。|Touchez le badge pour ouvrir directement ce panneau.
+表示位置|Position
+水平オフセット|Décalage horizontal
+垂直オフセット|Décalage vertical
+バッジを既定に戻す|Rétablir le badge
+ローカル通知|Notifications locales
+ブラウザのシステム通知：ページを開いている間に、時間帯の切替や予約リマインダーの発火時に通知します。|Notifications système du navigateur : tant que la page est ouverte, notifient les changements de tranche ou le déclenchement des rappels.
+ローカル通知を有効化|Activer les notifications locales
+フェーズ転換時に通知|Notifier au changement de phase
+ピーク／オフピークの切替時に通知します。|Notifier lors du passage plein／creux.
+予約リマインダーの発火時に通知|Notifier au déclenchement d'un rappel
+サーバーがプッシュチャネルで通知を送るときに同期して通知します。|Notifier en synchronisation quand le serveur envoie via le canal push.
+通知権限をリクエスト|Demander l'autorisation de notification
+このブラウザは通知に対応していません|Ce navigateur ne prend pas en charge les notifications
+通知権限を取得しました|Autorisation de notification accordée
+権限を取得できませんでした：|Impossible d'obtenir l'autorisation : 
+テスト通知を送信|Envoyer une notification de test
+先に通知を許可してください|Veuillez d'abord autoriser les notifications
+ピーク／オフピーク通知テスト|Test des alertes heures pleines／creuses
+この通知が見えていれば、ローカル通知は利用可能です。|Si vous voyez cette notification, les notifications locales fonctionnent.
+このブラウザは Notification API に対応していません|Ce navigateur ne prend pas en charge l'API Notification
+通知権限：許可済み|Autorisation de notification : accordée
+通知権限：拒否されています（ブラウザのサイト設定で有効にしてください）|Autorisation de notification : refusée (activez-la dans les paramètres du site du navigateur)
+通知権限：未許可|Autorisation de notification : non accordée
+プッシュチャネルがまだありません。1 つ追加すると、リマインダーがスマホに届きます。|Aucun canal push pour l'instant. Ajoutez-en un et les rappels arriveront sur votre téléphone.
+未入力の項目があります|Des champs ne sont pas remplis
+有効|Activé
+無効|Désactivé
+未設定|Non défini
+✅ 送信成功：|✅ Envoyé : 
+チャネル「|Canal «
+」？|»?
+＋ チャネルを追加|＋ Ajouter un canal
+チャネルを編集|Modifier le canal
+チャネルを追加|Ajouter un canal
+チャネルの種類|Type de canal
+名前|Nom
+リスト表示専用です。|Uniquement pour l'affichage en liste.
+例：私のスマホ|Ex. mon téléphone
+保存済みのキーはマスク表示されます。変更しなければ元の値が保持されます。|Les clés enregistrées sont masquées. Sans modification, la valeur d'origine est conservée.
+ここに入力|Saisir ici
+空欄なら https://api.day.app を使用|Vide, https://api.day.app est utilisé
+完全な URL|URL complète
+Telegram のチャット ID。|ID de chat Telegram.
+例：123456789|Ex. 123456789
+署名キー|Clé de signature
+DingTalk / Feishu の secret（任意）。|secret DingTalk / Feishu (facultatif).
+リクエスト方法|Méthode de requête
+リクエスト本文のテンプレート|Modèle de corps de requête
+{title} と {content} のプレースホルダに対応。|Prend en charge les espaces réservés {title} et {content}.
+このチャネルを有効化|Activer ce canal
+チャネルを保存|Enregistrer le canal
+✅ チャネルを保存しました|✅ Canal enregistré
+到達|À l'arrivée
+通知を有効化|Activer les notifications
+事前通知|Préavis
+0 は時間帯が始まる瞬間に送信することを意味します。|0 signifie envoyer à l'instant où la tranche commence.
+定刻（到達時）|À l'heure (à l'arrivée)
+5 分前|5 min avant
+10 分前|10 min avant
+15 分前|15 min avant
+30 分前|30 min avant
+60 分前|60 min avant
+すべてのチャネルを有効化|Activer tous les canaux
+使用可能な変数：{phase} {start} {end} {time} {date}|Variables disponibles : {phase} {start} {end} {time} {date}
+本文テンプレート|Modèle de corps
+上記の変数も同様に使用できます。|Les variables ci-dessus sont également utilisables.
+{phase}開始：{start}～{end}|Début {phase} : {start}–{end}
+追加の固定時刻|Heures fixes supplémentaires
+HH:MM。複数はカンマ区切り。その段階の進行中のみ発火します。|HH:MM. Plusieurs valeurs séparées par des virgules. Ne se déclenche que pendant cette phase.
+例：10:30,15:00|Ex. 10:30,15:00
+テスト送信|Envoi de test
+✅ 送信しました（|✅ Envoyé (
+今すぐ 1 回発火|Déclencher une fois maintenant
+この段階の通知は有効になっていません|Les notifications de cette phase ne sont pas activées
+発火して送信しました|Déclenché et envoyé
+最近の発火：|Déclenchements récents : 
+· 成功|· Succès
+· 失敗：|· Échec : 
+まだ発火していません|Pas encore déclenché
+この機能について|À propos de cette fonction
+有効開始日：2026-08-17 より。|Actif depuis : 2026-08-17.
+設定ファイル：|Fichier de configuration : 
+`);
+
+/* Messages d'erreur du serveur (Dart) — sources en chinois／japonais */
+I18N.add('fr', `
+公告不存在|Annonce introuvable
+内容不能为空|Le contenu ne peut pas être vide
+无效 multipart|Multipart invalide
+无效请求体|Corps de requête invalide
+未找到 file 字段|Champ file introuvable
+未找到要更新的消息|Message à mettre à jour introuvable
+未知操作|Opération inconnue
+模型名不能包含空格|Le nom du modèle ne peut pas contenir d'espaces
+缺少 API Key|API Key manquante
+缺少 boundary|Boundary manquante
+缺少 id|id manquant
+缺少 ids|ids manquants
+缺少 sessionId|sessionId manquant
+缺少 sessionId 或 id|sessionId ou id manquant
+缺少id|id manquant
+缺少会话ID|ID de session manquant
+セッション ID がありません|ID de session manquant
+セッションが存在しません|La session n'existe pas
+タイトルは必須です|Le titre est obligatoire
+テキストが空です|Le texte est vide
+テキストは空です（クリーニング後）|Le texte est vide (après nettoyage)
+テキストは必須です|Le texte est obligatoire
+プロンプトは必須です|Le prompt est obligatoire
+モデル名は必須です|Le nom du modèle est obligatoire
+ユーザーメッセージの保存に失敗しました|Échec de l'enregistrement du message utilisateur
+作成に失敗しました|Échec de la création
+保存に失敗しました|Échec de l'enregistrement
+先に DeepSeek API Key を設定してください|Veuillez d'abord configurer la DeepSeek API Key
+内容が空です|Le contenu est vide
+内容は必須です|Le contenu est obligatoire
+削除する投稿が指定されていません|Aucune publication à supprimer n'est spécifiée
+単語が存在しません|Le mot n'existe pas
+単語が長すぎます|Le mot est trop long
+単語は必須です|Le mot est obligatoire
+名前の変更に失敗しました|Échec du renommage
+回答の保存に失敗しました|Échec de l'enregistrement de la réponse
+投稿が存在しないか、ファイルに異常があります|La publication n'existe pas ou son fichier est corrompu
+書き込みに失敗しました|Échec de l'écriture
+無効な multipart 終端です|Terminateur multipart invalide
+無効なリクエストボディです|Corps de requête invalide
+画像の書き込みに失敗しました|Échec de l'écriture de l'image
+継続生成できる内容がありません|Aucun contenu à continuer
+翻訳するテキストが空です|Le texte à traduire est vide
+翻訳に失敗しました：|Échec de la traduction : 
+翻訳結果が空でした|Le résultat de la traduction est vide
+例文が長すぎます|La phrase d'exemple est trop longue
+お知らせは最大 0 件までです。先に古いお知らせを削除してください|# annonces maximum. Supprimez d'abord les plus anciennes
+アップロードに失敗しました：|Échec du téléversement : 
+API 呼び出しに失敗しました：|Échec de l'appel API : 
+ツール呼び出しに失敗しました：|Échec de l'appel d'outil : 
+生成サービスが 0 を返しました|Le service de génération a renvoyé #
+タイトルは最大 0 文字までです|Le titre fait au maximum # caractères
+タイトルは最大 0 文字までです（現在 0 文字）|Le titre fait au maximum # caractères (actuellement #)
+内容最多 0 字|Le contenu fait au maximum # caractères
+正文最多 0 字，当前 0 字|Le corps fait au maximum # caractères (actuellement #)
+模型名最多 0 字|Le nom du modèle fait au maximum # caractères
+画像生成に失敗しました：|Échec de la génération d'image : 
+小説の生成に失敗しました：|Échec de la génération du roman : 
+`);
+
+/* 追加抽出分（画面テンプレート・開発者ツール・小説モード等） */
+I18N.add('fr', `
+キャンセル|Annuler
+✅ コピーしました|✅ Copié
+ピーク|Plein
+キーワードを入力して、すべての履歴セッションを検索|Saisissez un mot-clé pour rechercher dans toutes les sessions
+アイドル|Creux
+プッシュチャネル|Canal push
+開発者ツール|Outils de développement
+ロールプレイ|Jeu de rôle
+📋 コピー|📋 Copier
+最上位|Priorité max
+入力|Entrée
+測定|Mesure
+公式の時間帯（北京時間）：ピークは 09:00–12:00、14:00–18:00。それ以外はオフピーク（アイドル）時間帯で、API 料金はピークの約半額です。|Horaires officiels (heure de Pékin) : plein 09:00–12:00 et 14:00–18:00. Les autres heures sont creuses (inactives) et le tarif API y est environ deux fois moindre.
+リマインダーは以下のチャネルで送信されます。キーはサーバー側の設定ファイル（権限 0600）に保存され、API 応答時は自動でマスクされます。|Les rappels sont envoyés via les canaux ci-dessous. Les clés sont stockées dans le fichier de configuration du serveur (mode 0600) et masquées automatiquement dans les réponses API.
+前に（または到達時に）プッシュチャネルでリマインダーを送信します。スケジューリングはサーバー側で実行されるため、ページを閉じても届きます。|Envoie le rappel via le canal push à l’avance (ou à l’arrivée). La planification s’exécute côté serveur, donc il arrive même page fermée.
+サービス提供元の制限により、長文モードは終了しました。ご了承ください。「📖 小説モード」で約 3 万字の長編を生成できます。|Le mode texte long a pris fin en raison des restrictions du fournisseur. Merci de votre compréhension. Utilisez « 📖 Mode roman » pour générer environ 30 000 caractères.
+画像を含むときは画像認識対応のビジョンモデルへ自動切替し、Pro などのテキスト専用モデルでの画像読み取り失敗を防ぎます。|En présence d’images, bascule automatiquement vers un modèle de vision, évitant les échecs de lecture sur les modèles texte comme Pro.
+スケジューラ：サーバーが 30 秒ごとに確認します。サービス再起動後、10 分以内に期限が来るリマインダーは再送されます。|Planificateur : le serveur vérifie toutes les 30 secondes. Après un redémarrage, les rappels arrivant à échéance sous 10 minutes sont renvoyés.
+完全な小説を一括生成 · 最大 100 万字/篇 · ストリーミング出力|Générer un roman complet d’un coup · jusqu’à 1 000 000 caractères · sortie en flux
+pdf / txt / md / docx / json / コード|pdf / txt / md / docx / json / code
+警告：これは開発者ツールであり、開発環境でのみ使用できます。|Attention : outil de développement, utilisable uniquement en environnement de développement.
+開いたあとプロンプトをタップで注入／もう一度タップで解除|Après ouverture, touchez un prompt pour l’injecter／touchez à nouveau pour le retirer
+💬 プロンプト内容（送信メッセージの前に付加されます）|💬 Contenu du prompt (ajouté avant le message envoyé)
+まだ投稿がありません。右上の「⋯」から投稿できます|Aucune publication. Vous pouvez publier via « ⋯ » en haut à droite
+チャット画面とセッション履歴には表示されません。|Non affiché dans l’écran de chat ni dans l’historique des sessions.
+💰 今回の翻訳：料金を取得できませんでした|💰 Cette traduction : coût indisponible
+この投稿は非表示のため、本文は見られません|Cette publication est masquée, le corps n’est pas visible
+件。次回メッセージ送信時に反映されます| éléments. Appliqué au prochain envoi de message
+Webhook / サーバーアドレス|Webhook / adresse du serveur
+一致するメッセージが見つかりません|Aucun message correspondant
+次回メッセージ送信時に反映されます|Appliqué au prochain envoi de message
+タップまたはドラッグでアップロード|Touchez ou glissez pour téléverser
+🎭 ロールプレイをオンにしました|🎭 Jeu de rôle activé
+⏸ ロールプレイをオフにしました|⏸ Jeu de rôle désactivé
+プロンプト注入 · 開発環境限定|Injection de prompts · développement uniquement
+推論過程とツール呼び出しの記録|Journal du raisonnement et des appels d’outils
+DeepSeek チャットのみ|Chat DeepSeek uniquement
+セッションがまだありません|Aucune session pour l’instant
+ファイルがまだありません|Aucun fichier pour l’instant
+キー / SendKey|Clé / SendKey
+Webhook アドレス|Adresse Webhook
+思考チェーン全体を展開|Développer toute la chaîne de pensée
+お知らせはありません|Aucune annonce
+今日はもう表示しない|Ne plus afficher aujourd’hui
+タイトルテンプレート|Modèle de titre
+🔍 日本語かな一覧|🔍 Table des kana
+今回の復習は完了！|Révision terminée !
+データバックアップ|Sauvegarde des données
+件のプロンプト、| prompts, 
+プロンプトを注入|Injecter le prompt
+🎭 ロールプレイ|🎭 Jeu de rôle
+キャッシュ命中|Cache touché
+考えています…|Réflexion…
+📖 小説モード|📖 Mode roman
+ストーリー設定|Réglages de l’histoire
+🚀 執筆を開始|🚀 Commencer à écrire
+💰 今回の翻訳|💰 Cette traduction
+🧹 すべて削除|🧹 Tout supprimer
+プロンプトなし|Aucun prompt
+❌ わからない|❌ Je ne sais pas
+すべてのレベル|Tous les niveaux
+すべてのページ|Toutes les pages
+📶 接続中…|📶 Connexion…
+📵 通話終了|📵 Terminer l’appel
+検索に失敗：|Échec de la recherche : 
+💉 注入済み|💉 Injecté
+📌 タイトル|📌 Titre
+了解しました|Compris
+3 ラウンド|3 tours
+タイムゾーン|Fuseau horaire
+回呼び出し|appels
+目標文字数|Nombre de caractères cible
+現在注入中|Actuellement injecté
+AI 生成|Généré par IA
+✅ わかる|✅ Je sais
+💻 コード|💻 Code
+オフピーク|Creux
+検索中…|Recherche…
+注入済み|Injecté
+＋ 追加|＋ Ajouter
+← 戻る|← Retour
+ファイル|Fichier
+未命中|Manqué
+テーマ|Thème
+優先度|Priorité
+ウェブ|Web
+レベル|Niveau
+スマホ|Téléphone
+テスト|Test
+出力|Sortie
+合計|Total
+添付|Pièce jointe
+タグ|Étiquettes
+分類|Catégorie
+都市|Ville
+正解|Bonne réponse
+`);
+
+I18N.add('fr', `
+すべて|Tout
+すべての|Tous les
+`);
+
+I18N.add('fr', `
+入力|Entrée
+合計|Total
+字（|car. (
+段落|paragraphe
+玄幻|Fantasy
+仙侠|Xianxia
+歴史|Historique
+言情|Romance
+恋愛|Romance
+百合|Yuri
+少女|Jeune fille
+短編|Nouvelle
+グロ|Gore
+爽文|Power fantasy
+学園|École
+教育|Éducation
+美女|Beauté
+生活|Tranche de vie
+大学|Université
+単独|Solo
+軍事|Militaire
+件：|éléments :
+編集|Modifier
+削除|Supprimer
+出力|Sortie
+測定|Mesure
+分類|Catégorie
+送信|Envoyer
+タグ|Tags
+都市|Urbain
+· 全|· Total
+自由に|Libre
+タグ：|Tags :
+万字）|0k mots)
+二人称|Deuxième personne
+テック|Tech
+異世界|Isekai
+アニメ|Anime
+ホラー|Horreur
+ダーク|Sombre
+ゲーム|Jeu
+件 @|éléments @
+未命中|Raté
+最上位|Top
+優先度|Priorité
+テーマ|Thème
+一括削除|Suppression groupée
+🤖 第|🤖 Tour
+✓ 完了|✓ Terminé
+停止中…|Arrêt…
+小説創作|Écriture de roman
+テーマ：|Thème :
+微ホラー|Micro-horreur
+成人向け|Adulte
+激情恋愛|Romance passionnée
+女子同士|Entre filles
+愛の言葉|Mots d'amour
+コーパス|Corpus
+直接回答|Réponse directe
+（任意）|(facultatif)
+追加済み|Ajouté
+注入済み|Injecté
+検索中…|Recherche…
+⏱ 思考|⏱ Réflexion
+＋ 追加|+ Ajouter
+← 戻る|← Retour
+回呼び出し|appels
+新しい対話|Nouvelle conversation
+ラウンド）|tours)
+生成を停止|Arrêter la génération
+上級モード|Mode avancé
+📞 通話|📞 Appel
+ミステリー|Mystère
+⏸ 再生中|⏸ Lecture
+現在注入中|Actuellement injecté
+AI 生成|Généré par IA
+📎 添付|📎 Pièce jointe
+キャンセル|Annuler
+💾 保存|💾 Enregistrer
+📋 コピー|📋 Copier
+ここにいます|Je suis là
+始めましょう|Commençons
+始まりますよ|Ça commence
+（内容なし）|(Aucun contenu)
+ラウンド ·|tours ·
+生成を続ける|Continuer la génération
+次で思考中:|Réflexion ensuite :
+目標文字数：|Longueur cible :
+TTS 戻る|TTS retour
+単一ラウンド|Tour unique
+二重ラウンド|Double tour
+三重ラウンド|Triple tour
+四重ラウンド|Quadruple tour
+（カスタム）|(personnalisé)
+TTS 失敗|Échec TTS
+開発者ツール|Outils développeur
+読み込み中…|Chargement…
+検索に失敗：|Échec de la recherche :
+了解しました|Compris
+件のセッション|sessions
+うん、それで？|Ouais, et alors ?
+生成を継続中…|Génération en cours…
+📖 執筆済み|📖 Écrit
+チュートリアル|Tutoriel
+保存しました：|Enregistré :
+📌 タイトル|📌 Titre
+キャッシュ命中|Cache trouvé
+💉 注入済み|💉 Injecté
+読み込みに失敗|Échec du chargement
+考えています…|Réflexion…
+📶 接続中…|📶 Connexion…
+📵 通話終了|📵 Terminer l'appel
+⏳ 読み込み中|⏳ Chargement
+名前の変更に失敗|Échec du renommage
+セッションを削除|Supprimer la session
+引用の取得に失敗|Échec de la citation
+未踏の境地を探る|Explorer l'inconnu
+ストリームエラー|Erreur de flux
+▶ 生成を続ける|▶ Continuer la génération
+続きの生成に失敗|Échec de la continuation
+📖 執筆中：第|📖 Écriture : chapitre
+🔇 ミュート中|🔇 Muet
+音声の再生に失敗|Échec de la lecture audio
+上級モードをオフ|Désactiver le mode avancé
+件のプロンプト、|invites,
+📖 小説モード|📖 Mode roman
+💰 今回の翻訳|💰 Cette traduction
+🚀 執筆を開始|🚀 Commencer l'écriture
+🧹 すべて削除|🧹 Tout supprimer
+⏳ 読み込み中…|⏳ Chargement…
+セッション名を変更|Renommer la session
+名前を変更しました|Renommé
+名前の変更に失敗：|Échec du renommage :
+件のセッション ·|sessions ·
+何かしましょうか？|On fait quelque chose ?
+何を話しましょう？|De quoi parlons-nous ?
+生成を停止しました|Génération arrêtée
+生成の継続に失敗：|Échec de la continuation :
+✅ 生成しました：|✅ Généré :
+🔊 聞き取り中…|🔊 Écoute…
+ネットワークエラー|Erreur réseau
+📚 超長文をオフ|📚 Désactiver le texte ultra-long
+音声合成が空です（|Synthèse vocale vide (
+🗑️ 選択を削除|🗑️ Supprimer la sélection
+改行を挿入しました|Saut de ligne inséré
+引用のコピーに失敗：|Échec de la copie de la citation :
+どうぞ、聞いています|Allez-y, j'écoute
+録音の初期化に失敗：|Échec de l'initialisation de l'enregistrement :
+。入力欄を開きます～|. J'ouvre le champ de saisie～
+(設定ファイル由来)|(depuis le fichier de config)
+設定の読み込みに失敗|Échec du chargement des paramètres
+（設定ファイル由来）|(depuis le fichier de config)
+お知らせはありません|Aucune annonce
+🛠️ 開発者ツール|🛠️ Outils développeur
+今日はもう表示しない|Ne plus afficher aujourd'hui
+🔍 日本語かな一覧|🔍 Liste des kana japonais
+セッションの作成に失敗|Échec de la création de session
+セッションがありません|Aucune session
+今日も頑張りましょう！|Faisons de notre mieux aujourd'hui aussi !
+あなたのことが好きです|Je t'aime bien
+思考チェーン全体を展開|Développer toute la chaîne de réflexion
+API 呼び出しに失敗|Échec de l'appel API
+📖 小説創作 分類：|📖 Écriture de roman Catégorie :
+⚠️ 上級モードをオン|⚠️ Activer le mode avancé
+回答 + 1 回の反省|Réponse + 1 réflexion
+回答 + 2 回の反省|Réponse + 2 réflexions
+回答 + 3 回の反省|Réponse + 3 réflexions
+· ストリーミング出力|· Sortie en streaming
+🧩 推論レベル Lv|🧩 Niveau de raisonnement Lv
+TTS サービス応答:|Réponse du service TTS :
+💉 プロンプトを注入|💉 Injecter l'invite
+今日は何を話しましょう？|De quoi parlons-nous aujourd'hui ?
+自分を信じて、できますよ|Crois en toi, tu peux le faire
+✅ 生成を継続しました：|✅ Génération poursuivie :
+✅ 小説を生成しました：|✅ Roman généré :
+📵 通話を終了しました|📵 Appel terminé
+📚 超長文をオン（目標|📚 Activer le texte ultra-long (cible
+セッションの読み込みに失敗|Échec du chargement des sessions
+メッセージの読み込みに失敗|Échec du chargement des messages
+やあ、今日はどうでしたか？|Salut, ta journée s'est bien passée ?
+さあ、面白い話をしましょう|Allez, parlons de choses intéressantes
+私がいるから、怖がらないで|Je suis là, n'aie pas peur
+一緒に問題を解決しましょう|Résolvons le problème ensemble
+生成を停止しました。保持：|Génération arrêtée. Conservé :
+🤖 自律エージェント起動|🤖 Agent autonome démarré
+⚠️ エラーが発生しました|⚠️ Une erreur est survenue
+モデル名を入力してください|Veuillez saisir un nom de modèle
+聞いています、ゆっくりどうぞ|J'écoute, prenez votre temps
+読み込み失敗、タップで再試行|Échec du chargement, touchez pour réessayer
+[アップロード済みファイル]|[Fichier téléversé]
+⚠️ API Key 未設定|⚠️ API Key non configurée
+一致するセッションがありません|Aucune session correspondante
+件のセッションを削除しますか？|sessions ?
+慌てないで、ずっとここにいます|Ne panique pas, je suis toujours là
+悩みがあれば、聞かせてください|Si tu as des soucis, raconte-moi
+今日も元気いっぱいの一日ですね|Encore une journée pleine d'énergie
+誠心誠意、ご質問にお答えします|Je répondrai à vos questions avec sincérité
+↑ 以前のメッセージを読み込む|↑ Charger les messages précédents
+生成中です、少々お待ちください|Génération en cours, veuillez patienter
+🎙️ マイクをオンにしました|🎙️ Microphone activé
+🔇 マイクをミュートしました|🔇 Microphone coupé
+。もう一度試してみてください～|. Veuillez réessayer～
+保存済み。空欄なら変更しません|Enregistré. Laissez vide pour ne pas modifier
+カスタムモデルを削除しました:|Modèle personnalisé supprimé :
+モデル名に空白は使用できません|Le nom du modèle ne peut pas contenir d'espaces
+推論過程とツール呼び出しの記録|Processus de raisonnement et journal des appels
+🎉 今回の復習は完了！ 正解|🎉 Révision terminée ! Correct
+先にセッションを選択してください|Veuillez d'abord sélectionner une session
+すべてのセッションを消去しました|Toutes les sessions ont été effacées
+おかえりなさい、何かご用ですか？|Bon retour, comment puis-je aider ?
+お久しぶりです、何か話しますか？|Ça fait longtemps, on discute ?
+どんな話題でも、私はここにいます|Quel que soit le sujet, je suis là
+退屈なときは、私を頼ってください|Quand tu t'ennuies, compte sur moi
+難しい問題も、一緒に考えましょう|Réfléchissons aussi aux problèmes difficiles
+以前のメッセージの読み込みに失敗|Échec du chargement des messages précédents
+設定を保存しました · モデル:|Paramètres enregistrés · Modèle :
+プロンプト注入 · 開発環境限定|Injection d'invites · Développement uniquement
+聞きたいことがあれば、何でもどうぞ|Posez toutes vos questions
+あれ？来ましたね、待っていましたよ|Oh ? Vous êtes là, je vous attendais
+先に上級モードをオンにしてください|Veuillez d'abord activer le mode avancé
+次回メッセージ送信時に反映されます|Prendra effet à votre prochain message
+一致するメッセージが見つかりません|Aucun message correspondant trouvé
+こんにちは、おしゃべりを始めましょう|Bonjour, commençons à discuter
+何かお手伝いできることはありますか？|Puis-je vous aider ?
+ここにいます、いつでもお手伝いします|Je suis là, toujours prêt à aider
+一緒に面白いアイデアを考えませんか？|On cherche une idée amusante ensemble ?
+来たからには、少し話していきませんか|Puisque vous êtes là, discutons un peu
+夜も更けましたね、本音で話しますか？|Il se fait tard, parlons franchement ?
+おっと、通話で少し問題が起きました：|Oups, un problème est survenu dans l'appel :
+今日は何か楽しいことを共有しませんか？|On partage quelque chose de sympa aujourd'hui ?
+こっそり教えますが、私は何でも話せます|Entre nous, je peux parler de tout
+眠れないなら、おしゃべりに付き合います|Si tu ne dors pas, je te tiens compagnie
+上級モードをオフ · 推論レベル Lv|Désactiver le mode avancé · Niveau Lv
+ラウンド · max_tokens ≈|tours · max_tokens ≈
+件。次回メッセージ送信時に反映されます|éléments. Prendra effet au prochain message
+DeepSeek チャット · モデル:|DeepSeek Chat · Modèle :
+静かな夜は、ゆっくり話すのに向いています|Les nuits calmes sont propices aux discussions posées
+🐟 deepseek が考えています…|🐟 deepseek réfléchit…
+🐟 deepseek が話しています…|🐟 deepseek parle…
+オフにすると推論レベルはデフォルト Lv|Désactivé, le niveau est par défaut Lv
+。カスタマイズはできません。閉じますか？|. Non personnalisable. Fermer ?
+モデル名が長すぎます（最大 120 字）|Nom du modèle trop long (max 120 car.)
+そのモデルは既に一覧にあり、選択しました|Ce modèle est déjà dans la liste et sélectionné
+」とそのすべてのメッセージを削除しますか？|» et tous ses messages ?
+また会えましたね、今日は何か新しいことは？|On se revoit, quoi de neuf aujourd'hui ?
+言いたくても言えないことを、ここで話せます|Dites ici ce que vous n'osez pas dire
+テーマか物語設定を最低1つ入力してください|Saisissez au moins un thème ou un cadre
+（ローカルキャッシュ、バックエンド未同期）|(cache local, backend non synchronisé)
+大きなことでも小さなことでも、話してください|Parlez-moi de tout, grand ou petit
+🤖 思考チェーンとツール呼び出しの記録（全|🤖 Chaîne de réflexion et appels (total
+📖 小説を執筆中です。数分かかる見込みです|📖 Rédaction du roman. Cela prendra quelques minutes
+🔒 上級モードをオン · 推論レベル Lv|🔒 Activer le mode avancé · Niveau Lv
+💰 今回の翻訳：料金を取得できませんでした|💰 Cette traduction : coût indisponible
+遠慮しないで、ここは自分の家だと思ってください|Ne vous gênez pas, faites comme chez vous
+小さなクジラは準備完了、指示を待っています 🐳|La petite baleine est prête, en attente d'ordres 🐳
+メッセージを入力するかファイルを添付してください|Saisissez un message ou joignez un fichier
+小説モード（最大 100 万字の小説を一括生成）|Mode roman (générer jusqu'à 1 000 000 caractères d'un coup)
+✅ API Key 設定済み · 現在のモデル:|✅ API Key configurée · Modèle actuel :
+バックエンド未同期、現在はローカルキャッシュのみ|Backend non synchronisé, cache local uniquement
+画面には追加しましたが、ファイル書き込みに失敗：|Ajouté à l'interface, mais échec de l'écriture du fichier :
+チャット画面とセッション履歴には表示されません。|N'apparaîtra pas dans le chat ni l'historique.
+🚫 この投稿は非表示のため、本文は見られません|🚫 Ce message est masqué, contenu indisponible
+生成を停止しました（ローカルのみ保持、履歴未保存）|Génération arrêtée (conservée localement, non enregistrée)
+キーワードを入力して、すべての履歴セッションを検索|Saisissez des mots-clés pour chercher dans toutes les sessions
+🤖 自律エージェント起動（最大 50 億ラウンド）|🤖 Agent autonome démarré (jusqu'à 5 milliards de tours)
+画面からは削除しましたが、.sts ファイルの削除に失敗|Retiré de l'interface, mais échec de la suppression du fichier .sts
+開いたあとプロンプトをタップで注入／もう一度タップで解除|Après ouverture, touchez une invite pour injecter / touchez à nouveau pour retirer
+💬 プロンプト内容（送信メッセージの前に付加されます）|💬 Contenu de l'invite (ajouté avant votre message)
+💬 まだ投稿がありません。右上の「⋯」から投稿できます|💬 Aucun message. Publiez via « ⋯ » en haut à droite
+警告：これは開発者ツールであり、開発環境でのみ使用できます。|Attention : outil de développeur, réservé à l'environnement de développement.
+音声通話中です。太った魚の deepseek が参上しました～|Appel vocal en cours. Le gros poisson deepseek est arrivé～
+API 呼び出しに失敗しました。アカウント残高を確認してください|Échec de l'appel API. Vérifiez le solde de votre compte.
+📞 通話がつながりました（太った魚の deepseek 参上）|📞 Appel connecté (le gros poisson deepseek est arrivé)
+（data/displaymodels/*.sts に保存済み）|(enregistré dans data/displaymodels/*.sts)
+データディレクトリ：ddsh/data/displaymodels|Répertoire de données : ddsh/data/displaymodels
+件のセッションとメッセージを削除しますか？この操作は元に戻せません！|sessions et messages ? Cette action est irréversible !
+マイクが開けませんでした。入力欄を開きますので、文字でも話せますよ～|Impossible d'ouvrir le micro. J'ouvre le champ de saisie, vous pouvez écrire～
+完全な小説を一括生成 · 最大 100 万字/篇 · ストリーミング出力|Générer un roman complet d'un coup · jusqu'à 1 000 000 car./partie · sortie en streaming
+おっと、音声認識で少し問題が起きました。文字で送ってもらっても大丈夫ですよ～|Oups, la reconnaissance vocale a eu un souci. Vous pouvez envoyer du texte～
+このブラウザは録音に対応していません。入力欄を開きますので、文字でも話せますよ～|Ce navigateur ne prend pas en charge l'enregistrement. J'ouvre le champ de saisie, vous pouvez écrire～
+画面には追加しましたが、.sts の書き込みに失敗（バックエンド未コンパイル？）|Ajouté à l'interface, mais échec de l'écriture .sts (backend non compilé ?)
+ツールモード：AI が自律的にツールを呼び出して複雑なタスクを遂行（最大 50 億ラウンド）|Mode outils : l'IA appelle de façon autonome des outils pour des tâches complexes (jusqu'à 5 milliards de tours)
+現在のアドレスは安全な環境ではないため、マイクがブラウザに無効化されます。http://localhost:9999 からアクセスしてください～|Cette adresse n'est pas un contexte sécurisé, le navigateur désactive donc le microphone. Accédez via http://localhost:9999～
+上級モードでは推論レベル（Lv.1-50）を自由に設定できます。レベルは max_tokens と temperature に影響し、すべての対話はストリーミングのタイプライター出力になります。|En mode avancé, vous pouvez définir librement le niveau de raisonnement (Lv.1-50). Le niveau influence max_tokens et temperature, et toutes les conversations s'affichent en streaming façon machine à écrire.
+`);
+
+I18N.add('fr', `
+言語|Langue
+言語を切り替え|Changer de langue
+この返信の実際の token 消費量：モデル API が返す usage（課金基準）による値であり、ローカル推定ではありません|Consommation réelle de tokens de cette réponse : issue de l'usage renvoyé par l'API du modèle (base de facturation), pas une estimation locale
+モデル思考(reasoning)の総所要時間（複数ラウンドは全ラウンド累積、ツールモードは初回本文前の所要時間）|Durée totale de raisonnement du modèle (cumulée sur tous les tours ; en mode outils, avant le premier texte)
+この翻訳 1 回分だけの実費（API が返す usage に単価を掛けた値）。保存はしません|Coût réel de cette seule traduction (usage API × prix unitaire). Non enregistré.
+`);
+
+I18N.add('fr', `
+このメッセージをコピー|Copier ce message
+このメッセージを読み上げ|Lire ce message
+例：第一項 / 挨拶|Ex. : élément 1 / salutation
+例：恋愛小説|Ex. : roman d'amour
+例：恋愛|Ex. : amour
+太った魚の deepseek|Gros poisson deepseek
+音声が使えない？直接入力して送信…|Voix indisponible ? Saisissez et envoyez…
+小さなクジラ|Petite baleine
+マイクのオン／オフ|Micro activé/désactivé
+ダウンロード|Télécharger
+引用をコピー|Copier la citation
+接続中…|Connexion…
+通話終了|Terminer l'appel
+読込中…|Lecture…
+開く|Ouvrir
+執筆を開始|Commencer l'écriture
+小説モード|Mode roman
+モデル|Modèle
+現在のモデル|Modèle actuel
+サーチ|Recherche
+読み上げ|Lire à voix haute
+コピー|Copier
+翻訳|Traduction
+`);
+
+I18N.add('fr', `
+生成中|Génération
+ダウンロードを開始|Démarrage du téléchargement
+読み込み中|Chargement
+セッションを検索|Rechercher des sessions
+生成したい画像を描写|Décrivez l'image à générer
+`);
+
+I18N.add('fr', `
+ファイル名を検索|Rechercher un nom de fichier
+新しいタイトルを入力|Saisir un nouveau titre
+お知らせのタイトルを入力|Saisir le titre de l'annonce
+お知らせの本文を入力|Saisir le corps de l'annonce
+タイトルを入力|Saisir un titre
+本文を入力|Saisir le corps
+`);
