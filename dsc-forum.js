@@ -194,7 +194,7 @@
   // ============ 列表 ============
   function renderLoading() {
     var listEl = $('dscForumList');
-    if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>読み込み中…</div>';
+    if (listEl) listEl.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>' + T('読み込み中…') + '</div>';
   }
 
   function renderList() {
@@ -369,7 +369,7 @@
     }
     lm.style.display = '';
     if (state.loading) {
-      lm.textContent = '読み込み中…';
+      lm.textContent = T('読み込み中…');
       lm.classList.add('loading');
     } else if (state.hasMore) {
       lm.textContent = 'さらに読み込む（表示中 ' + state.posts.length + ' / ' + state.total + '）';
@@ -387,7 +387,7 @@
     var body = $('dscForumDetailBody');
     $('dscForumDetailTitle').textContent = '投稿の詳細';
     $('dscForumDetailMeta').textContent = '';
-    if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>読み込み中…</div>';
+    if (body) body.innerHTML = '<div class="dsc-forum-empty"><span class="emoji">⏳</span>' + T('読み込み中…') + '</div>';
     if (overlay) overlay.classList.add('open');
     state.currentId = id;
     state.detailPost = null;

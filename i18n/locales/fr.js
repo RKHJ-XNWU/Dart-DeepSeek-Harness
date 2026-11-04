@@ -231,6 +231,7 @@ Server酱|Server酱
 設定済み|Configuré
 音声：|Voix : 
 コピーに失敗|Échec de la copie
+コピーしました|Copié
 コピーに失敗：|Échec de la copie : 
 0 元|0 yuan
 時間帯単価の計算（アイドル＝ピークの半額）：|Calcul du prix par tranche (creux = moitié du plein) : 
@@ -1182,4 +1183,5 @@ I18N.add('fr', `
 ✅ 削除しました：# 件|✅ Supprimé : # éléments
 すべての # 件のプロンプトですか？この操作は元に戻せません！|Tous les # prompts ? Cette action est irréversible !
 ストリーミング出力|sortie en streaming
+📖 小説を執筆中です。数分かかる見込みです...|📖 Rédaction du roman en cours. Cela peut prendre quelques minutes...
 `);

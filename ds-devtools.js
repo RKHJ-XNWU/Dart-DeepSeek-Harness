@@ -9,6 +9,14 @@
     console.log('[DSDT] 開発者ツールのスクリプトを読み込み中...');
 
     var API_BASE = '/api/ds-devtools';
+
+    // ★ i18n：多言語時に日本語が混在しないよう UI 文言はここを通す
+    function T(s) {
+        try {
+            var a = Array.prototype.slice.call(arguments, 1);
+            return (window.I18N && window.I18N.t) ? window.I18N.t.apply(window.I18N, [s].concat(a)) : s;
+        } catch (e) { return s; }
+    }
     var MENU_ENTRY_ID = 'dsdtMenuEntry';
     var STORAGE_KEY = 'dsdt_active_inject_ids';
 
@@ -197,7 +205,7 @@
     function loadPrompts() {
         var body = $('dsdtBody');
         if (!body) return;
-        body.innerHTML = '<div class="dsdt-empty"><span class="emoji">⏳</span>読み込み中...</div>';
+        body.innerHTML = '<div class="dsdt-empty"><span class="emoji">⏳</span>' + T('読み込み中...') + '</div>';
 
         api('GET', API_BASE + '/prompts').then(function (data) {
             state.prompts = data.prompts || [];

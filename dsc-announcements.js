@@ -9,6 +9,14 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // ★ i18n：多言語時に日本語が混在しないよう UI 文言はここを通す
+  function T(s) {
+    try {
+      var a = Array.prototype.slice.call(arguments, 1);
+      return (window.I18N && window.I18N.t) ? window.I18N.t.apply(window.I18N, [s].concat(a)) : s;
+    } catch (e) { return s; }
+  }
+
   function showToast(msg, type) {
     var wrap = $('dscToastWrap');
     if (!wrap) { console.log('[ANN]', msg); return; }
@@ -97,7 +105,7 @@
   async function loadList() {
     var listEl = $('dscAnnList');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="dsc-ann-empty">読み込み中…</div>';
+    listEl.innerHTML = '<div class="dsc-ann-empty">' + T('読み込み中…') + '</div>';
     var list = [];
     try {
       var res = await fetch('/api/announcements', { cache: 'no-store' });

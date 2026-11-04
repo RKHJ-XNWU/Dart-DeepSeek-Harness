@@ -703,7 +703,7 @@
         var lang = String(info || '').trim().split(/[ \t]+/)[0] || '';
         var cls = lang ? ' class="language-' + escapeHtml(lang.replace(/[^A-Za-z0-9_+-]/g, '')) + '"' : '';
         return '<div class="dsc-code-block">' +
-            '<button class="dsc-code-copy" type="button" data-raw="' + b64EncodeUnicode(code) + '">📋 コピー</button>' +
+            '<button class="dsc-code-copy" type="button" data-raw="' + b64EncodeUnicode(code) + '">📋 ' + dscT('コピー') + '</button>' +
             '<pre><code' + cls + '>' + escapeHtml(code) + '</code></pre>' +
             '</div>';
     }
@@ -1603,7 +1603,7 @@
         var titleEl = $('dscChatTitle');
         var subEl = $('dscChatSub');
         // ★ 上部は常に「未踏の境地を探る」を固定表示し、セッション情報はサブタイトル行へ移動
-        if (titleEl) titleEl.textContent = '未踏の境地を探る';
+        if (titleEl) titleEl.textContent = dscT('未踏の境地を探る');
         if (sess) {
             if (subEl) subEl.textContent = (sess.title || dscT('無題')) + dscT(' · 全 {0} 件のセッション · {1}', state.sessions.length, state.currentModel);
         } else {
@@ -1702,7 +1702,7 @@
         var sentinel = document.createElement('div');
         sentinel.id = 'dscLoadMoreSentinel';
         sentinel.className = 'dsc-load-more-sentinel';
-        sentinel.textContent = state.loadingOlder ? '読み込み中…' : '↑ 以前のメッセージを読み込む';
+        sentinel.textContent = state.loadingOlder ? dscT('読み込み中…') : dscT('↑ 以前のメッセージを読み込む');
         sentinel.addEventListener('click', loadOlderMessages);
         return sentinel;
     }
@@ -1746,7 +1746,7 @@
         if (!state.hasMore || !state.messages.length) return;
         state.loadingOlder = true;
         var s0 = $('dscLoadMoreSentinel');
-        if (s0) s0.textContent = '読み込み中…';
+        if (s0) s0.textContent = dscT('読み込み中…');
         try {
             var first = state.messages[0];
             var res = await fetch('/api/ds-chat/messages?sessionId=' + encodeURIComponent(state.currentSessionId) +
@@ -1766,7 +1766,7 @@
         } finally {
             state.loadingOlder = false;
             var s1 = $('dscLoadMoreSentinel');
-            if (s1) s1.textContent = '↑ 以前のメッセージを読み込む';
+            if (s1) s1.textContent = dscT('↑ 以前のメッセージを読み込む');
         }
     }
 
@@ -1777,7 +1777,7 @@
         var msgId = btn.getAttribute('data-msg-id');
         var sid = state.currentSessionId;
         if (!msgId || !sid) return;
-        btn.textContent = '読み込み中…';
+        btn.textContent = dscT('読み込み中…');
         btn.disabled = true;
         try {
             var res = await fetch('/api/ds-chat/reasoning?sessionId=' + encodeURIComponent(sid) + '&id=' + encodeURIComponent(msgId));
@@ -1787,10 +1787,10 @@
                 body.innerHTML = escapeHtml(full);
                 if (panel) panel.classList.add('open');
             } else {
-                btn.textContent = '（内容なし）';
+                btn.textContent = dscT('（内容なし）');
             }
         } catch (err) {
-            btn.textContent = '読み込み失敗、タップで再試行';
+            btn.textContent = dscT('読み込み失敗、タップで再試行');
             btn.disabled = false;
         }
     }
@@ -1806,7 +1806,7 @@
             var ids = m.attachments.split(',').filter(Boolean);
             ids.forEach(function (fid) {
                 attachHtml += '<div class="dsc-msg-attach" data-fid="' + fid + '" onclick="window.open(\'/api/ds-files/download?id=' + fid + '\',\'_blank\')">' +
-                    '<span class="ic">📎</span><span class="nm">添付</span></div>';
+                    '<span class="ic">📎</span><span class="nm">' + dscT('添付') + '</span></div>';
             });
         }
 
@@ -1814,13 +1814,13 @@
         if (!isUser && m.reasoning && String(m.reasoning).trim()) {
             var loadFullBtn = '';
             if (m.reasoningTruncated) {
-                loadFullBtn = '<button class="dsc-think-load-full" type="button" data-msg-id="' + escapeHtml(m.id) + '">思考チェーン全体を展開</button>';
+                loadFullBtn = '<button class="dsc-think-load-full" type="button" data-msg-id="' + escapeHtml(m.id) + '">' + dscT('思考チェーン全体を展開') + '</button>';
             }
             thinkHtml =
                 '<div class="dsc-think-panel">' +
                 '<div class="dsc-think-header">' +
                 '<span class="icon">🧠</span>' +
-                '<span class="label">推論過程とツール呼び出しの記録</span>' +
+                '<span class="label">' + dscT('推論過程とツール呼び出しの記録') + '</span>' +
                 '<span class="arrow">›</span>' +
                 '</div>' +
                 '<div class="dsc-think-body">' + escapeHtml(m.reasoning) + loadFullBtn + '</div>' +
@@ -1829,13 +1829,13 @@
 
         var copyBtnHtml = '';
         if (typeof idx === 'number') {
-            copyBtnHtml = '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>';
+            copyBtnHtml = '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="' + dscT('このメッセージをコピー') + '">📋 ' + dscT('コピー') + '</button>';
         }
         // ★ 翻訳ボタン（AI の返信のみ／コピーボタンの直前）と翻訳結果ブロック
         var translateBtnHtml = '';
         var translationHtml = '';
         if (!isUser && typeof idx === 'number') {
-            translateBtnHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="この返信を中国語に翻訳">🌐 翻訳</button>';
+            translateBtnHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="' + dscT('この返信を中国語に翻訳') + '">🌐 ' + dscT('翻訳') + '</button>';
             if (m._translation) {
                 translationHtml = '<div class="dsc-msg-translation">' + dscTransBoxHtml(m) + '</div>';
             } else {
@@ -1844,7 +1844,7 @@
         }
         var speakBtnHtml = '';
         if (!isUser && typeof idx === 'number') {
-            speakBtnHtml = '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
+            speakBtnHtml = '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="' + dscT('このメッセージを読み上げ') + '">' + dscT('🔊 読み上げ') + '</button>';
         }
 
         var usageHtml = (!isUser && m.usage) ? dsUsageBlockHtml(m.usage, m.model || state.currentModel) : '';
@@ -1886,7 +1886,7 @@
             '<div class="dsc-msg-avatar">🤖</div>' +
             '<div class="dsc-msg-content">' +
             '<div class="dsc-msg-bubble">' +
-            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + (label || '生成中...') + '</div>' +
+            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + (label || dscT('生成中...')) + '</div>' +
             '<div class="dsc-typing"><span></span><span></span><span></span></div>' +
             '</div>' +
             '</div>';
@@ -2170,7 +2170,7 @@
                             thinkPanel.style.display = '';
                         }
                         if (thinkLabel) {
-                            thinkLabel.textContent = '🤖 自律エージェント起動（最大 50 億ラウンド）';
+                            thinkLabel.textContent = dscT('🤖 自律エージェント起動（最大 50 億ラウンド）');
                         }
 
                     } else if (currentEvent === 'tool_call') {
@@ -2229,7 +2229,7 @@
                 if (toolModeActive) {
                     thinkLabel.textContent = '🤖 思考チェーンとツール呼び出しの記録（全 ' + toolRound + ' ラウンド）';
                 } else {
-                    thinkLabel.textContent = '推論過程とツール呼び出しの記録';
+                    thinkLabel.textContent = dscT('推論過程とツール呼び出しの記録');
                 }
             }
             // ★ ツールモード：終了後も思考チェーンを展開したまま表示。通常モードでは折りたたむ
@@ -2287,7 +2287,7 @@
             if (thinkingTimeMs != null && thinkingTimeMs >= 0) {
                 thinkTimeHtml = '<span class="dsc-think-time" title="モデル思考(reasoning)の総所要時間（複数ラウンドは全ラウンド累積、ツールモードは初回本文前の所要時間）">⏱ 思考 ' + (thinkingTimeMs / 1000).toFixed(1) + 's</span>';
             }
-            var streamTranslateHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="この返信を中国語に翻訳">🌐 翻訳</button>';
+            var streamTranslateHtml = '<button class="dsc-msg-translate-btn" data-idx="' + idx + '" title="' + dscT('この返信を中国語に翻訳') + '">🌐 ' + dscT('翻訳') + '</button>';
             if (aiMessage._translation) {
                 streamTranslateHtml = '<button class="dsc-msg-translate-btn translated" data-idx="' + idx + '" title="翻訳を隠す">🌐 原文</button>';
             }
@@ -2306,7 +2306,7 @@
                 thinkTimeHtml +
                 streamTranslateHtml +
                 '<button class="dsc-msg-copy-btn" data-idx="' + idx + '" title="このメッセージをコピー">📋 コピー</button>' +
-                '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="このメッセージを読み上げ">🔊 読み上げ</button>';
+                '<button class="dsc-msg-speak-btn" data-idx="' + idx + '" title="' + dscT('このメッセージを読み上げ') + '">' + dscT('🔊 読み上げ') + '</button>';
         }
 
         aiMsgEl.dataset.idx = String(idx);
@@ -2480,7 +2480,7 @@
         btn.className = 'dsc-msg-continue-btn';
         btn.setAttribute('data-idx', String(lastAi));
         btn.setAttribute('title', '生成を続ける');
-        btn.textContent = '▶ 生成を続ける';
+        btn.textContent = dscT('▶ 生成を続ける');
         meta.appendChild(btn);
     }
 
@@ -2873,7 +2873,7 @@
 
         var tipEl = document.createElement('div');
         tipEl.style.cssText = 'font-size:0.75rem;color:#9ca3af;margin-bottom:6px;';
-        tipEl.textContent = '📖 小説を執筆中です。数分かかる見込みです...';
+        tipEl.textContent = dscT('📖 小説を執筆中です。数分かかる見込みです...');
         var bubble = aiMsgEl.querySelector('#dscStreamBubble');
         if (bubble && bubble.parentNode) bubble.parentNode.insertBefore(tipEl, bubble);
 
@@ -3078,7 +3078,7 @@
             '</div>' +
             '<div id="dscCallSubtitles" class="dsc-call-subtitles"></div>' +
             '<div id="dscCallInputBar" class="dsc-call-inputbar" style="display:none">' +
-                '<input id="dscCallTextInput" class="dsc-call-textinput" type="text" placeholder="音声が使えない？直接入力して送信…" autocomplete="off">' +
+                '<input id="dscCallTextInput" class="dsc-call-textinput" type="text" placeholder="' + dscT('音声が使えない？直接入力して送信…') + '" autocomplete="off">' +
                 '<button id="dscCallSendBtn" class="dsc-call-sendbtn" type="button">送信</button>' +
             '</div>' +
             '<div class="dsc-call-controls">' +
@@ -3791,7 +3791,7 @@
                     }).join('') +
                 '</div></div></div>' +
                 '<div class="dsc-field"><label>目標文字数</label><input id="dscNovelChars" type="number" value="30000" min="5000" max="1000000" step="1000"></div>' +
-                '<div class="dsc-field full"><label>ストーリー設定</label><textarea id="dscNovelStory" rows="3" placeholder="物語の背景、主要人物、中心となる対立、望む結末などを詳しく記述"></textarea></div>' +
+                '<div class="dsc-field full"><label>ストーリー設定</label><textarea id="dscNovelStory" rows="3" placeholder="' + dscT('物語の背景、主要人物、中心となる対立、望む結末などを詳しく記述') + '"></textarea></div>' +
                 '</div>' +
                 '<div class="dsc-modal-footer">' +
                 '<button class="dsc-btn ghost" id="dscNovelCancel">キャンセル</button>' +
@@ -3937,7 +3937,7 @@
             }
         } catch (e) {
             var st2 = $('dscApiStatus');
-            if (st2) { st2.textContent = '設定の読み込みに失敗'; st2.className = 'dsc-status err'; }
+            if (st2) { st2.textContent = dscT('設定の読み込みに失敗'); st2.className = 'dsc-status err'; }
         }
         var overlay = $('dscSettingsOverlay');
         if (overlay) overlay.classList.add('open');
@@ -4425,7 +4425,7 @@
             if (visible) {
                 box.style.display = 'none';
                 btnElement.textContent = '🌐 翻訳';
-                btnElement.title = 'この返信を中国語に翻訳';
+                btnElement.title = dscT('この返信を中国語に翻訳');
                 btnElement.classList.remove('translated');
             } else {
                 box.style.display = '';
@@ -4483,14 +4483,14 @@
         if (state.currentSpeakBtn === btnElement) {
             state.ttsCancelled = true;
             if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
-            if (btnElement) { btnElement.textContent = '🔊 読み上げ'; btnElement.classList.remove('speaking'); }
+            if (btnElement) { btnElement.textContent = dscT('🔊 読み上げ'); btnElement.classList.remove('speaking'); }
             state.currentSpeakBtn = null;
             return;
         }
         if (state.currentSpeakBtn) {
             state.ttsCancelled = true;
             if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
-            state.currentSpeakBtn.textContent = '🔊 読み上げ';
+            state.currentSpeakBtn.textContent = dscT('🔊 読み上げ');
             state.currentSpeakBtn.classList.remove('speaking');
             state.currentSpeakBtn = null;
         }
@@ -4500,7 +4500,7 @@
         state.ttsCancelled = false;
         state.currentSpeakBtn = btnElement;
         var originalText = btnElement ? (btnElement.textContent || '🔊 読み上げ') : '🔊 読み上げ';
-        if (btnElement) { btnElement.textContent = '⏳ 読み込み中...'; btnElement.classList.add('speaking'); }
+        if (btnElement) { btnElement.textContent = dscT('⏳ 読み込み中...'); btnElement.classList.add('speaking'); }
         try {
             await playTTSChunks(cleanedText, btnElement, originalText, ttsLang);
         } catch (err) {
@@ -4551,7 +4551,7 @@
         state.ttsCancelled = true;
         if (state.currentAudio) { try { state.currentAudio.pause(); } catch (e) {} state.currentAudio = null; }
         if (state.currentSpeakBtn) {
-            state.currentSpeakBtn.textContent = '🔊 読み上げ';
+            state.currentSpeakBtn.textContent = dscT('🔊 読み上げ');
             state.currentSpeakBtn.classList.remove('speaking');
             state.currentSpeakBtn = null;
         }
@@ -4763,7 +4763,7 @@
                     }
                     copyToClipboard(rawCode);
                     var orig = codeBtn.textContent;
-                    codeBtn.textContent = '✅ コピーしました';
+                    codeBtn.textContent = '✅ ' + dscT('コピーしました');
                     codeBtn.classList.add('copied');
                     setTimeout(function () { codeBtn.textContent = orig; codeBtn.classList.remove('copied'); }, 1600);
                     return;
@@ -4790,7 +4790,7 @@
                     if (m) {
                         copyToClipboard(m.content || '');
                         var orig2 = copyBtn.textContent;
-                        copyBtn.textContent = '✅ コピーしました';
+                        copyBtn.textContent = dscT('✅ コピーしました');
                         copyBtn.classList.add('copied');
                         setTimeout(function () { copyBtn.textContent = orig2; copyBtn.classList.remove('copied'); }, 1600);
                     }
@@ -4990,7 +4990,7 @@ function buildSearchOverlay() {
             '<div class="dsc-search-head">' +
                 '<div class="dsc-search-input-wrap">' +
                     '<span class="dsc-search-icon">🔍</span>' +
-                    '<input type="text" id="dscGlobalSearchInput" placeholder="すべてのセッションのメッセージを検索…" autocomplete="off">' +
+                    '<input type="text" id="dscGlobalSearchInput" placeholder="' + dscT('すべてのセッションのメッセージを検索…') + '" autocomplete="off">' +
                     '<button class="dsc-search-clear" id="dscGlobalSearchClear" type="button">✕</button>' +
                 '</div>' +
                 '<button class="dsc-search-close" id="dscGlobalSearchClose" type="button" title="閉じる">✕</button>' +
@@ -5001,7 +5001,7 @@ function buildSearchOverlay() {
                 '<button class="dsc-search-party-btn" data-party="assistant">DeepSeek</button>' +
             '</div>' +
             '<div class="dsc-search-body" id="dscGlobalSearchBody">' +
-                '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>' +
+                '<div class="dsc-search-hint">' + dscT('キーワードを入力して、すべての履歴セッションを検索') + '</div>' +
             '</div>' +
         '</div>';
     document.body.appendChild(ov);
@@ -5018,7 +5018,7 @@ function buildSearchOverlay() {
         searchState.input.value = '';
         searchState.query = '';
         resetSearchState();
-        searchState.body.innerHTML = '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>';
+        searchState.body.innerHTML = '<div class="dsc-search-hint">' + dscT('キーワードを入力して、すべての履歴セッションを検索') + '</div>';
         searchState.input.focus();
     });
 
@@ -5040,7 +5040,7 @@ function buildSearchOverlay() {
         clearTimeout(searchState.timer);
         if (!v) {
             resetSearchState();
-            searchState.body.innerHTML = '<div class="dsc-search-hint">キーワードを入力して、すべての履歴セッションを検索</div>';
+            searchState.body.innerHTML = '<div class="dsc-search-hint">' + dscT('キーワードを入力して、すべての履歴セッションを検索') + '</div>';
             return;
         }
         searchState.timer = setTimeout(function () {
@@ -5098,7 +5098,7 @@ async function doGlobalSearch(q, append) {
         searchState.body.innerHTML = '<div class="dsc-search-hint">検索中…</div>';
     } else {
         var more = document.getElementById('dscSearchMore');
-        if (more) more.textContent = '読み込み中…';
+        if (more) more.textContent = dscT('読み込み中…');
     }
 
     try {
@@ -5122,7 +5122,7 @@ async function doGlobalSearch(q, append) {
                 escapeHtml(e.message || String(e)) + '</div>';
         } else {
             var more = document.getElementById('dscSearchMore');
-            if (more) more.textContent = '読み込み失敗。スクロールで再試行できます';
+            if (more) more.textContent = dscT('読み込み失敗。スクロールで再試行できます');
         }
     } finally {
         searchState.loading = false;
@@ -5138,7 +5138,7 @@ function renderSearchHits(data, q, append) {
         searchState.body.innerHTML = '';
 
         if (searchState.total === 0) {
-            searchState.body.innerHTML = '<div class="dsc-search-hint">一致するメッセージが見つかりません</div>';
+            searchState.body.innerHTML = '<div class="dsc-search-hint">' + dscT('一致するメッセージが見つかりません') + '</div>';
             return;
         }
 
@@ -5227,13 +5227,13 @@ function updateSearchMoreIndicator() {
         var more = document.createElement('div');
         more.id = 'dscSearchMore';
         more.className = 'dsc-search-more';
-        more.textContent = searchState.loading ? '読み込み中…' : 'スクロールでさらに読み込み…';
+        more.textContent = searchState.loading ? dscT('読み込み中…') : dscT('スクロールでさらに読み込み…');
         searchState.body.appendChild(more);
     } else if (searchState.total > 0) {
         var endEl = document.createElement('div');
         endEl.id = 'dscSearchEnd';
         endEl.className = 'dsc-search-end';
-        endEl.textContent = '— ここが最後です —';
+        endEl.textContent = dscT('— ここが最後です —');
         searchState.body.appendChild(endEl);
     }
 }
@@ -5388,7 +5388,7 @@ function highlightInElement(root, keyword) {
         if (!el) return;
         var role = cosplayFindRole(cosplayState.activeRole);
         if (!role) {
-            el.textContent = 'キャラクター未選択';
+            el.textContent = dscT('キャラクター未選択');
             el.className = 'dsc-cosplay-status';
             return;
         }
@@ -5404,7 +5404,7 @@ function highlightInElement(root, keyword) {
         if (!cosplayState.roles.length) {
             var empty = document.createElement('div');
             empty.className = 'dsc-cosplay-empty';
-            empty.textContent = 'キャラクターが登録されていません。「＋ キャラクターを新規作成」から作成してください';
+            empty.textContent = dscT('キャラクターが登録されていません。「＋ キャラクターを新規作成」から作成してください');
             box.appendChild(empty);
             return;
         }
@@ -5483,7 +5483,7 @@ function highlightInElement(root, keyword) {
         closeCosplayEditor();
         overlay.classList.add('open');
         var st = $('dscCosplayStatus');
-        if (st) { st.textContent = '読み込み中…'; st.className = 'dsc-cosplay-status'; }
+        if (st) { st.textContent = dscT('読み込み中…'); st.className = 'dsc-cosplay-status'; }
         try {
             var res = await fetch('/api/ds-cosplay?_t=' + Date.now());
             var data = await res.json();

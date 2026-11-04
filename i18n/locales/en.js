@@ -231,6 +231,7 @@ Server酱|ServerChan
 設定済み|Configured
 音声：|Voice: 
 コピーに失敗|Copy failed
+コピーしました|Copied
 コピーに失敗：|Copy failed: 
 0 元|0 CNY
 時間帯単価の計算（アイドル＝ピークの半額）：|Price per slot (off-peak = half of peak): 
@@ -1182,4 +1183,5 @@ I18N.add('en', `
 ✅ 削除しました：# 件|✅ Deleted: # items
 すべての # 件のプロンプトですか？この操作は元に戻せません！|All # prompts? This cannot be undone!
 ストリーミング出力|streaming output
+📖 小説を執筆中です。数分かかる見込みです...|📖 Writing the novel now. This may take a few minutes...
 `);
