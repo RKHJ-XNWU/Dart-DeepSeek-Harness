@@ -13,6 +13,8 @@
 
     // ---------- 基本定義 ----------
     var STORAGE_KEY = 'dsc_ui_lang';
+    // 言語切替が成立したらページを再読込する（辞書適用漏れを確実に消す）
+    var RELOAD_ON_LANG_CHANGE = true;
     var DEFAULT_LANG = 'ja';
     var LANGS = ['ja', 'zh', 'en', 'ko', 'ru', 'fr'];
     var LANG_LABEL = {
@@ -44,6 +46,16 @@
         '.dsc-think-body',     // AI の思考ログ
     ].join(',');
 
+    // SKIP 領域のうち、アプリ自身の UI 文言は翻訳対象に戻す
+    // （翻訳ブロック内の料金行・token 行など。AI 本文は引き続き対象外）
+    var ALLOW_SEL = [
+        '.dsc-trans-cost-row',
+        '.dsc-trans-tok',
+        '.dsc-trans-cost-amt',
+        '.dsc-trans-cost-tag',
+        '.dsc-trans-cost-unknown'
+    ].join(',');
+
     var dicts = {};                 // code -> { src: dst }
     var dictCache = {};             // code -> 正規化キー索引
     var partialIndex = {};          // code -> [[原文, 訳文]] 長さ降順（部分一致用）
@@ -65,9 +77,27 @@
      * t(src) —— 現在言語へ翻訳
      * 1) 完全一致 → 2) 数字を # に潰して一致 → 3) 原文のまま
      */
+    /**
+     * t(src, ...args) —— 現在言語へ翻訳
+     * ・第 2 引数以降は {0} {1} … のプレースホルダに差し込む
+     *   （ユーザー入力・セッション名などを文に埋め込む場合、
+     *     部分一致による混在翻訳を避けるためこの形を使うこと）
+     */
     function t(src) {
         if (src == null) return '';
         var s = String(src);
+        var args = arguments.length > 1 ? Array.prototype.slice.call(arguments, 1) : null;
+        var res = tCore(s);
+        if (args && args.length && res.indexOf('{') >= 0) {
+            res = res.replace(/\{(\d+)\}/g, function (m, i) {
+                var v = args[Number(i)];
+                return (v === undefined || v === null) ? m : String(v);
+            });
+        }
+        return res;
+    }
+
+    function tCore(s) {
         if (current === 'ja') return s;
         var d = dicts[current];
         if (!d) return s;
@@ -180,7 +210,10 @@
     // ---------- テキストノード翻訳 ----------
     function inSkipped(el) {
         if (!el) return true;
-        try { return !!el.closest(SKIP_SEL); } catch (e) { return false; }
+        try {
+            if (el.closest && el.closest(ALLOW_SEL)) return false;
+            return !!el.closest(SKIP_SEL);
+        } catch (e) { return false; }
     }
 
     function translateTextNode(node) {
@@ -203,7 +236,11 @@
 
     function translateElementAttrs(el) {
         if (!el || el.nodeType !== 1) return;
-        if (inSkipped(el)) return;
+        if (inSkipped(el)) {
+            // 入力欄の本文・値は翻訳しないが、placeholder / title などの UI 文言は翻訳する
+            var tag = el.tagName;
+            if (tag !== 'TEXTAREA' && tag !== 'INPUT') return;
+        }
         for (var i = 0; i < ATTRS.length; i++) {
             var name = ATTRS[i];
             if (!el.hasAttribute || !el.hasAttribute(name)) continue;
@@ -391,6 +428,29 @@
                 global.dscToast(LANG_FLAG[code] + ' ' + LANG_LABEL[code]);
             }
         }
+
+        // ---------- 言語切替後の自動リロード ----------
+        // 切替が成立したとき（同一言語の再選択は除く）は、その場でページを再読込する。
+        // 辞書適用漏れ・動的 DOM の取りこぼし・各モジュールの再描画漏れを
+        // 一度の再読込で確実に解消するため。opt.reload === false でのみ無効化できる。
+        if (code !== prev && RELOAD_ON_LANG_CHANGE && (!opt || opt.reload !== false)) {
+            // ?lang= 付きの URL は initialLang() で最優先されるため、
+            // 再読込で選択が巻き戻らないよう、先に新しい言語へ書き換えておく
+            try {
+                var u = new URL(global.location.href);
+                if (u.searchParams.has('lang')) {
+                    u.searchParams.set('lang', code);
+                    if (global.history && global.history.replaceState) {
+                        global.history.replaceState(null, '', u.pathname + u.search + u.hash);
+                    }
+                }
+            } catch (e6) { }
+            try { global.location.reload(); } catch (e7) { }
+            // reload が無視される WebView 向けの保険（reload 成功時は到達しない）
+            try { setTimeout(function () { global.location.reload(); }, 0); } catch (e8) { }
+            return code;
+        }
+
         return code;
     }
 
@@ -584,6 +644,26 @@
         refresh: function () { restoreAll(); translateTree(document.body); updateLangUI(); },
         aiPrompt: aiPrompt,
         aiLangName: function (c) { return AI_LANG_NAME[c || current] || '日本語'; },
+        // 非 ja 言語で「まだ日本語（かな）が残っている」文字列を一覧化する
+        residualReport: function (code) {
+            code = code || current;
+            if (code === 'ja') return [];
+            var out = [];
+            var seenEl = {};
+            if (document.body) {
+                var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+                var n;
+                while ((n = w.nextNode())) {
+                    var v = (n.__i18nSrc !== undefined) ? n.nodeValue : n.nodeValue;
+                    if (!v) continue;
+                    if (!/[\u3040-\u309f\u30a0-\u30ff]/.test(v)) continue;
+                    if (inSkipped(n.parentNode)) continue;
+                    var s2 = String(v).trim();
+                    if (s2 && !seenEl[s2]) { seenEl[s2] = 1; out.push(s2); }
+                }
+            }
+            return out;
+        },
         missingReport: function () {
             var out = [];
             for (var k in missing) out.push({ text: k, count: missing[k] });

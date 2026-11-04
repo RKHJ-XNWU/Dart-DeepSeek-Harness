@@ -155,7 +155,7 @@ Tokens/回|Tokens/round
 単語を追加|Add Word
 単語／読み／意味を検索…|Search word / reading / meaning…
 日本語単語|Japanese word
-例：たべる|e.g. たべる
+例：たべる|e.g. taberu
 例：0 / [1] / [0,2]|e.g. 0 / [1] / [0,2]
 中国語の意味|Chinese meaning
 例：動詞／名詞／形容詞|e.g. Verb / Noun / Adjective
@@ -1105,4 +1105,81 @@ I18N.add('en', `
 お知らせの本文を入力|Enter announcement body
 タイトルを入力|Enter a title
 本文を入力|Enter body
+
+アップロードした .tar.gz バックアップで、現在の data/ と imgs/ ディレクトリ全体を上書きします。|The uploaded .tar.gz backup will overwrite the entire current data/ and imgs/ directories.
+この操作は元に戻せません。現在のデータのバックアップが済んでいるか確認してください！|This operation cannot be undone. Make sure the current data has been backed up!
+.tar.gz バックアップファイルをアップロードしてください|Please upload a .tar.gz backup file
+プロンプト内容（送信メッセージの前に付加されます）|Prompt content (prepended to the outgoing message)
+お知らせの取得に失敗|Failed to fetch announcements
+アップロードキューのエラー|Upload queue error
+
+「{0}」とそのすべてのメッセージを削除しますか？|Delete "{0}" and all its messages?
+「{0}」を削除しますか？この操作は元に戻せません。|Delete "{0}"? This action cannot be undone.
+「{0}」を削除しますか？削除後は元に戻せません。|Delete "{0}"? This cannot be undone.
+絞り込み中：含む「{0}」|Filtering: containing "{0}"
+🗑️ 投稿を削除|🗑️ Delete post
+🗑️ 単語を削除|🗑️ Delete word
+今回の翻訳|This translation
+なし|None
+すべてのセッションのメッセージを検索…|Search messages across all sessions…
+物語の背景、主要人物、中心となる対立、望む結末などを詳しく記述|Describe the story background, main characters, central conflict and the ending you want in detail
+💰 今回の翻訳：|💰 This translation: 
+`);
+
+I18N.add('en', `
+設定済み {0} 音声：{1}|Voice {0} set: {1}
+ · 全 {0} 件のセッション · {1}| · {0} sessions total · {1}
+🤖 第 {0} ラウンド · |🤖 Round {0} · 
+次で思考中: {0} ...|Thinking next: {0} ...
+✅ 生成しました：{0} 字（{1}）|✅ Generated: {0} chars ({1})
+録音の初期化に失敗：{0}。入力欄を開きます～|Failed to initialize recording: {0}. Opening the input field ~
+音声合成が空です（{0}）|Speech synthesis is empty ({0})
+{0} 時間 {1} 分|{0} h {1} min
+{0} 分 {1} 秒|{0} min {1} s
+次の切替：{0} → {1}（{2}後）|Next switch: {0} → {1} (in {2})
+読み込みに失敗：{0}（サービスが起動しているか確認してください）|Load failed: {0} (check that the service is running)
+チャネル「{0}」？|Channel "{0}"?
+✅ 送信しました（{0}/{1}）|✅ Sent ({0}/{1})
+· 成功 {0}/{1}|· success {0}/{1}
+· 失敗：{0}|· failed: {0}
+🔀 今回の画像を含むため自動ルーティング {0} → {1}|🔀 Auto-routed because of the image: {0} → {1}
+選択した # 件のセッションを削除しますか？|Delete the # selected sessions?
+削除しました：# 件のセッション|Deleted: # sessions
+すべての # 件のセッションとメッセージを削除しますか？この操作は元に戻せません！|Delete all # sessions and their messages? This cannot be undone!
+🤖 思考チェーンとツール呼び出しの記録（全 # ラウンド）|🤖 Chain-of-thought and tool calls (all # rounds)
+⏱ 思考 #s|⏱ Thinking #s
+✅ 生成を継続しました：# 字|✅ Generation resumed: # chars
+✅ 生成しました：# 字|✅ Generated: # chars
+📖 執筆済み # / # 字|📖 Written # / # chars
+📖 執筆中：第 # 段落...|📖 Writing: paragraph #...
+✅ 小説を生成しました：# 字|✅ Novel generated: # chars
+オフにすると推論レベルはデフォルト Lv.#。カスタマイズはできません。閉じますか？|Turning this off resets the reasoning level to default Lv.#. It cannot be customized. Close?
+📚 超長文をオン（目標 # 万字）|📚 Ultra-long text ON (target # ×10k chars)
+🧠 # ラウンド · max_tokens ≈ #|🧠 # rounds · max_tokens ≈ #
+追加済み # 件：|Added # items:
+⏸ 再生中 #/#|⏸ Playing #/#
+全 # 件ヒット|# hits total
+⚠️ # 件の投稿ファイルに異常があり、隔離してスキップしました。残りの投稿は正常に表示されます。|⚠️ # post files were corrupted and skipped. The remaining posts display normally.
+全 # 件の投稿|# posts total
+さらに読み込む（表示中 # / #）|Load more (showing # / #)
+—— 全 # 件を読み込みました ——|—— All # loaded ——
+タイトルは最大 # 文字、現在 # 字|Title max # chars, currently #
+本文は最大 # 文字、現在 # 字|Body max # chars, currently #
+選択した # 件の投稿を削除しますか？削除後は元に戻せません。|Delete the # selected posts? This cannot be undone.
+削除しました：# 件の投稿|Deleted: # posts
+すべての # 件の投稿を削除しますか？この操作は元に戻せません！|Delete all # posts? This cannot be undone!
+一括削除（選択 #）|Bulk delete (selected #)
+全 # 語|# words total
+復習を開始（#）|Start review (#)
+復習 # 回|Reviewed # times
+選択した # 語を削除しますか？元に戻せません！|Delete the # selected words? This cannot be undone!
+削除しました：# 件|Deleted: # items
+正解 # · 不正解 #|Correct # · Wrong #
+第 # / # 件|# / #
+分割 # のアップロードに失敗|Failed to upload part #
+🗑️ 選択を削除(#)|🗑️ Delete selected (#)
+選択した # 件のプロンプトですか？|The # selected prompts?
+✅ 削除しました：# 件|✅ Deleted: # items
+すべての # 件のプロンプトですか？この操作は元に戻せません！|All # prompts? This cannot be undone!
+ストリーミング出力|streaming output
 `);

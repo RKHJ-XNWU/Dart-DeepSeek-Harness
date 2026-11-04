@@ -5,6 +5,14 @@
 (function () {
   'use strict';
 
+  // ★ i18n：多言語時に日本語が混在しないよう、UI 文言はここを通す
+  function T(s) {
+    try {
+      var a = Array.prototype.slice.call(arguments, 1);
+      return (window.I18N && window.I18N.t) ? window.I18N.t.apply(window.I18N, [s].concat(a)) : s;
+    } catch (e) { return s; }
+  }
+
   var KANA_ROWS = ['すべて', 'その他'];
   // [FIX] 仮名欄を全件表示
 
@@ -164,7 +172,7 @@
       renderRowTabs(); 
       loadList(true);
       var sub = document.getElementById('dscVocabSub');
-      if (sub) sub.textContent = '絞り込み中：含む「' + ch + '」';
+      if (sub) sub.textContent = T('絞り込み中：含む「{0}」', ch);
     }
 
     function buildSection(title, rows, cols) {
@@ -578,7 +586,7 @@ async function loadList(reset) {
 
   // ============ 削除/掌握 ============
   async function deleteWord(w) {
-    var ok = await showConfirmDialog('🗑️ 単語を削除', '「' + w.word + '」を削除しますか？削除後は元に戻せません。');
+    var ok = await showConfirmDialog(T('🗑️ 単語を削除'), T('「{0}」を削除しますか？削除後は元に戻せません。', w.word));
     if (!ok) return;
     try {
       var res = await fetch('/api/vocab?id=' + encodeURIComponent(w.id), { method: 'DELETE' });

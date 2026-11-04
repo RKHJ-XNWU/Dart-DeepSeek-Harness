@@ -1285,7 +1285,16 @@ Future<({String text, String? error})> generateNovelStream(
 const String _ttsPunct = '，。！？；：、“”‘’（）【】《》「」『』〈〉〔〕〖〗—–…·～﹏,'
     '.!?;:"\'`()[]{}<>/\\|@#\$%^&*+=~_\n\r\t';
 
-String cleanTTSText(String s) {
+// 句読点と語中のアポストロフィ・ハイフンを残す言語（ラテン / キリル / ハングル）。
+// ここを潰すと l'homme / aujourd'hui / peut-être / кто-то が語として壊れ、
+// 発音だけでなく語の区切りと間（ま）も不自然になる。
+const Set<String> _ttsKeepPunctLangs = {'en', 'fr', 'ru', 'ko'};
+
+/// TTS 前処理。[lang] を渡すと、その言語に合わせた本土化ルールで洗浄する。
+/// 既存呼び出し（lang 未指定）は日本語・中国語向けの従来挙動を維持する。
+String cleanTTSText(String s, [String lang = '']) {
+  final l = lang.toLowerCase();
+  if (_ttsKeepPunctLangs.contains(l)) return _cleanTTSTextKeepPunct(s, l);
   final sb = StringBuffer();
   for (final r in s.runes) {
     final ch = String.fromCharCode(r);
@@ -1296,6 +1305,35 @@ String cleanTTSText(String s) {
     }
   }
   return sb.toString().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).join(' ');
+}
+
+/// 欧文（仏 / 露 / 韓 / 英）向けの洗浄。
+/// 句読点（. , ! ? ; :）と語中の ' ’ - を残し、引用符・括弧・記号だけを空白へ置換する。
+String _cleanTTSTextKeepPunct(String s, String lang) {
+  var t = s;
+
+  // 全角スペース・引用符・括弧は「間」に置き換える
+  t = t.replaceAll(
+      RegExp(r'[\u3000"\u201C\u201D\u00AB\u00BB\u300C\u300D\u300E\u300F\uFF08\uFF09()\[\]{}<>\u300A\u300B\u3010\u3011\u3008\u3009\u3014\u3015\u3016\u3017]'),
+      ' ');
+  t = t.replaceAll(RegExp(r'[#@&+=\\|^\$%/*]'), ' ');
+
+  // 語頭・語尾に孤立した ' ’ - のみ落とし、語中のものは残す
+  t = t.replaceAllMapped(RegExp(r'\S+'), (m) {
+    var w = m[0]!;
+    w = w.replaceFirst(RegExp(r"^['\u2019\-]+"), '');
+    w = w.replaceFirst(RegExp(r"['\u2019\-]+$"), '');
+    return w;
+  });
+
+  // ダッシュ・中黒・省略記号は「間」として使う
+  t = t.replaceAll(RegExp(r'[\u2013\u2014\u2015\u2026\u00B7\u2022]'), ' ');
+
+  // 音声の混線を防ぐ：ハングル音声からはかなを、キリル音声からは漢字を落とす
+  if (lang == 'ko') t = t.replaceAll(RegExp(r'[\u3040-\u309F\u30A0-\u30FF]'), ' ');
+  if (lang == 'ru') t = t.replaceAll(RegExp(r'[\u4E00-\u9FFF]'), ' ');
+
+  return t.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).join(' ');
 }
 
 List<String> splitTextForTTS(String text, int chunkRunes, int hardMax) {

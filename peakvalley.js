@@ -13,6 +13,15 @@
 (function () {
     'use strict';
 
+    // ★ i18n ヘルパー：引数付きで辞書を引く（無ければ原文）
+    function pvT(s) {
+        try {
+            if (!(window.I18N && window.I18N.t)) return s;
+            var args = [s].concat(Array.prototype.slice.call(arguments, 1));
+            return window.I18N.t.apply(null, args);
+        } catch (e) { return s; }
+    }
+
     var API_BASE = '/api/peakvalley/';
 
     // 実行時の状態
@@ -854,7 +863,7 @@
             poll();
         }).catch(function (e) {
             modalBody.innerHTML = '';
-            var err = ce('div', 'pv-empty', '読み込みに失敗：' + e.message + '（サービスが起動しているか確認してください）');
+            var err = ce('div', 'pv-empty', pvT('読み込みに失敗：{0}（サービスが起動しているか確認してください）', e.message));
             modalBody.appendChild(err);
         });
     }
@@ -997,11 +1006,11 @@
         var hh = Math.floor(diff / 3600);
         var mm = Math.floor((diff % 3600) / 60);
         var ss = diff % 60;
-        var cd = hh > 0 ? (hh + ' 時間 ' + mm + ' 分') : (mm + ' 分 ' + pad2(ss) + ' 秒');
+        var cd = hh > 0 ? pvT('{0} 時間 {1} 分', hh, mm) : pvT('{0} 分 {1} 秒', mm, pad2(ss));
         var nextPhase = status && status.nextPhase === 'peak' ? 'ピーク時間帯' : 'オフピーク時間帯';
         var t = new Date(nextAt.getTime());
         var hm = pad2(t.getHours()) + ':' + pad2(t.getMinutes());
-        statusCardRefs.nextText.textContent = '次の切替：' + hm + ' → ' + nextPhase + '（' + cd + '後）';
+        statusCardRefs.nextText.textContent = pvT('次の切替：{0} → {1}（{2}後）', hm, nextPhase, cd);
     }
 
     // ---- ピーク時間帯カード
@@ -1342,7 +1351,7 @@
                 });
             }));
             item.appendChild(btn('削除', 'pv-btn-danger pv-btn-sm', function () {
-                if (!confirm('チャネル「' + (ch.name || ch.type) + '」？')) { return; }
+                if (!confirm(pvT('チャネル「{0}」？', (ch.name || ch.type)))) { return; }
                 api('channelDelete', { id: ch.id }).then(function () {
                     return api('config');
                 }).then(function (v) {
@@ -1523,7 +1532,7 @@
                     var ok = v.result && v.result.ok;
                     info.className = 'pv-msg ' + (ok ? 'pv-msg-ok' : 'pv-msg-err');
                     info.textContent = ok
-                        ? '✅ 送信しました（' + v.result.sent + '/' + v.result.total + '）\n' + v.title
+                        ? pvT('✅ 送信しました（{0}/{1}）', v.result.sent, v.result.total) + '\n' + v.title
                         : '❌ ' + ((v.result && v.result.error) || '送信に失敗');
                 }).catch(function (e) {
                     info.className = 'pv-msg pv-msg-err';
@@ -1546,7 +1555,7 @@
             var res = r.lastResult;
             var text = '最近の発火：' + formatTime(r.lastFiredAt);
             if (res) {
-                text += res.ok ? ' · 成功 ' + res.sent + '/' + res.total : ' · 失敗：' + (res.error || '');
+                text += res.ok ? pvT(' · 成功 {0}/{1}', res.sent, res.total) : pvT(' · 失敗：{0}', (res.error || ''));
             }
             c.appendChild(ce('div', 'pv-msg ' + (res && res.ok ? 'pv-msg-ok' : 'pv-msg-err'), text));
         } else {

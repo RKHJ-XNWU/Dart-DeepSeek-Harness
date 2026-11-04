@@ -155,7 +155,7 @@ Tokens/回|Tokens/tour
 単語を追加|Ajouter un mot
 単語／読み／意味を検索…|Rechercher mot／lecture／sens…
 日本語単語|Mot japonais
-例：たべる|Ex. たべる
+例：たべる|ex. : taberu
 例：0 / [1] / [0,2]|Ex. 0 / [1] / [0,2]
 中国語の意味|Sens en chinois
 例：動詞／名詞／形容詞|Ex. verbe／nom／adjectif
@@ -1105,4 +1105,81 @@ I18N.add('fr', `
 お知らせの本文を入力|Saisir le corps de l'annonce
 タイトルを入力|Saisir un titre
 本文を入力|Saisir le corps
+
+アップロードした .tar.gz バックアップで、現在の data/ と imgs/ ディレクトリ全体を上書きします。|La sauvegarde .tar.gz téléversée écrasera l'intégralité des répertoires data/ et imgs/ actuels.
+この操作は元に戻せません。現在のデータのバックアップが済んでいるか確認してください！|Cette opération est irréversible. Vérifiez que les données actuelles ont bien été sauvegardées !
+.tar.gz バックアップファイルをアップロードしてください|Veuillez téléverser un fichier de sauvegarde .tar.gz
+プロンプト内容（送信メッセージの前に付加されます）|Contenu du prompt (ajouté avant le message envoyé)
+お知らせの取得に失敗|Échec de récupération des annonces
+アップロードキューのエラー|Erreur de file de téléversement
+
+「{0}」とそのすべてのメッセージを削除しますか？|Supprimer « {0} » et tous ses messages ?
+「{0}」を削除しますか？この操作は元に戻せません。|Supprimer « {0} » ? Cette action est irréversible.
+「{0}」を削除しますか？削除後は元に戻せません。|Supprimer « {0} » ? Opération irréversible après suppression.
+絞り込み中：含む「{0}」|Filtrage : contient « {0} »
+🗑️ 投稿を削除|🗑️ Supprimer la publication
+🗑️ 単語を削除|🗑️ Supprimer le mot
+今回の翻訳|Cette traduction
+なし|Aucun
+すべてのセッションのメッセージを検索…|Rechercher dans les messages de toutes les sessions…
+物語の背景、主要人物、中心となる対立、望む結末などを詳しく記述|Décrivez en détail le contexte de l'histoire, les personnages principaux, le conflit central et le dénouement souhaité
+💰 今回の翻訳：|💰 Cette traduction : 
+`);
+
+I18N.add('fr', `
+設定済み {0} 音声：{1}|Voix {0} définie : {1}
+ · 全 {0} 件のセッション · {1}| · {0} sessions au total · {1}
+🤖 第 {0} ラウンド · |🤖 Tour {0} · 
+次で思考中: {0} ...|Réflexion suivante : {0} ...
+✅ 生成しました：{0} 字（{1}）|✅ Généré : {0} caractères ({1})
+録音の初期化に失敗：{0}。入力欄を開きます～|Échec de l'initialisation de l'enregistrement : {0}. Ouverture du champ de saisie ~
+音声合成が空です（{0}）|La synthèse vocale est vide ({0})
+{0} 時間 {1} 分|{0} h {1} min
+{0} 分 {1} 秒|{0} min {1} s
+次の切替：{0} → {1}（{2}後）|Prochain changement : {0} → {1} (dans {2})
+読み込みに失敗：{0}（サービスが起動しているか確認してください）|Échec du chargement : {0} (vérifiez que le service est démarré)
+チャネル「{0}」？|Canal « {0} » ?
+✅ 送信しました（{0}/{1}）|✅ Envoyé ({0}/{1})
+· 成功 {0}/{1}|· réussis {0}/{1}
+· 失敗：{0}|· échec : {0}
+🔀 今回の画像を含むため自動ルーティング {0} → {1}|🔀 Routage automatique à cause de l'image : {0} → {1}
+選択した # 件のセッションを削除しますか？|Supprimer les # sessions sélectionnées ?
+削除しました：# 件のセッション|Supprimé : # sessions
+すべての # 件のセッションとメッセージを削除しますか？この操作は元に戻せません！|Supprimer les # sessions et leurs messages ? Cette action est irréversible !
+🤖 思考チェーンとツール呼び出しの記録（全 # ラウンド）|🤖 Chaîne de réflexion et appels d'outils (# tours au total)
+⏱ 思考 #s|⏱ Réflexion #s
+✅ 生成を継続しました：# 字|✅ Génération reprise : # caractères
+✅ 生成しました：# 字|✅ Généré : # caractères
+📖 執筆済み # / # 字|📖 Écrit # / # caractères
+📖 執筆中：第 # 段落...|📖 Rédaction : paragraphe #...
+✅ 小説を生成しました：# 字|✅ Roman généré : # caractères
+オフにすると推論レベルはデフォルト Lv.#。カスタマイズはできません。閉じますか？|En désactivant, le niveau de raisonnement revient à Lv.# par défaut. Non personnalisable. Fermer ?
+📚 超長文をオン（目標 # 万字）|📚 Texte ultra-long activé (objectif # ×10k caractères)
+🧠 # ラウンド · max_tokens ≈ #|🧠 # tours · max_tokens ≈ #
+追加済み # 件：|# éléments ajoutés :
+⏸ 再生中 #/#|⏸ Lecture #/#
+全 # 件ヒット|# résultats au total
+⚠️ # 件の投稿ファイルに異常があり、隔離してスキップしました。残りの投稿は正常に表示されます。|⚠️ # fichiers de publications étaient corrompus et ignorés. Les autres s'affichent normalement.
+全 # 件の投稿|# publications au total
+さらに読み込む（表示中 # / #）|Charger plus (# affichés / #)
+—— 全 # 件を読み込みました ——|—— # éléments chargés ——
+タイトルは最大 # 文字、現在 # 字|Titre max # caractères, actuellement #
+本文は最大 # 文字、現在 # 字|Contenu max # caractères, actuellement #
+選択した # 件の投稿を削除しますか？削除後は元に戻せません。|Supprimer les # publications sélectionnées ? Action irréversible.
+削除しました：# 件の投稿|Supprimé : # publications
+すべての # 件の投稿を削除しますか？この操作は元に戻せません！|Supprimer les # publications ? Cette action est irréversible !
+一括削除（選択 #）|Suppression groupée (# sélectionnés)
+全 # 語|# mots au total
+復習を開始（#）|Commencer la révision (#)
+復習 # 回|Révisé # fois
+選択した # 語を削除しますか？元に戻せません！|Supprimer les # mots sélectionnés ? Irréversible !
+削除しました：# 件|Supprimé : # éléments
+正解 # · 不正解 #|Correct # · Incorrect #
+第 # / # 件|# / #
+分割 # のアップロードに失敗|Échec du chargement de la partie #
+🗑️ 選択を削除(#)|🗑️ Supprimer la sélection (#)
+選択した # 件のプロンプトですか？|Les # prompts sélectionnés ?
+✅ 削除しました：# 件|✅ Supprimé : # éléments
+すべての # 件のプロンプトですか？この操作は元に戻せません！|Tous les # prompts ? Cette action est irréversible !
+ストリーミング出力|sortie en streaming
 `);

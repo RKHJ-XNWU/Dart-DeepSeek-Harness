@@ -42,32 +42,97 @@
     var TTS_VOICE_DEFAULT = {
         ja: 'ja-JP-NanamiNeural',
         zh: 'zh-CN-XiaoxiaoNeural',
-        en: 'en-US-AriaNeural'
+        en: 'en-US-AriaNeural',
+        // 追加：フランス語 / ロシア語 / 韓国語（Edge TTS の標準 Neural 音色）
+        fr: 'fr-FR-DeniseNeural',
+        ru: 'ru-RU-SvetlanaNeural',
+        ko: 'ko-KR-SunHiNeural'
     };
-    // 日本語音色の微調整：ピッチをやや高め（少女感）+ 話速をやや速め（アニメ感）。甘すぎず老けすぎない
+    // 言語ごとの音色微調整。日本語だけアニメ寄りに上げ、他言語は母語話者の自然な抑揚に合わせて
+    // ピッチ・話速を動かさない（不自然な高低は訛りに聞こえるため、本土化では触らないのが正解）
     var TTS_PROSODY = {
         ja: { pitch: '+12Hz', rate: '+4%' },
         zh: { pitch: '+0Hz', rate: '+0%' },
-        en: { pitch: '+0Hz', rate: '+0%' }
+        en: { pitch: '+0Hz', rate: '+0%' },
+        fr: { pitch: '+0Hz', rate: '+0%' },
+        ru: { pitch: '+0Hz', rate: '+0%' },
+        ko: { pitch: '+0Hz', rate: '+0%' }
     };
+    // 句読点を残す言語（ラテン / キリル / ハングル）。
+    // 日本語・中国語は従来どおり記号を落とす（TTS 側が自動で区切るため）。
+    // 欧文は . , ! ? ; : を残さないと長文が一息で読まれ、間が不自然になる。
+    var TTS_KEEP_PUNCT_LANGS = { en: 1, fr: 1, ru: 1, ko: 1 };
     var TTS_MAX_RETRY = 1;
 
     function dscSetTTSVoice(lang, voice) {
         try {
             localStorage.setItem('dsc_tts_voice_' + lang, String(voice || ''));
-            toast('設定済み ' + lang + ' 音声：' + voice, 'success');
+            toast(dscT('設定済み {0} 音声：{1}', lang, voice), 'success');
         } catch (e) {}
     }
     window.dscSetTTSVoice = dscSetTTSVoice;
 
+    // スクリプト判定用の文字クラス
+    var TTS_RE_HANGUL = /[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/g;
+    var TTS_RE_CYRILLIC = /[\u0400-\u04FF]/g;
+    var TTS_RE_KANA = /[\u3040-\u309F\u30A0-\u30FF]/g;
+    var TTS_RE_CJK = /[\u4E00-\u9FFF]/g;
+    var TTS_RE_LATIN = /[A-Za-z]/g;
+    // フランス語の決め手：固有のアクセント字と、英語には出ない高頻度語
+    var TTS_RE_FR_ACCENT = /[\u00E0\u00E2\u00E4\u00E7\u00E9\u00E8\u00EA\u00EB\u00EE\u00EF\u00F4\u00F9\u00FB\u00FC\u00FF\u0153\u00E6]/g;
+    var TTS_FR_WORDS = ['le', 'la', 'les', 'des', 'une', 'est', 'dans', 'pour', 'que', 'qui',
+        'pas', 'sur', 'avec', 'aux', 'nous', 'vous', 'cette', 'mais', 'plus', 'tout', 'fait',
+        'bien', 'comme', 'leur', 'sans', 'sous', 'entre', 'tout'];
+    var TTS_EN_WORDS = ['the', 'of', 'and', 'to', 'in', 'is', 'that', 'it', 'for', 'with',
+        'as', 'you', 'this', 'be', 'are', 'was', 'on', 'not', 'but', 'have', 'from', 'they'];
+
+    function _ttsCountWords(s, list) {
+        var n = 0;
+        var low = s.toLowerCase();
+        for (var i = 0; i < list.length; i++) {
+            var w = list[i];
+            // 単語境界で数える（"les" が "unless" に誤ヒットしないように）
+            if (new RegExp('(^|[^a-z\u00C0-\u00FF])' + w + '([^a-z\u00C0-\u00FF]|$)', 'i').test(low)) n++;
+        }
+        return n;
+    }
+
+    // 読み上げ対象テキストの言語を判定する。
+    // 従来は ja / en / zh の 3 択で、フランス語→en、ロシア語・韓国語→zh に誤判定されていた
+    // （誤った音色で読まれる最大の原因）。スクリプト（文字種）で先に切り分け、
+    // ラテン文字だけのときは語彙とアクセント字で仏英を判別する。
     function detectTTSLang(text) {
         if (!text) return 'zh';
         var s = String(text);
-        var kana = (s.match(/[\u3040-\u309F\u30A0-\u30FF]/g) || []).length;
+
+        // 1) ハングル（韓国語）— 出たら韓国語
+        if ((s.match(TTS_RE_HANGUL) || []).length > 0) return 'ko';
+
+        var cyr = (s.match(TTS_RE_CYRILLIC) || []).length;
+        var kana = (s.match(TTS_RE_KANA) || []).length;
+        var latin = (s.match(TTS_RE_LATIN) || []).length;
+        var cjk = (s.match(TTS_RE_CJK) || []).length;
+
+        // 2) キリル文字（ロシア語）
+        if (cyr > 0 && cyr >= latin) return 'ru';
+
+        // 3) かな（日本語）
         if (kana > 0) return 'ja';
-        var latin = (s.match(/[A-Za-z]/g) || []).length;
-        var cjk = (s.match(/[\u4E00-\u9FFF]/g) || []).length;
-        if (latin > cjk) return 'en';
+
+        // 4) ラテン文字が主なら仏英を判別
+        if (latin > cjk) {
+            var accent = (s.match(TTS_RE_FR_ACCENT) || []).length;
+            var fr = _ttsCountWords(s, TTS_FR_WORDS);
+            var en = _ttsCountWords(s, TTS_EN_WORDS);
+            // アクセント字は重めに加点。英語の café / résumé 程度では閾値を超えないようにする
+            var score = accent * 2 + fr - en;
+            if (score > 1) return 'fr';
+            return 'en';
+        }
+
+        // 5) キリルがラテンより多くない場合でも、一定数あればロシア語
+        if (cyr > 0) return 'ru';
+
         return 'zh';
     }
 
@@ -272,6 +337,16 @@
     // ============================================================
     // ★ 1 件の返信の実際の token 消費（provider usage の課金基準、推定ではない）
     // ============================================================
+    // ★ i18n ヘルパー：動的生成する UI 文言はここを通してから HTML に埋め込む
+    //   （DOM 挿入後の MutationObserver 頼みにせず、生成時点で確定させる＝ちらつき・残留を防ぐ）
+    function dscT(s) {
+        try {
+            if (!(window.I18N && window.I18N.t)) return s;
+            var args = [s].concat(Array.prototype.slice.call(arguments, 1));
+            return window.I18N.t.apply(null, args);
+        } catch (e) { return s; }
+    }
+
     function fmtTokNum(n) {
         n = Number(n) || 0;
         return n.toLocaleString('en-US');
@@ -287,19 +362,19 @@
         if (!total && !prompt && !outTok) return '';
         var calls = Number(u.apiCalls) || 1;
 
-        var html = '<span class="dsc-usage-chip" title="この返信の実際の token 消費量：モデル API が返す usage（課金基準）による値であり、ローカル推定ではありません">';
+        var html = '<span class="dsc-usage-chip" title="' + dscT('この返信の実際の token 消費量：モデル API が返す usage（課金基準）による値であり、ローカル推定ではありません') + '">';
         html += '<span class="ic">⛁</span>';
-        html += '<span>入力 <b>' + fmtTokNum(prompt) + '</b></span>';
+        html += '<span>' + dscT('入力') + ' <b>' + fmtTokNum(prompt) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>キャッシュ命中 <b class="dsc-usage-hit">' + fmtTokNum(hit) + '</b></span>';
+        html += '<span>' + dscT('キャッシュ命中') + ' <b class="dsc-usage-hit">' + fmtTokNum(hit) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>未命中 <b class="dsc-usage-miss">' + fmtTokNum(miss) + '</b></span>';
+        html += '<span>' + dscT('未命中') + ' <b class="dsc-usage-miss">' + fmtTokNum(miss) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>出力 <b class="dsc-usage-out">' + fmtTokNum(outTok) + '</b></span>';
+        html += '<span>' + dscT('出力') + ' <b class="dsc-usage-out">' + fmtTokNum(outTok) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
-        html += '<span>合計 <b>' + fmtTokNum(total) + '</b></span>';
+        html += '<span>' + dscT('合計') + ' <b>' + fmtTokNum(total) + '</b></span>';
         if (calls > 1) {
-            html += '<span class="dsc-usage-sep">·</span><span>' + calls + ' 回呼び出し</span>';
+            html += '<span class="dsc-usage-sep">·</span><span>' + calls + ' ' + dscT('回呼び出し') + '</span>';
         }
         html += '</span>';
         return html;
@@ -412,13 +487,13 @@
     function dscCostChipHtml(u, model) {
         var r = dscCalcCost(u, model);
         if (!r) return '';
-        var tip = (r.peak ? 'ピーク' : 'アイドル') + '時間帯単価の計算（アイドル＝ピークの半額）：' +
-            '命中 ' + fmtTokNum(r.hit) + ' / 未命中 ' + fmtTokNum(r.miss) +
-            ' / 出力 ' + fmtTokNum(r.out);
+        var tip = (r.peak ? dscT('ピーク') : dscT('アイドル')) + dscT('時間帯単価の計算（アイドル＝ピークの半額）：') +
+            dscT('命中') + ' ' + fmtTokNum(r.hit) + ' / ' + dscT('未命中') + ' ' + fmtTokNum(r.miss) +
+            ' / ' + dscT('出力') + ' ' + fmtTokNum(r.out);
         return '<span class="dsc-cost-chip" title="' + escapeHtml(tip) + '">' +
             '<span class="ic">💰</span>' +
             '<span>' + dscFmtCost(r.cost) + '</span>' +
-            '<span class="dsc-cost-tag">' + (r.peak ? 'ピーク' : 'アイドル') + '</span>' +
+            '<span class="dsc-cost-tag">' + (r.peak ? dscT('ピーク') : dscT('アイドル')) + '</span>' +
             '</span>';
     }
 
@@ -1319,7 +1394,7 @@
         if (e) e.stopPropagation();
         var sess = state.sessions.find(function (s) { return s.id === id; });
         if (!sess) return;
-        var ok = await simpleConfirm('セッションを削除', '「' + sess.title + '」とそのすべてのメッセージを削除しますか？');
+        var ok = await simpleConfirm(dscT('セッションを削除'), dscT('「{0}」とそのすべてのメッセージを削除しますか？', sess.title));
         if (!ok) return;
         try {
             await fetch('/api/ds-chat/sessions?id=' + encodeURIComponent(id), { method: 'DELETE' });
@@ -1415,7 +1490,7 @@
         // ★ 上部は常に「未踏の境地を探る」を固定表示し、セッション情報はサブタイトル行へ移動
         if (titleEl) titleEl.textContent = '未踏の境地を探る';
         if (sess) {
-            if (subEl) subEl.textContent = (sess.title || '無題') + ' · 全 ' + state.sessions.length + ' 件のセッション · ' + state.currentModel;
+            if (subEl) subEl.textContent = (sess.title || dscT('無題')) + dscT(' · 全 {0} 件のセッション · {1}', state.sessions.length, state.currentModel);
         } else {
             if (subEl) subEl.textContent = 'DeepSeek チャット · モデル: ' + state.currentModel;
         }
@@ -1996,7 +2071,7 @@
                         if (phase === 'start') {
                             toolRound++;
                             if (thinkLabel) {
-                                thinkLabel.textContent = '🤖 第 ' + toolRound + ' ラウンド · ' + icon + ' ' + name;
+                                thinkLabel.textContent = dscT('🤖 第 {0} ラウンド · ', toolRound) + icon + ' ' + name;
                             }
                             var argsPreview = args.length > 300 ? args.slice(0, 300) + '…' : args;
                             t.reasoningBuf += '\n' + icon + ' [' + toolRound + '] ' + name + '\n';
@@ -2488,7 +2563,7 @@
             effectiveLevel = state.deepThink ? (DEFAULT_LEVEL + 5) : DEFAULT_LEVEL;
         }
 
-        var tipMsg = '次で思考中: ' + state.currentModel + ' ...';
+        var tipMsg = dscT('次で思考中: {0} ...', state.currentModel);
         if (state.enableTools) tipMsg = '🤖 自律エージェント起動...';
         showTyping(tipMsg);
 
@@ -2555,7 +2630,7 @@
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 decorateContinueButton();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(dataStream);
-                toast('✅ 生成しました：' + ((dataStream && dataStream.charCount) || 0).toLocaleString() + ' 字（' + ((dataStream && dataStream.model) || state.currentModel) + '）', 'success');
+                toast(dscT('✅ 生成しました：{0} 字（{1}）', ((dataStream && dataStream.charCount) || 0).toLocaleString(), ((dataStream && dataStream.model) || state.currentModel)), 'success');
             } else {
                 var response = await fetch('/api/ds-chat/send', {
                     method: 'POST',
@@ -3130,7 +3205,7 @@
             callState.silenceTimer = checkTimer;
         } catch (e) {
             callState.srBroken = true;
-            appendCallSubtitle('ai', '録音の初期化に失敗：' + (e && e.message ? e.message : e) + '。入力欄を開きます～');
+            appendCallSubtitle('ai', dscT('録音の初期化に失敗：{0}。入力欄を開きます～', (e && e.message ? e.message : e)));
             showCallInput();
         }
     }
@@ -4082,11 +4157,28 @@
         text = text.replace(/^\d+\.\s+/gm, '');
         text = text.replace(/^[-*=]{3,}\s*$/gm, ' ');
         text = text.replace(/^\|.*\|$/gm, ' ');
-        if (lang === 'ja') {
+        if (TTS_KEEP_PUNCT_LANGS[lang]) {
+            // 仏 / 露 / 韓 / 英：句読点と語中のアポストロフィ・ハイフンを残す。
+            // ここを潰すと l'homme→"l homme"、aujourd'hui→"aujourd hui"、
+            // peut-être→"peut être"、кто-то→"кто то" となり、発音と語の区切りが壊れる。
+            text = text.replace(/["\u201C\u201D\u00AB\u00BB\u300C\u300D\u300E\u300F\uFF08\uFF09()\[\]{}<>\u300A\u300B\u3010\u3011\u3008\u3009\u3014\u3015\u3016\u3017]/g, ' ');
+            text = text.replace(/[#@&+=\\|^$%\/]/g, ' ');
+            // 語頭・語尾に孤立した ' ’ - は落とし、語中のものだけ残す
+            text = text.replace(/\S+/g, function (w) {
+                return w.replace(/^['\u2019\-]+/, '').replace(/['\u2019\-]+$/, '');
+            });
+            // ダッシュ・中黒・省略記号は「間」として使う
+            text = text.replace(/[\u2013\u2014\u2015\u2026\u00B7\u2022]/g, ' ');
+            // ハングル音声にかなが混ざると発音が混線するので落とす
+            if (lang === 'ko') text = text.replace(/[\u3040-\u309F\u30A0-\u30FF]/g, ' ');
+            // キリル音声に漢字が混ざる場合も落とす（声調が混入するのを防ぐ）
+            if (lang === 'ru') text = text.replace(/[\u4E00-\u9FFF]/g, ' ');
+        } else if (lang === 'ja') {
             // 日本語：句読点の 。、！？… は保持し、TTS の間が自然になるようにする（以前は記号としてすべて除去していた）
             text = text.replace(/[\uFF3B\uFF3D\uFF5B\uFF5D\uFF5E\uFF3C\uFF0F\uFF3F]/g, ' ');
             text = text.replace(/[!-\/:-@\[-`{-~]/g, ' ');
         } else {
+            // 中国語（および判定不能時のフォールバック）：従来どおり全角記号を落とす
             text = text.replace(/[\u3000-\u303F\u2018\u2019\u201C\u201D\u2014\u2013\u2026\u00B7]/g, ' ');
             text = text.replace(/[\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65]/g, ' ');
             text = text.replace(/[!-\/:-@\[-`{-~]/g, ' ');
@@ -4118,7 +4210,7 @@
             }
             var blob = await res.blob();
             if (blob && blob.size > 0) return blob;
-            lastErr = new Error('音声合成が空です（' + ttsVoiceFor(lang) + '）');
+            lastErr = new Error(dscT('音声合成が空です（{0}）', ttsVoiceFor(lang)));
         }
         throw lastErr || new Error('TTS 失敗');
     }
@@ -4179,16 +4271,16 @@
         var outTok = hasUsage ? (Number(u.completionTokens) || 0) : 0;
         var tok = '';
         if (hasUsage && (prompt || outTok)) {
-            tok = '<span class="dsc-trans-tok">入力 ' + fmtTokNum(prompt) + ' · 出力 ' + fmtTokNum(outTok) + ' tokens</span>';
+            tok = '<span class="dsc-trans-tok">' + dscT('入力') + ' ' + fmtTokNum(prompt) + ' · ' + dscT('出力') + ' ' + fmtTokNum(outTok) + ' tokens</span>';
         }
         var r = hasUsage ? dscCalcCost(u, model) : null;
         if (!r) {
             if (!tok) return '';
-            return '<div class="dsc-trans-cost-row"><span class="dsc-trans-cost-unknown">💰 今回の翻訳：料金を取得できませんでした</span>' + tok + '</div>';
+            return '<div class="dsc-trans-cost-row"><span class="dsc-trans-cost-unknown">' + dscT('💰 今回の翻訳：料金を取得できませんでした') + '</span>' + tok + '</div>';
         }
-        return '<div class="dsc-trans-cost-row" title="この翻訳 1 回分だけの実費（API が返す usage に単価を掛けた値）。保存はしません">' +
-            '<span class="dsc-trans-cost-amt">💰 今回の翻訳 ' + dscFmtCost(r.cost) + '</span>' +
-            '<span class="dsc-trans-cost-tag">' + (r.peak ? 'ピーク' : 'アイドル') + '</span>' +
+        return '<div class="dsc-trans-cost-row" title="' + dscT('この翻訳 1 回分だけの実費（API が返す usage に単価を掛けた値）。保存はしません') + '">' +
+            '<span class="dsc-trans-cost-amt">' + dscT('💰 今回の翻訳') + ' ' + dscFmtCost(r.cost) + '</span>' +
+            '<span class="dsc-trans-cost-tag">' + (r.peak ? dscT('ピーク') : dscT('アイドル')) + '</span>' +
             tok +
             '</div>';
     }
@@ -4694,9 +4786,9 @@
         var inputEl = $('dscInput');
         if (inputEl) {
             inputEl.addEventListener('input', autoResize);
-            inputEl.addEventListener('focus', function () { inputEl.placeholder = 'メッセージを送信'; });
+            inputEl.addEventListener('focus', function () { inputEl.placeholder = dscT('メッセージを送信'); });
             inputEl.addEventListener('blur', function () {
-                if (inputEl.value.trim() === '') inputEl.placeholder = 'メッセージを送信、または長押しで話す';
+                if (inputEl.value.trim() === '') inputEl.placeholder = dscT('メッセージを送信、または長押しで話す');
             });
             inputEl.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -5360,7 +5452,7 @@ function highlightInElement(root, keyword) {
     }
 
     async function cosplayRemove(id, name) {
-        var ok = await simpleConfirm('キャラクターを削除', '「' + (name || id) + '」を削除しますか？この操作は元に戻せません。');
+        var ok = await simpleConfirm(dscT('キャラクターを削除'), dscT('「{0}」を削除しますか？この操作は元に戻せません。', (name || id)));
         if (!ok) return;
         try {
             await cosplayRequest('removeRole', { id: id });

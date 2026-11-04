@@ -610,17 +610,17 @@
     </div>
 
     <!-- i18n：6 言語対応（既定＝日本語）。コア→言語パック→AI 言語固定プロンプトの順で読み込む -->
-    <script src="i18n/i18n.js?v=6"></script>
-    <script src="i18n/locales/ja.js?v=6"></script>
-    <script src="i18n/locales/zh.js?v=6"></script>
-    <script src="i18n/locales/en.js?v=6"></script>
-    <script src="i18n/locales/ko.js?v=6"></script>
-    <script src="i18n/locales/ru.js?v=6"></script>
-    <script src="i18n/locales/fr.js?v=6"></script>
-    <script src="i18n/ai-prompts.js?v=6"></script>
+    <script src="i18n/i18n.js?v=8"></script>
+    <script src="i18n/locales/ja.js?v=8"></script>
+    <script src="i18n/locales/zh.js?v=8"></script>
+    <script src="i18n/locales/en.js?v=8"></script>
+    <script src="i18n/locales/ko.js?v=8"></script>
+    <script src="i18n/locales/ru.js?v=8"></script>
+    <script src="i18n/locales/fr.js?v=8"></script>
+    <script src="i18n/ai-prompts.js?v=8"></script>
     <script src="ds-files.js"></script>
     <script src="ds-devtools.js"></script>
-    <script src="deepseek-chat.js?v=20261103i18n6"></script>
+    <script src="deepseek-chat.js?v=20261104tts9"></script>
     <script src="peakvalley.js"></script>
 
     <!-- ★ データ復元：完全用内联脚本接管，不改 deepseek-chat.js -->
@@ -747,11 +747,13 @@
                 if (menu) menu.classList.remove('open');
                 if (moreBtn) moreBtn.classList.remove('more-active');
 
+                // ★ i18n：行単位で翻訳してから連結する（多言語時に日本語が混在しないように）
+                var _t = function (x) { return (window.I18N && window.I18N.t) ? window.I18N.t(x) : x; };
                 confirmDialog(
-                    '♻️ バックアップから復元',
-                    'アップロードした .tar.gz バックアップで、現在の data/ と imgs/ ディレクトリ全体を上書きします。\n\n' +
-                    'この操作は元に戻せません。現在のデータのバックアップが済んでいるか確認してください！\n\n' +
-                    '（推奨：先に「📦 データバックアップ」ボタンで現在のデータをダウンロードしてください）'
+                    _t('♻️ バックアップから復元'),
+                    _t('アップロードした .tar.gz バックアップで、現在の data/ と imgs/ ディレクトリ全体を上書きします。') + '\n\n' +
+                    _t('この操作は元に戻せません。現在のデータのバックアップが済んでいるか確認してください！') + '\n\n' +
+                    _t('（推奨：先に「📦 データバックアップ」ボタンで現在のデータをダウンロードしてください）')
                 ).then(function (ok) {
                     if (!ok) return;
                     input.value = '';

@@ -13,6 +13,14 @@
   var MAX_CONTENT = 5000000; // 500 万字
   var DETAIL_CHUNK = 200000;
 
+  // ★ i18n：多言語時に日本語が混在しないよう、UI 文言はここを通す
+  function T(s) {
+    try {
+      var a = Array.prototype.slice.call(arguments, 1);
+      return (window.I18N && window.I18N.t) ? window.I18N.t.apply(window.I18N, [s].concat(a)) : s;
+    } catch (e) { return s; }
+  }
+
   function $(id) { return document.getElementById(id); }
 
   function escHtml(s) {
@@ -614,7 +622,7 @@
   }
 
   function deleteSingle(post) {
-    confirmDelete('🗑️ 投稿を削除', '「' + (post.title || post.id) + '」を削除しますか？削除後は元に戻せません。')
+    confirmDelete(T('🗑️ 投稿を削除'), T('「{0}」を削除しますか？削除後は元に戻せません。', (post.title || post.id)))
       .then(async function (ok) {
         if (!ok) return;
         try {

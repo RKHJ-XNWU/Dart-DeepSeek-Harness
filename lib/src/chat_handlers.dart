@@ -452,11 +452,19 @@ Future<void> handleDsChatTTS(HttpRequest req) async {
     return;
   }
   var voice = mStr(body, 'voice');
-  final ttsLang = mStr(body, 'lang').toLowerCase();
+  // 'fr' / 'fr-FR' / 'ru-RU' のいずれでも受けられるよう先頭 2 文字に正規化する
+  final ttsLangRaw = mStr(body, 'lang').toLowerCase();
+  final ttsLang = ttsLangRaw.length >= 2 ? ttsLangRaw.substring(0, 2) : ttsLangRaw;
   if (voice.isEmpty) {
-    voice = ttsLang == 'ja'
-        ? 'ja-JP-NanamiNeural'
-        : (ttsLang == 'en' ? 'en-US-AriaNeural' : 'zh-CN-XiaoxiaoNeural');
+    const defVoice = <String, String>{
+      'ja': 'ja-JP-NanamiNeural',
+      'en': 'en-US-AriaNeural',
+      'fr': 'fr-FR-DeniseNeural',
+      'ru': 'ru-RU-SvetlanaNeural',
+      'ko': 'ko-KR-SunHiNeural',
+      'zh': 'zh-CN-XiaoxiaoNeural',
+    };
+    voice = defVoice[ttsLang] ?? defVoice['zh']!;
   }
   // prosody 白名单校验（防止 SSML 注入 / 非法值）
   String safeProsody(String raw, String unit, String def) {
@@ -477,7 +485,7 @@ Future<void> handleDsChatTTS(HttpRequest req) async {
   }
   final cleaned = <String>[];
   for (final c in chunks) {
-    final cc = cleanTTSText(c);
+    final cc = cleanTTSText(c, ttsLang);
     if (cc.trim().isNotEmpty) cleaned.add(cc);
   }
   if (cleaned.isEmpty) {

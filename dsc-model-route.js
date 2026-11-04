@@ -9,6 +9,15 @@
 (function () {
     'use strict';
 
+    // ★ i18n ヘルパー：引数付きで辞書を引く（無ければ原文）
+    function mrT(s) {
+        try {
+            if (!(window.I18N && window.I18N.t)) return s;
+            var args = [s].concat(Array.prototype.slice.call(arguments, 1));
+            return window.I18N.t.apply(null, args);
+        } catch (e) { return s; }
+    }
+
     var API = '/api/ds-chat/model-router';
     var cfg = null;
     var caps = null;
@@ -32,7 +41,7 @@
             if (!payload || !payload.modelRoute) return;
             var r = payload.modelRoute;
             if (!r.routed) return;
-            toast('🔀 今回の画像を含むため自動ルーティング ' + r.requested + ' → ' + r.effective, 'info');
+            toast(mrT('🔀 今回の画像を含むため自動ルーティング {0} → {1}', r.requested, r.effective), 'info');
         } catch (e) { /* 通知失敗は主フローに影響しない */ }
     };
 
