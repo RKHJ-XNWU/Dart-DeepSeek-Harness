@@ -302,7 +302,7 @@
             var ok = document.execCommand('copy');
             toast(ok ? '✅ コピーしました' : 'コピーに失敗', ok ? 'success' : 'error');
         } catch (e) {
-            toast('コピーに失敗：' + e.message, 'error');
+            toast(dscErrText('コピーに失敗：', e.message), 'error');
         }
         document.body.removeChild(ta);
     }
@@ -347,18 +347,131 @@
         } catch (e) { return s; }
     }
 
+    // ============================================================
+    // ★ エラー表示の日本語露出を防ぐ
+    //   ・バックエンドは日本語の接頭辞（例「翻訳に失敗しました：」）を返すため、
+    //     そのまま toast に流すと他言語 UI で日本語が残る。
+    //   ・tCore の部分一致は 160 文字超で無効なので、長いエラー文は絶対に
+    //     辞書置換されない。→ 接頭辞を明示的に剥がして辞書キーへ寄せる。
+    // ============================================================
+    var DSC_ERR_HEADS = [
+        '翻訳に失敗しました：', '翻訳に失敗しました', '翻訳に失敗しました:',
+        '翻訳に失敗：', '翻訳に失敗:', '翻訳に失敗',
+        '翻訳結果が空でした',
+        '読み上げに失敗：', '読み上げに失敗:', '読み上げに失敗',
+        '保存に失敗しました：', '保存に失敗しました',
+        '作成に失敗しました：', '作成に失敗しました',
+        '削除に失敗しました：', '削除に失敗しました',
+        '生成に失敗：', '生成に失敗:',
+        'コピーに失敗：', 'コピーに失敗:',
+        '切り替えに失敗：', '切り替えに失敗:',
+        '消去に失敗: ', '消去に失敗：',
+        '一括削除に失敗: '
+    ];
+
+    // 仮名を含む断片を落とす（英数字・記号＝技術情報だけ残す）
+    function dscStripKana(s) {
+        var t = String(s == null ? '' : s);
+        if (!/[\u3040-\u309f\u30a0-\u30ff]/.test(t)) return t;
+        var out = t.replace(/[^\s]*[\u3040-\u309f\u30a0-\u30ff][^\s]*/g, ' ');
+        out = out.replace(/\s{2,}/g, ' ');
+        out = out.replace(/^[\s:：、,，。|]+|[\s:：、,，。|]+$/g, '');
+        return out;
+    }
+
+    // エラー本文を現在言語へ。headKey は辞書に存在する日本語キー。
+    function dscErrText(headKey, raw) {
+        var s = raw == null ? '' : String(raw).trim();
+        var head = headKey || '翻訳に失敗：';
+        var isJa = false;
+        try {
+            isJa = !!(window.I18N && window.I18N.getLang && window.I18N.getLang() === 'ja');
+        } catch (e0) {}
+
+        for (var i = 0; i < DSC_ERR_HEADS.length; i++) {
+            var k = DSC_ERR_HEADS[i];
+            if (s.indexOf(k) !== 0) continue;
+            var base = k.replace(/[\s:：]+$/, '');
+            s = s.slice(k.length).replace(/^[\s:：、,，。|]+/, '');
+            if (isJa) {
+                head = base + '：';
+            } else {
+                var cands = [base + '：', base + ':', base];
+                var picked = '';
+                for (var j = 0; j < cands.length; j++) {
+                    if (dscT(cands[j]) !== cands[j]) { picked = cands[j]; break; }
+                }
+                // 辞書に無い接頭辞は汎用ヘッドへ寄せる（日本語残留を作らない）
+                head = picked || '翻訳に失敗：';
+            }
+            break;
+        }
+
+        var detail = s;
+        if (detail) {
+            if (detail.length <= 160) detail = dscT(detail);
+            if (!isJa) detail = dscStripKana(detail);
+            detail = detail.replace(/\s{2,}/g, ' ').trim();
+            detail = detail.replace(/^[\s:：、,，。|]+/, '');
+        }
+        var h = dscT(head);
+        if (!detail) return h;
+        // 既に区切り（空白・コロン）で終わっていれば二重に空けない
+        var glue = /[\s:：、,，。]$/.test(h) ? '' : ' ';
+        return h + glue + detail;
+    }
+
     function fmtTokNum(n) {
         n = Number(n) || 0;
         return n.toLocaleString('en-US');
     }
 
+    // ============================================================
+    // ★ usage の token 正規化（料金計算・表示の唯一の口径）
+    //   請求対象は必ず 3 区分：キャッシュ命中(hit) / 未命中(miss) / 出力(out)
+    //   不変条件：hit + miss == prompt
+    //   ・miss が 0 や欠損で返る実装があるため、prompt から必ず補完する
+    //     （未命中は単価が最も高く、取りこぼすと過少計上になる）
+    //   ・completion に reasoning が含まれない実装があるため、大きい方を採る
+    // ============================================================
+    function dscNormalizeUsage(u) {
+        if (!u) return null;
+        var hit = Number(u.promptCacheHitTokens) || 0;
+        if (!hit) hit = Number(u.cachedTokens) || 0;   // OpenAI 形式への回落
+        var miss = Number(u.promptCacheMissTokens) || 0;
+        var prompt = Number(u.promptTokens) || 0;
+        if (!prompt) prompt = hit + miss;
+
+        if (hit < 0) hit = 0;
+        if (miss < 0) miss = 0;
+        if (prompt < 0) prompt = 0;
+
+        // 恒等式 hit + miss == prompt を強制（欠損は未命中として補う）
+        if (hit > prompt) hit = prompt;
+        if (prompt > 0) {
+            miss = prompt - hit;
+        } else if (miss > 0) {
+            prompt = hit + miss;
+        }
+
+        var out = Number(u.completionTokens) || 0;
+        var reasoning = Number(u.reasoningTokens) || 0;
+        if (out < 0) out = 0;
+        if (out < reasoning) out = reasoning;
+
+        return { hit: hit, miss: miss, out: out, prompt: prompt, total: prompt + out };
+    }
+
     function dsUsageChipHtml(u) {
         if (!u) return '';
-        var hit = Number(u.promptCacheHitTokens) || 0;
-        var miss = Number(u.promptCacheMissTokens) || 0;
-        var prompt = Number(u.promptTokens) || (hit + miss);
-        var outTok = Number(u.completionTokens) || 0;
-        var total = Number(u.totalTokens) || (prompt + outTok);
+        var t = dscNormalizeUsage(u);
+        if (!t) return '';
+        var hit = t.hit;
+        var miss = t.miss;
+        var prompt = t.prompt;
+        var outTok = t.out;
+        var total = Number(u.totalTokens) || 0;
+        if (total < t.total) total = t.total;
         if (!total && !prompt && !outTok) return '';
         var calls = Number(u.apiCalls) || 1;
 
@@ -455,32 +568,34 @@
     }
     
     function dscCalcCost(u, model) {
-        if (!u) return null;
-        var hit = Number(u.promptCacheHitTokens) || 0;
-        var miss = Number(u.promptCacheMissTokens) || 0;
-        var prompt = Number(u.promptTokens) || (hit + miss);
-        if (!miss && prompt && !hit) miss = prompt;
-        var out = Number(u.completionTokens) || 0;
+        var t = dscNormalizeUsage(u);
+        if (!t) return null;
+        var hit = t.hit, miss = t.miss, out = t.out;
         if (!hit && !miss && !out) return null;
     
         var price = dscPriceForModel(model);
         var peak = dscIsPeakHour();
         var factor = peak ? 2 : 1;   // アイドル = ピーク的一半
     
-        var cost =
-            hit  * price.hit  * factor / 1e6 +
-            miss * price.miss * factor / 1e6 +
-            out  * price.out  * factor / 1e6;
+        // 3 区分をそれぞれ単価で計算してから合算する（まとめ算すると取りこぼす）
+        // 単価は「元 / 100 万 tokens」。ナノ元の整数で累積し、浮動小数の誤差を排除する
+        var nano =
+            Math.round(hit  * price.hit  * factor * 1000) +
+            Math.round(miss * price.miss * factor * 1000) +
+            Math.round(out  * price.out  * factor * 1000);
+        var cost = nano / 1e9;
     
-        return { cost: cost, peak: peak, hit: hit, miss: miss, out: out, total: hit + miss + out };
+        return { cost: cost, peak: peak, hit: hit, miss: miss, out: out, prompt: t.prompt, total: t.total };
     }
     
     function dscFmtCost(cost) {
         if (cost == null || isNaN(cost)) return '';
         if (cost === 0) return '0 元';
-        if (cost < 0.0001) return cost.toFixed(6) + ' 元';
-        if (cost < 0.01) return cost.toFixed(4) + ' 元';
-        if (cost < 1) return cost.toFixed(3) + ' 元';
+        // 単価は「元 / 100 万 tokens」のため 1 回の翻訳は 0.00x 元台。
+        // 丸めで有効数字が落ちないよう、金額帯ごとに表示桁を広げる
+        if (cost < 0.0001) return cost.toFixed(8) + ' 元';
+        if (cost < 0.01) return cost.toFixed(6) + ' 元';
+        if (cost < 1) return cost.toFixed(4) + ' 元';
         return cost.toFixed(2) + ' 元';
     }
     
@@ -1386,7 +1501,7 @@
                 renderSessions();
                 updateTitle();
                 toast('名前を変更しました', 'success');
-            } catch (e) { toast('名前の変更に失敗：' + e.message, 'error'); }
+            } catch (e) { toast(dscErrText('名前の変更に失敗：', e.message), 'error'); }
         });
     }
 
@@ -1426,7 +1541,7 @@
                 setTimeout(function () { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
             }
         } catch (err) {
-            toast('引用のコピーに失敗：' + err.message, 'error');
+            toast(dscErrText('引用のコピーに失敗：', err.message), 'error');
         }
     }
 
@@ -1455,7 +1570,7 @@
             renderSessions();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
             toast('削除しました：' + data.deleted + ' 件のセッション', 'success');
-        } catch (e) { toast('一括削除に失敗: ' + e.message, 'error'); }
+        } catch (e) { toast(dscErrText('一括削除に失敗: ', e.message), 'error'); }
     }
 
     async function clearAllSessions() {
@@ -1480,7 +1595,7 @@
             updateTitle();
             if (typeof window.dsLoadFiles === 'function') window.dsLoadFiles();
             toast('すべてのセッションを消去しました', 'success');
-        } catch (e) { toast('消去に失敗: ' + e.message, 'error'); }
+        } catch (e) { toast(dscErrText('消去に失敗: ', e.message), 'error'); }
     }
 
     function updateTitle() {
@@ -2501,7 +2616,7 @@
                 decorateContinueButton();
                 toast('生成を停止しました', 'info');
             } else {
-                toast('生成の継続に失敗：' + err.message, 'error');
+                toast(dscErrText('生成の継続に失敗：', err.message), 'error');
                 renderMessages();
                 decorateContinueButton();
             }
@@ -2813,7 +2928,7 @@
             if (state.stopRequested || isStopAbort(e)) {
                 toast('生成を停止しました', 'info');
             } else {
-                toast('生成に失敗: ' + e.message, 'error');
+                toast(dscErrText('生成に失敗: ', e.message), 'error');
                 var idx2 = state.messages.findIndex(function (m) { return m.id === userMsg.id; });
                 if (idx2 !== -1) state.messages.splice(idx2, 1);
                 if (aiMsgEl && aiMsgEl.parentNode) aiMsgEl.remove();
@@ -3847,7 +3962,7 @@
             toast('設定を保存しました · モデル: ' + model, 'success');
             updateTitle();
             closeSettings();
-        } catch (e) { toast('保存に失敗: ' + e.message, 'error'); }
+        } catch (e) { toast(dscErrText('保存に失敗: ', e.message), 'error'); }
     }
 
     function autoResize() {
@@ -4106,7 +4221,7 @@
                   renderModelHint();
                   toast('保存しました：' + name + ' → data/displaymodels/' + f, 'success');
               } else {
-                  toast('画面には追加しましたが、ファイル書き込みに失敗：' + ((d && d.error) || '不明なエラー'), 'error');
+                  toast(dscErrText('画面には追加しましたが、ファイル書き込みに失敗：', (d && d.error) || '不明なエラー'), 'error');
               }
           })
           .catch(function (e) {
@@ -4266,14 +4381,17 @@
 
     // 「今回の翻訳 ◯◯ 元」の 1 行（翻訳本文の直下＝ボックス内の最下部に置く）
     function dscTransCostHtml(u, model) {
-        var hasUsage = !!u;
-        var prompt = hasUsage ? (Number(u.promptTokens) || (Number(u.promptCacheHitTokens) || 0) + (Number(u.promptCacheMissTokens) || 0)) : 0;
-        var outTok = hasUsage ? (Number(u.completionTokens) || 0) : 0;
+        // ★ 請求対象の 3 区分（キャッシュ命中 / 未命中 / 出力）を必ず並べて出す
+        //   未命中は単価が最も高いため、ここが欠けると安く見えてしまう
+        var t = dscNormalizeUsage(u);
         var tok = '';
-        if (hasUsage && (prompt || outTok)) {
-            tok = '<span class="dsc-trans-tok">' + dscT('入力') + ' ' + fmtTokNum(prompt) + ' · ' + dscT('出力') + ' ' + fmtTokNum(outTok) + ' tokens</span>';
+        if (t && (t.prompt || t.out)) {
+            tok = '<span class="dsc-trans-tok">' +
+                dscT('命中') + ' ' + fmtTokNum(t.hit) + ' · ' +
+                dscT('未命中') + ' ' + fmtTokNum(t.miss) + ' · ' +
+                dscT('出力') + ' ' + fmtTokNum(t.out) + ' tokens</span>';
         }
-        var r = hasUsage ? dscCalcCost(u, model) : null;
+        var r = t ? dscCalcCost(u, model) : null;
         if (!r) {
             if (!tok) return '';
             return '<div class="dsc-trans-cost-row"><span class="dsc-trans-cost-unknown">' + dscT('💰 今回の翻訳：料金を取得できませんでした') + '</span>' + tok + '</div>';
@@ -4328,7 +4446,18 @@
                 body: JSON.stringify({ text: m.content, target: '簡体字中国語（简体中文）' })
             });
             var data = await res.json().catch(function () { return {}; });
-            if (!res.ok) throw new Error(data && data.error ? data.error : ('HTTP ' + res.status));
+            if (!res.ok) {
+                // detail があれば技術情報だけ、無ければ error 本文（接頭辞は dscErrText が剥がす）
+                var emsg = 'HTTP ' + res.status;
+                if (data && data.error === 'translate_empty') {
+                    emsg = '翻訳結果が空でした';
+                } else if (data && data.detail) {
+                    emsg = String(data.detail);
+                } else if (data && data.error) {
+                    emsg = String(data.error);
+                }
+                throw new Error(emsg);
+            }
             var tr = (data.translation || '').trim();
             if (!tr) throw new Error('翻訳結果が空でした');
             m._translation = tr;
@@ -4343,7 +4472,7 @@
             if (typeof renderMath === 'function') requestAnimationFrame(function () { renderMath(box); });
         } catch (err) {
             console.error('[DSC] 翻訳失敗:', err);
-            toast('翻訳に失敗：' + err.message, 'error');
+            toast(dscErrText('翻訳に失敗：', err.message), 'error');
             btnElement.textContent = '🌐 翻訳';
         } finally {
             btnElement.disabled = false;
@@ -4376,7 +4505,7 @@
             await playTTSChunks(cleanedText, btnElement, originalText, ttsLang);
         } catch (err) {
             console.error('[DSC] TTS 失敗:', err);
-            toast('読み上げに失敗: ' + err.message, 'error');
+            toast(dscErrText('読み上げに失敗: ', err.message), 'error');
         } finally {
             if (btnElement) {
                 btnElement.textContent = originalText;
@@ -5365,7 +5494,7 @@ function highlightInElement(root, keyword) {
                 st.textContent = '⚠️ キャラクターの読み込みに失敗：' + e.message;
                 st.className = 'dsc-cosplay-status err';
             }
-            toast('キャラクターの読み込みに失敗：' + e.message, 'error');
+            toast(dscErrText('キャラクターの読み込みに失敗：', e.message), 'error');
         }
     }
 
@@ -5404,7 +5533,7 @@ function highlightInElement(root, keyword) {
             var r = cosplayFindRole(id);
             toast('🎭 キャラクターを選択しました：' + (r ? r.name : id), 'success');
         } catch (e) {
-            toast('キャラクターの切替に失敗：' + e.message, 'error');
+            toast(dscErrText('キャラクターの切替に失敗：', e.message), 'error');
         }
     }
 
@@ -5413,7 +5542,7 @@ function highlightInElement(root, keyword) {
             await cosplayRequest('setEnabled', { enabled: !!on });
             toast(on ? '🎭 ロールプレイをオンにしました' : '⏸ ロールプレイをオフにしました', on ? 'success' : 'info');
         } catch (e) {
-            toast('切り替えに失敗：' + e.message, 'error');
+            toast(dscErrText('切り替えに失敗：', e.message), 'error');
             var en = $('dscCosplayEnabled');
             if (en) en.checked = !on;
         }
@@ -5424,7 +5553,7 @@ function highlightInElement(root, keyword) {
             await cosplayRequest('setThinkingStyle', { style: style === 'role' ? 'role' : 'neutral' });
             toast(style === 'role' ? '🎭 思考スタイル：キャラ没入' : '🧠 思考スタイル：ニュートラル', 'info');
         } catch (e) {
-            toast('思考スタイルの保存に失敗：' + e.message, 'error');
+            toast(dscErrText('思考スタイルの保存に失敗：', e.message), 'error');
         }
     }
 
@@ -5447,7 +5576,7 @@ function highlightInElement(root, keyword) {
             toast('✅ キャラクターを保存しました', 'success');
             closeCosplayEditor();
         } catch (e) {
-            toast('キャラクターの保存に失敗：' + e.message, 'error');
+            toast(dscErrText('キャラクターの保存に失敗：', e.message), 'error');
         }
     }
 
@@ -5458,7 +5587,7 @@ function highlightInElement(root, keyword) {
             await cosplayRequest('removeRole', { id: id });
             toast('🗑 キャラクターを削除しました', 'success');
         } catch (e) {
-            toast('削除に失敗しました：' + e.message, 'error');
+            toast(dscErrText('削除に失敗しました：', e.message), 'error');
         }
     }
 

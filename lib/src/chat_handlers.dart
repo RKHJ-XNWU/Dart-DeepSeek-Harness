@@ -988,7 +988,8 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
     }
     final clean = dsSanitizeTranslatedMarkdown(out);
     if (clean.isEmpty) {
-      await dsJSONErr(res, 502, '翻訳結果が空でした');
+      // ★ 日本語を返さない：UI 側が error コードで自言語に描画する
+      await dsJSONOk(res, 502, {'error': 'translate_empty', 'detail': ''});
       return;
     }
     // 壊れ検知：構造カウントがずれたらログに残す（表示側は原文を壊さない）
@@ -1016,6 +1017,7 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
     });
   } catch (e) {
     logp('❌ 翻訳失敗: $e');
-    await dsJSONErr(res, 502, '翻訳に失敗しました：$e');
+    // ★ 日本語を返さない：詳細（HTTP 402 等）だけを渡し、文言は UI 側で決める
+    await dsJSONOk(res, 502, {'error': 'translate_failed', 'detail': e.toString()});
   }
 }

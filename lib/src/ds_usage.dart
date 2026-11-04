@@ -105,21 +105,36 @@ class DsUsageAcc {
 
   void addRaw(RawDsUsage? r) {
     if (r == null) return;
+    // ① 命中：公式フィールドを優先し、無ければ prompt_tokens_details.cached_tokens へ回落
     var hit = r.promptCacheHitTokens;
     if (hit == 0) hit = r.cachedTokens;
-    var prompt = r.promptTokens;
-    if (prompt == 0) prompt = hit + r.promptCacheMissTokens;
     var miss = r.promptCacheMissTokens;
-    if (miss == 0 && prompt > hit) miss = prompt - hit;
+    // ② 入力総量：prompt_tokens が欠けていれば「命中 + 未命中」で補う
+    var prompt = r.promptTokens;
     if (prompt == 0) prompt = hit + miss;
+    if (hit < 0) hit = 0;
+    if (miss < 0) miss = 0;
+    if (prompt < 0) prompt = 0;
+    // ③ 不変条件 hit + miss == prompt を強制する。
+    //    未命中が 0 や欠損で返る実装があり、そのまま加算すると過少計上になる
+    //    （単価は 未命中 > 出力 > 命中 の順に高く、取りこぼしの影響が最も大きい）
+    if (hit > prompt) hit = prompt;
+    if (prompt > 0) {
+      miss = prompt - hit;
+    } else if (miss > 0) {
+      prompt = hit + miss;
+    }
+    // ④ 出力：completion に reasoning が含まれない実装があるため大きい方を採る
+    var outTok = r.completionTokens;
+    if (outTok < r.reasoningTokens) outTok = r.reasoningTokens;
     var total = r.totalTokens;
-    if (total == 0) total = prompt + r.completionTokens;
+    if (total < prompt + outTok) total = prompt + outTok;
 
     _used = true;
     _total.promptTokens += prompt;
     _total.promptCacheHitTokens += hit;
     _total.promptCacheMissTokens += miss;
-    _total.completionTokens += r.completionTokens;
+    _total.completionTokens += outTok;
     _total.reasoningTokens += r.reasoningTokens;
     _total.totalTokens += total;
     _total.apiCalls += 1;
