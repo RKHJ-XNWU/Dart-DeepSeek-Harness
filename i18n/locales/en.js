@@ -1089,6 +1089,9 @@ I18N.add('en', `
 読み上げ|Read aloud
 コピー|Copy
 翻訳|Translate
+翻訳見出し|Translation
+翻訳をコピー|Copy translation
+翻訳を読み上げ|Read translation aloud
 `);
 
 I18N.add('en', `

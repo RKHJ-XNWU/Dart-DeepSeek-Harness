@@ -3917,22 +3917,22 @@
             var data = await res.json();
             var ak = $('dscApiKeyInput'), ms = $('dscModelSelect'),
                 ik = $('dscImgKeyInput'), st = $('dscApiStatus');
-            if (ak) { ak.value = ''; ak.placeholder = data.hasKey ? '保存済み。空欄なら変更しません' : 'sk-...'; }
+            if (ak) { ak.value = ''; ak.placeholder = data.hasKey ? dscT('保存済み。空欄なら変更しません') : 'sk-...'; }
             if (ms) {
                 var wantModel = data.model || 'deepseek-flash';
                 ms.value = wantModel;
                 if (ms.value !== wantModel) {
                     var opt = document.createElement('option');
                     opt.value = wantModel;
-                    opt.textContent = wantModel + ' (設定ファイル由来)';
+                    opt.textContent = wantModel + ' ' + dscT('(設定ファイル由来)');
                     ms.appendChild(opt);
                     ms.value = wantModel;
                 }
                 state.currentModel = ms.value || wantModel;
             }
-            if (ik) { ik.value = ''; ik.placeholder = data.hasImgKey ? '保存済み。空欄なら変更しません' : '（任意）'; }
+            if (ik) { ik.value = ''; ik.placeholder = data.hasImgKey ? dscT('保存済み。空欄なら変更しません') : dscT('（任意）'); }
             if (st) {
-                st.textContent = data.hasKey ? '✅ API Key 設定済み · 現在のモデル: ' + (data.model || 'deepseek-flash') : '⚠️ API Key 未設定';
+                st.textContent = data.hasKey ? dscT('✅ API Key 設定済み · 現在のモデル:') + ' ' + (data.model || 'deepseek-flash') : dscT('⚠️ API Key 未設定');
                 st.className = 'dsc-status ' + (data.hasKey ? 'ok' : '');
             }
         } catch (e) {
@@ -3959,7 +3959,7 @@
             var data = await res.json();
             if (!res.ok) throw new Error(data.error || '保存に失敗しました');
             state.currentModel = model;
-            toast('設定を保存しました · モデル: ' + model, 'success');
+            toast(dscT('設定を保存しました · モデル:') + ' ' + model, 'success');
             updateTitle();
             closeSettings();
         } catch (e) { toast(dscErrText('保存に失敗: ', e.message), 'error'); }
@@ -4027,7 +4027,7 @@
                 if (ms.value !== cfgModel) {
                     var opt = document.createElement('option');
                     opt.value = cfgModel;
-                    opt.textContent = cfgModel + ' (設定ファイル由来)';
+                    opt.textContent = cfgModel + ' ' + dscT('(設定ファイル由来)');
                     ms.appendChild(opt);
                     ms.value = cfgModel;
                 }
@@ -4085,7 +4085,7 @@
         if (!ms || !name || hasModelOption(name)) return false;
         var opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = name + (isCustom ? '（カスタム）' : '（設定ファイル由来）');
+        opt.textContent = name + (isCustom ? dscT('（カスタム）') : dscT('（設定ファイル由来）'));
         ms.appendChild(opt);
         return true;
     }
@@ -4123,8 +4123,8 @@
         var tip = document.createElement('span');
         tip.className = 'dsc-model-hint-label';
         tip.style.opacity = '0.6';
-        tip.title = customModelsFromServer ? 'データディレクトリ：ddsh/data/displaymodels' : 'バックエンド未同期、現在はローカルキャッシュのみ';
-        tip.textContent = customModelsFromServer ? '（data/displaymodels/*.sts に保存済み）' : '（ローカルキャッシュ、バックエンド未同期）';
+        tip.title = customModelsFromServer ? dscT('データディレクトリ：ddsh/data/displaymodels') : dscT('バックエンド未同期、現在はローカルキャッシュのみ');
+        tip.textContent = customModelsFromServer ? dscT('（data/displaymodels/*.sts に保存済み）') : dscT('（ローカルキャッシュ、バックエンド未同期）');
         h.appendChild(tip);
     }
     function injectCustomModels() {
@@ -4219,13 +4219,13 @@
                   var f = (d.model && d.model.file) ? d.model.file : (name + '.sts');
                   customModelsFromServer = true;
                   renderModelHint();
-                  toast('保存しました：' + name + ' → data/displaymodels/' + f, 'success');
+                  toast(dscT('保存しました：') + name + ' → data/displaymodels/' + f, 'success');
               } else {
-                  toast(dscErrText('画面には追加しましたが、ファイル書き込みに失敗：', (d && d.error) || '不明なエラー'), 'error');
+                  toast(dscErrText('画面には追加しましたが、ファイル書き込みに失敗：', (d && d.error) || dscT('不明なエラー')), 'error');
               }
           })
           .catch(function (e) {
-              toast('画面には追加しましたが、.sts の書き込みに失敗（バックエンド未コンパイル？）', 'error');
+              toast(dscT('画面には追加しましたが、.sts の書き込みに失敗（バックエンド未コンパイル？）'), 'error');
               console.log('[DSC] モデルの保存に失敗:', e);
           });
     }
@@ -4408,7 +4408,22 @@
         if (!m || !m._translation) return '';
         var body = renderMarkdown(dscCleanTranslatedMarkdown(m._translation));
         var meta = dscTransCostHtml(m._translationUsage, m._translationModel || state.currentModel);
-        return body + meta;
+        // ★ 見出し行：左にラベル、右にワンクリックコピー
+        //    ・このブロックは SKIP_SEL に入っていて i18n の自動翻訳対象外。
+        //      だからラベルは生成時に dscT() で決める（CSS の content だと日本語が残る）
+        //    ・コピー対象は Markdown 原文。過去メッセージ挿入で idx がずれるので data-raw に持たせる
+        // ★ 読み上げとコピーは同じ原文を使う。
+        //    b64 は 1 回だけエンコードして両ボタンで共有する（二重エンコードは無駄）
+        var rawB64 = b64EncodeUnicode(String(m._translation));
+        var head = '<div class="dsc-trans-head">' +
+            '<span class="dsc-trans-label">' + dscT('翻訳見出し') + '</span>' +
+            '<span class="dsc-trans-actions">' +
+            '<button class="dsc-trans-speak-btn" type="button" title="' + dscT('翻訳を読み上げ') + '"' +
+            ' data-raw="' + rawB64 + '">' + dscT('🔊 読み上げ') + '</button>' +
+            '<button class="dsc-trans-copy-btn" type="button" title="' + dscT('翻訳をコピー') + '"' +
+            ' data-raw="' + rawB64 + '">📋 ' + dscT('コピー') + '</button>' +
+            '</span></div>';
+        return head + '<div class="dsc-trans-body">' + body + '</div>' + meta;
     }
 
     // ★ AI の返信を中国語（簡体字）へ翻訳する。結果はメッセージ直下のブロックに表示する。
@@ -4766,6 +4781,37 @@
                     codeBtn.textContent = '✅ ' + dscT('コピーしました');
                     codeBtn.classList.add('copied');
                     setTimeout(function () { codeBtn.textContent = orig; codeBtn.classList.remove('copied'); }, 1600);
+                    return;
+                }
+                var transSpeakBtn = e.target.closest('.dsc-trans-speak-btn');
+                if (transSpeakBtn) {
+                    e.stopPropagation();
+                    var trSpeakB64 = transSpeakBtn.getAttribute('data-raw') || '';
+                    var trSpeakRaw = trSpeakB64 ? b64DecodeUnicode(trSpeakB64) : '';
+                    if (!trSpeakRaw) {
+                        var trSpeakBox = transSpeakBtn.closest('.dsc-msg-translation');
+                        var trSpeakBody = trSpeakBox ? trSpeakBox.querySelector('.dsc-trans-body') : null;
+                        trSpeakRaw = trSpeakBody ? trSpeakBody.textContent : '';
+                    }
+                    if (!trSpeakRaw) { toast(dscT('読み上げる内容がありません'), 'info'); return; }
+                    speakMessage(trSpeakRaw, transSpeakBtn);
+                    return;
+                }
+                var transCopyBtn = e.target.closest('.dsc-trans-copy-btn');
+                if (transCopyBtn) {
+                    e.stopPropagation();
+                    var trB64 = transCopyBtn.getAttribute('data-raw') || '';
+                    var trRaw = trB64 ? b64DecodeUnicode(trB64) : '';
+                    if (!trRaw) {
+                        var trBoxEl = transCopyBtn.closest('.dsc-msg-translation');
+                        var trBodyEl = trBoxEl ? trBoxEl.querySelector('.dsc-trans-body') : null;
+                        trRaw = trBodyEl ? trBodyEl.textContent : '';
+                    }
+                    copyToClipboard(trRaw);
+                    var trOrigHtml = transCopyBtn.innerHTML;
+                    transCopyBtn.innerHTML = '✅ ' + dscT('コピーしました');
+                    transCopyBtn.classList.add('copied');
+                    setTimeout(function () { transCopyBtn.innerHTML = trOrigHtml; transCopyBtn.classList.remove('copied'); }, 1600);
                     return;
                 }
                 var continueBtn = e.target.closest('.dsc-msg-continue-btn');
@@ -5573,7 +5619,7 @@ function highlightInElement(root, keyword) {
         if (cosplayEditingId) card.id = cosplayEditingId;
         try {
             await cosplayRequest('upsertRole', { card: card });
-            toast('✅ キャラクターを保存しました', 'success');
+            toast(dscT('✅ キャラクターを保存しました'), 'success');
             closeCosplayEditor();
         } catch (e) {
             toast(dscErrText('キャラクターの保存に失敗：', e.message), 'error');
@@ -5659,4 +5705,102 @@ function highlightInElement(root, keyword) {
     } else {
         init();
     }
+})();
+/* dsc-speak-state-l10n: 朗读按钮「再生中」状态文案本地化
+   该区域位于 i18n.js 的 SKIP_SEL（.dsc-think-body / .dsc-msg-bubble / .dsc-msg-translation）内，
+   DOM 兜底翻译永远覆盖不到，因此在生成/变更时直接本地化。 */
+;(function () {
+  if (window.__dscSpeakStateL10n) return;
+  window.__dscSpeakStateL10n = true;
+
+  var MAP = {
+    ja: { playing: '再生中' },
+    zh: { playing: '播放中' },
+    en: { playing: 'Playing' },
+    fr: { playing: 'Lecture' },
+    ru: { playing: 'Воспроизведение' },
+    ko: { playing: '재생 중' }
+  };
+
+  function curLang() {
+    try {
+      if (window.I18N) {
+        if (typeof I18N.getLang === 'function') {
+          var a = String(I18N.getLang() || '');
+          if (a) return a.slice(0, 2).toLowerCase();
+        }
+        if (typeof I18N.lang === 'string' && I18N.lang) return I18N.lang.slice(0, 2).toLowerCase();
+        if (typeof I18N.current === 'string' && I18N.current) return I18N.current.slice(0, 2).toLowerCase();
+      }
+    } catch (e) {}
+    try {
+      var h = document.documentElement.getAttribute('lang') || '';
+      if (h) return h.slice(0, 2).toLowerCase();
+      var l = localStorage.getItem('dsc_lang') || localStorage.getItem('lang') || '';
+      if (l) return String(l).slice(0, 2).toLowerCase();
+    } catch (e) {}
+    return 'zh';
+  }
+
+  function target() {
+    var l = curLang();
+    return MAP[l] || MAP.zh;
+  }
+
+  var SEL = '.dsc-trans-speak-btn,.dsc-speak-btn,.dsc-msg-speak-btn';
+
+  function fix(el) {
+    if (!el || el.nodeType !== 1) return;
+    var p = target();
+    var t = el.textContent || '';
+    if (t.indexOf('再生中') >= 0) el.textContent = t.replace(/\u518d\u751f\u4e2d/g, p.playing);
+    var ti = el.getAttribute('title');
+    if (ti && ti.indexOf('再生中') >= 0) el.setAttribute('title', ti.replace(/\u518d\u751f\u4e2d/g, p.playing));
+    var al = el.getAttribute('aria-label');
+    if (al && al.indexOf('再生中') >= 0) el.setAttribute('aria-label', al.replace(/\u518d\u751f\u4e2d/g, p.playing));
+  }
+
+  function scan(root) {
+    if (!root || !root.querySelectorAll) return;
+    var list = root.querySelectorAll(SEL);
+    for (var i = 0; i < list.length; i++) fix(list[i]);
+  }
+
+  function start() {
+    scan(document);
+    var mo = new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var m = muts[i];
+        var tgt = m.target;
+        if (tgt && tgt.nodeType === 1 && tgt.matches && tgt.matches(SEL)) fix(tgt);
+        if (m.type === 'characterData') {
+          var pnode = tgt && tgt.parentNode;
+          if (pnode && pnode.nodeType === 1 && pnode.matches && pnode.matches(SEL)) fix(pnode);
+        }
+        if (m.addedNodes && m.addedNodes.length) {
+          for (var j = 0; j < m.addedNodes.length; j++) {
+            var n = m.addedNodes[j];
+            if (n && n.nodeType === 1) {
+              if (n.matches && n.matches(SEL)) fix(n);
+              scan(n);
+            }
+          }
+        }
+      }
+    });
+    mo.observe(document.body || document.documentElement, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['title', 'aria-label']
+    });
+    window.__dscSpeakStateMO = mo;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
 })();

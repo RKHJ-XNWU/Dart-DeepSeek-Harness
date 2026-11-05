@@ -281,7 +281,18 @@
 .dsc-msg-translate-btn.translated { color: #0891b2; background: #ecfeff; border-color: #a5f3fc; }
 .dsc-msg-translate-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .dsc-msg-translation { margin-top: 6px; padding: 8px 12px; border-left: 3px solid #06b6d4; border-radius: 8px; background: #f8fafc; color: #374151; font-size: 0.9em; line-height: 1.7; word-break: break-word; }
-.dsc-msg-translation::before { content: '翻訳'; display: block; font-size: 0.66rem; letter-spacing: 0.08em; color: #0891b2; font-weight: 700; margin-bottom: 4px; }
+/* 翻訳ラベルは CSS 扱似要素ではなく実 DOM で出す（content だと i18n が届かず日本語が残る） */
+.dsc-trans-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.dsc-trans-label { font-size: 0.66rem; letter-spacing: 0.08em; color: #0891b2; font-weight: 700; line-height: 1.4; }
+.dsc-trans-copy-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; font-size: 0.66rem; font-weight: 600; line-height: 1.5; color: #0891b2; background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 999px; cursor: pointer; transition: all 0.16s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.dsc-trans-copy-btn:hover { background: #cffafe; border-color: #67e8f9; }
+.dsc-trans-copy-btn:active { transform: scale(0.96); }
+.dsc-trans-copy-btn.copied { color: #047857; background: #d1fae5; border-color: #6ee7b7; }
+.dsc-trans-actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; }
+.dsc-trans-speak-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; font-size: 0.66rem; font-weight: 600; line-height: 1.5; color: #7c3aed; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 999px; cursor: pointer; transition: all 0.16s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.dsc-trans-speak-btn:hover { background: #ede9fe; border-color: #c4b5fd; }
+.dsc-trans-speak-btn:active { transform: scale(0.96); }
+.dsc-trans-speak-btn.speaking { color: #b45309; background: #fef3c7; border-color: #fcd34d; }
 
 /* ---- 翻訳ブロック内：今回の翻訳の料金（本文の直下・ボックス最下部） ---- */
 .dsc-msg-translation .dsc-trans-cost-row {

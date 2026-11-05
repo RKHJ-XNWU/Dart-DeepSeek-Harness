@@ -209,7 +209,7 @@
       });
       var data = await res.json();
       if (!res.ok) { showToast(data.error || '保存に失敗しました', 'error'); return; }
-      showToast('保存済み', 'success');
+      showToast((window.I18N&&window.I18N.t)?window.I18N.t('保存済み'):'保存済み', 'success');
       hideEditor();
       loadList();
     } catch (e) {

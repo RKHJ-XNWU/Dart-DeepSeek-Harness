@@ -901,7 +901,7 @@
             applyOverlay(status);
             ensureFlowLoop();
             startPolling(cfg.pollSeconds);
-            toast('保存済み');
+            toast((window.I18N&&window.I18N.t)?window.I18N.t('保存済み'):'保存済み');
         }).catch(function (e) {
             toast('保存に失敗：' + e.message);
         });
@@ -1422,7 +1422,7 @@
 
         if (fields.indexOf('key') >= 0) {
             var keyLabel = editingChannel.type === 'telegram' ? 'Bot Token' : (editingChannel.type === 'bark' ? 'DeviceKey' : 'キー / SendKey');
-            box.appendChild(row(keyLabel, '保存済みのキーはマスク表示されます。変更しなければ元の値が保持されます。',
+            box.appendChild(row(keyLabel, (window.I18N&&window.I18N.t)?window.I18N.t('保存済みのキーはマスク表示されます。変更しなければ元の値が保持されます。'):'保存済みのキーはマスク表示されます。変更しなければ元の値が保持されます。',
                 mkText(editingChannel.key, 'ここに入力', function (v) { editingChannel.key = v; })));
         }
         if (fields.indexOf('server') >= 0) {
