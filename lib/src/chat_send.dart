@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'cosplay.dart';
 import 'deepseek_api.dart';
+import 'doubao.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -34,6 +35,7 @@ Future<void> handleDsChatSendStream(
   List<String> fileIDs,
   bool enableTools, {
   ModelRouteDecision? route,
+  String apiUrl = DS_API_URL,
 }) async {
   final sse = Sse(req.response);
 
@@ -85,6 +87,7 @@ Future<void> handleDsChatSendStream(
           sse.send('reasoning', {'delta': s});
         },
         usageAcc,
+        apiUrl: apiUrl,
       );
     } catch (e) {
       await sse.send('error', {'message': '$e'});
@@ -145,7 +148,8 @@ Future<void> handleDsChatSendStream(
       content: contentBuf.toString(),
       createdAt: rfc3339(DateTime.now()),
       reasoning: outcome.reasoning,
-      usage: usageAcc.snapshot(),
+      // 豆包経由では usage を保存しない（方舟の消費量を正確に取得できないため）
+      usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
     );
     appendDsMessage(aiMsg);
 
@@ -222,6 +226,7 @@ Future<void> handleDsChatSendStream(
         sse.send('content', {'delta': s});
       },
       usageAcc,
+      apiUrl: apiUrl,
     );
   } catch (e) {
     await sse.send('error', {'message': '$e'});
@@ -253,7 +258,7 @@ Future<void> handleDsChatSendStream(
     content: contentBuf.toString(),
     createdAt: rfc3339(DateTime.now()),
     reasoning: reasoningBuf.toString(),
-    usage: usageAcc.snapshot(),
+    usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
   );
   appendDsMessage(aiMsg);
 
@@ -523,14 +528,28 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   }
 
   final cfg = getDsConfig();
-  if (cfg.apiKey.isEmpty) {
-    await dsJSONErr(res, 400, '请先配置 DeepSeek API Key');
-    return;
-  }
   var model = mStr(body, 'model').trim();
   if (model.isEmpty) model = cfg.model;
   if (model.isEmpty) model = DS_DEFAULT_MODEL;
-  logp('🚀 使用モデル: $model (リクエスト=${mStr(body, 'model')}, 設定=${cfg.model})');
+
+  // ========== 豆包（火山方舟）通道判定 ==========
+  // 选中的模型属于豆包目录时，鉴权与终点全部切到方舟，
+  // 绝不把豆包模型名发往 DeepSeek（否则返回 400 invalid_request_error）。
+  final dbCfg = getDbConfig();
+  final useDoubao = dbIsChatModel(model);
+  if (useDoubao) {
+    if (dbCfg.apiKey.isEmpty) {
+      await dsJSONErr(res, 400, '已选择豆包模型，但豆包 API Key 未填写（设置 → 豆包设定）');
+      return;
+    }
+  } else if (cfg.apiKey.isEmpty) {
+    await dsJSONErr(res, 400, '请先配置 DeepSeek API Key');
+    return;
+  }
+  final callKey = useDoubao ? dbCfg.apiKey : cfg.apiKey;
+  final callUrl = useDoubao ? dbChatEndpoint() : DS_API_URL;
+  logp('🚀 使用モデル: $model (リクエスト=${mStr(body, 'model')}, 設定=${cfg.model}, '
+      '経路=${useDoubao ? '豆包/方舟' : 'DeepSeek'})');
 
   // ========== 小说模式分流 ==========
   if (novelMode) {
@@ -560,13 +579,13 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   if (enableTools) temperature = 0.0;
 
   // 注入提示词（system 角色）
-  final injected = <String>[];
-  for (var p in injectedPrompts) {
-    p = p.trim();
-    if (p.isNotEmpty) injected.add(p);
-  }
+  // 本机开发者工具（devtools）功能，按所有者要求恢复启用。
+  final injected = injectedPrompts
+      .map((e) => '$e'.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
   if (injected.isNotEmpty) {
-    logp('💉 [開発者ツール] ${injected.length} 件のプロンプトをシステム指示として注入しました（計 ${runeLen(injected.join('\n'))} 文字）');
+    logp('🧩 外部注入プロンプトを適用: ${injected.length} 件（system ロール）');
   }
 
   final fileCtx = buildFileContext(fileIDs);
@@ -577,8 +596,19 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   //   - 所选模型本身支持图片 → 原样使用；
   //   - 所选模型不支持（如 deepseek-v4-pro）→ 路由到视觉兜底模型。
   final routeSettings = getModelRouteSettings();
-  final route = resolveModelRoute(model,
-      hasImage: fileCtx.imageFileIds.isNotEmpty, settings: routeSettings);
+  // 豆包模型不参与 DeepSeek 的视觉路由（否则会被改名为 deepseek-flash）
+  final route = useDoubao
+      ? ModelRouteDecision(
+          requested: model,
+          effective: model,
+          visionModel: model,
+          reason: 'doubao-direct',
+          routed: false,
+          hasImage: fileCtx.imageFileIds.isNotEmpty,
+          requestedSupportsVision: fileCtx.imageFileIds.isNotEmpty,
+        )
+      : resolveModelRoute(model,
+          hasImage: fileCtx.imageFileIds.isNotEmpty, settings: routeSettings);
   if (route.hasImage || route.routed || route.reason == 'router-disabled') {
     recordModelRoute(route);
     logp('🔀 モデルルーティング: ${route.summary} · 視覚抽出モデル=${route.visionModel}');
@@ -617,8 +647,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
             '${i + 1} 枚目の画像の内容を詳しく説明し、含まれるすべての文字を抽出し、要点をまとめてください。';
         try {
           final desc = await callDsVisionAPI(
-              cfg.apiKey, visionPrompt, b64.b64, b64.mime, 4096, 1.0,
-              model: route.visionModel);
+              callKey, visionPrompt, b64.b64, b64.mime, 4096, 1.0,
+              model: route.visionModel, apiUrl: callUrl);
           if (desc.trim().isNotEmpty) {
             visionDescs.add('【${i + 1} 枚目の画像の内容抽出結果】\n$desc');
             logp('✅ ${i + 1} 枚目の画像の内容抽出に成功しました');
@@ -679,9 +709,9 @@ Future<void> handleDsChatSend(HttpRequest req) async {
 
   // ============ 流式分支 ============
   if (stream && !longTextMode) {
-    await handleDsChatSendStream(req, cfg.apiKey, model, apiMessages,
+    await handleDsChatSendStream(req, callKey, model, apiMessages,
         maxTokens, temperature, rounds, sessionID, content, fileIDs, enableTools,
-        route: route);
+        route: route, apiUrl: callUrl);
     return;
   }
 
@@ -695,8 +725,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     ];
     ToolStreamOutcome outcome;
     try {
-      outcome = await callDsWithTools(cfg.apiKey, model, agentMsgs, maxTokens,
-          temperature, DS_TOOL_MAX_ITERATIONS, usageAcc);
+      outcome = await callDsWithTools(callKey, model, agentMsgs, maxTokens,
+          temperature, DS_TOOL_MAX_ITERATIONS, usageAcc, apiUrl: callUrl);
     } catch (e) {
       await dsJSONErr(res, 500, 'ツール呼び出しに失敗しました: $e');
       return;
@@ -730,7 +760,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       content: outcome.content,
       createdAt: rfc3339(DateTime.now()),
       reasoning: fullReasoning,
-      usage: usageAcc.snapshot(),
+      // 豆包额度无法从方舟精确取得，故不落库 usage，避免误导
+      usage: useDoubao ? null : usageAcc.snapshot(),
     );
     appendDsMessage(aiMsg);
 
@@ -769,8 +800,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   String reply;
   String reasoning;
   try {
-    final r = await callDsMultiRound(cfg.apiKey, model, apiMessages, maxTokens,
-        temperature, rounds, null, usageAcc);
+    final r = await callDsMultiRound(callKey, model, apiMessages, maxTokens,
+        temperature, rounds, null, usageAcc, apiUrl: callUrl);
     reply = r.content;
     reasoning = r.reasoning;
   } catch (e) {
@@ -797,7 +828,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     content: reply,
     createdAt: rfc3339(DateTime.now()),
     reasoning: reasoning,
-    usage: usageAcc.snapshot(),
+    usage: useDoubao ? null : usageAcc.snapshot(),
   );
   appendDsMessage(aiMsg);
 

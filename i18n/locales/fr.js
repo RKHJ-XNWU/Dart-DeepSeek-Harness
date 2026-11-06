@@ -601,6 +601,40 @@ HH:MM。複数はカンマ区切り。その段階の進行中のみ発火しま
 この機能について|À propos de cette fonction
 有効開始日：2026-08-17 より。|Actif depuis : 2026-08-17.
 設定ファイル：|Fichier de configuration : 
+RTC ルーム（サーバー起動）|Salle RTC (démarrage côté serveur)
+RTC はサーバー側で音声エージェントを起動します。ブラウザで実際に通話するには公式 RTC Web SDK で同じルームに参加してください（本アプリには同梱していません）。|RTC démarre l'agent vocal côté serveur. Pour parler réellement depuis le navigateur, rejoignez la même salle avec le SDK Web RTC officiel (non fourni avec cette application).
+ルーム ID|ID de salle
+ユーザー ID|ID utilisateur
+音色 ID|ID de voix
+混合編成（外掛け LLM でツール／視覚を担当）|Mode hybride (le LLM externe gère outils et vision)
+RTC タスクを起動|Démarrer la tâche RTC
+RTC タスクを停止|Arrêter la tâche RTC
+状態を確認|Vérifier l'état
+RTC タスクを起動しています…|Démarrage de la tâche RTC…
+✅ RTC タスクを起動しました（TaskId: {0}）|✅ Tâche RTC démarrée (TaskId : {0})
+❌ RTC 起動失敗：{0}|❌ Échec du démarrage RTC : {0}
+❌ RTC 停止失敗：{0}|❌ Échec de l'arrêt RTC : {0}
+RTC 起動失敗|Échec du démarrage RTC
+RTC 起動済み|RTC démarré
+停止する RTC タスクがありません|Aucune tâche RTC à arrêter
+RTC タスクは起動していません|Aucune tâche RTC en cours
+✅ RTC タスクを停止しました|✅ Tâche RTC arrêtée
+⚠️ 音声サービス用の Key が未設定です（設定で豆包音声 API Key を入力してください）|⚠️ Clé du service vocal absente (saisissez la clé API Doubao Voice dans les réglages)
+RTC モードに切り替えました。ルーム ID を入れて起動してください。|Mode RTC activé. Saisissez l’ID de salle puis démarrez.
+RTC モジュールが読み込まれていません|Module RTC non chargé
+ルーム ID を入力してください|Veuillez saisir l'ID de salle
+起動失敗|Échec du démarrage
+未起動|Non démarré
+RTC 未設定：{0}|RTC non configuré : {0}
+RTC 設定は就緒しています（AppId: {0}）|RTC est prêt (AppId : {0})
+Seeduplex は就緒しています|Seeduplex est prêt
+Seeduplex 未設定：{0}|Seeduplex non configuré : {0}
+RTC 設定が不足しています：{0}|Configuration RTC incomplète : {0}
+端到端音声サービスには豆包音声コンソールの API Key が別途必要です（方舟の API Key では 401 になります）|Le service vocal de bout en bout nécessite une clé API distincte de la console Doubao Voice (la clé Ark renvoie 401).
+RTC AppId が未設定です|RTC AppId n'est pas renseigné
+RoomId が未設定です（設定画面かリクエストで指定）|RoomId n'est pas renseigné (à définir dans les réglages ou la requête)
+RTC の AccessKey / SecretKey が未設定です。設定画面で入力してください。|AccessKey / SecretKey RTC absents. Saisissez-les dans les réglages.
+AppId / RoomId / TaskId が必要です|AppId / RoomId / TaskId sont requis
 `);
 
 /* Messages d'erreur du serveur (Dart) — sources en chinois／japonais */
@@ -1187,4 +1221,235 @@ I18N.add('fr', `
 すべての # 件のプロンプトですか？この操作は元に戻せません！|Tous les # prompts ? Cette action est irréversible !
 ストリーミング出力|sortie en streaming
 📖 小説を執筆中です。数分かかる見込みです...|📖 Rédaction du roman en cours. Cela peut prendre quelques minutes...
+`);
+
+/* 豆包（火山方舟）機能 */
+I18N.add('fr', `
+豆包生图|Image Doubao
+豆包で画像生成|Générer une image avec Doubao
+豆包生成视频|Vidéo Doubao
+豆包で動画生成|Générer une vidéo avec Doubao
+豆包播客|Podcast Doubao
+豆包ポッドキャスト|Podcast Doubao
+豆包语音通话|Appel vocal Doubao
+豆包音声通話|Appel vocal Doubao
+閉じる|Fermer
+豆包（火山方舟）|Doubao (Volcengine Ark)
+豆包（火山方舟）設定|Paramètres Doubao (Ark)
+豆包の API Key は DeepSeek の Key とは別に保存します。現状は平文保存です（.sts）。|La clé API Doubao est stockée séparément de celle de DeepSeek. Elle est actuellement en clair (.sts).
+豆包 API Key|Clé API Doubao
+保存済みの場合、空欄なら変更しません|Si déjà enregistrée, laissez vide
+ベース URL|URL de base
+既定：https://ark.cn-beijing.volces.com/api/v3|Par défaut : https://ark.cn-beijing.volces.com/api/v3
+対話モデル|Modèle de dialogue
+画像モデル|Modèle d'image
+動画モデル|Modèle vidéo
+音声合成モデル|Modèle de synthèse vocale
+ポッドキャストモデル|Modèle de podcast
+音声認識モデル|Modèle de reconnaissance vocale
+リアルタイム音声モデル|Modèle vocal temps réel
+TTS リソース ID（任意）|ID de ressource TTS (facultatif)
+音色 A（話者 1）|Voix A (locuteur 1)
+音色 B（話者 2）|Voix B (locuteur 2)
+高速モード（深い思考をオフ）|Mode rapide (réflexion approfondie désactivée)
+豆包の言語モデルで深い思考を無効化し、最初の一文字が届くまでの待ち時間を大幅に短縮します（実測 16.8 秒 → 0.9 秒）|Désactive la réflexion approfondie des modèles 豆包 et réduit fortement l'attente du premier caractère (mesuré 16,8 s → 0,9 s)
+録音ファイルを豆包へ自動ルーティング|Routage automatique des enregistrements vers Doubao
+豆包以外のモデルを選んでいても、録音を送ると豆包で認識・分析します|Même avec un autre modèle, l'enregistrement est transcrit et analysé par Doubao
+生成物に透かしを入れる|Ajouter un filigrane
+画像・動画の「AI 生成」透かし（既定はオフ）|Filigrane « généré par IA » (désactivé par défaut)
+豆包設定を保存|Enregistrer les paramètres Doubao
+Key を消去|Effacer la clé
+豆包モデル一覧（17 種）|Liste des modèles Doubao (17)
+カスタムモデル値（例：doubao-seed-2-2-pro）|Modèle personnalisé (ex. doubao-seed-2-2-pro)
+追加|Ajouter
+✅ 豆包 Key 設定済み · 対話モデル：{0}|✅ Clé Doubao configurée · Modèle : {0}
+⚠️ 豆包 Key 未設定|⚠️ Clé Doubao non configurée
+保存済み（{0}）。空欄なら変更しません|Enregistrée ({0}). Laissez vide pour conserver
+ARK API Key を入力|Saisissez la clé API ARK
+保存中…|Enregistrement…
+✅ 豆包設定を保存しました|✅ Paramètres Doubao enregistrés
+❌ 保存に失敗：{0}|❌ Échec de l'enregistrement : {0}
+豆包設定の保存に失敗：{0}|Échec de l'enregistrement des paramètres Doubao : {0}
+豆包 API Key を消去しますか？|Effacer la clé API Doubao ?
+豆包 Key を消去しました|Clé Doubao effacée
+❌ 消去に失敗：{0}|❌ Échec de l'effacement : {0}
+モデル値を入力してください|Saisissez une valeur de modèle
+カスタムモデルを追加しました：{0}|Modèle personnalisé ajouté : {0}
+追加に失敗：{0}|Échec de l'ajout : {0}
+豆包で画像を生成|Générer une image avec Doubao
+ファイル名・説明・比率・スタイルを指定して生成します。生成物は ds_files/blob に保存されます。|Renseignez le nom, la description, le ratio et le style. Le résultat est enregistré dans ds_files/blob.
+画像のファイル名|Nom du fichier image
+例：夏の夜景|Ex. : vue nocturne d'été
+画像の説明（プロンプト）|Description de l'image
+例：夕暮れの海辺を歩く少女、逆光、フィルムグレイン|Ex. : une fille sur une plage au crépuscule, contre-jour, grain de film
+アスペクト比|Ratio d'image
+カスタム比率|Ratio personnalisé
+例：7:5|Ex. : 7:5
+スタイル|Style
+カスタムスタイル|Style personnalisé
+例：水彩画風、柔らかい光|Ex. : aquarelle, lumière douce
+モデル|Modèle
+解像度|Résolution
+生成する|Générer
+ファイル管理を開く|Ouvrir les fichiers
+⚠️ 画像の説明を入力してください|⚠️ Saisissez une description
+生成中…（最大 1〜2 分かかります）|Génération… (1 à 2 minutes)
+ファイル名：{0}|Nom du fichier : {0}
+ダウンロード|Télécharger
+もう一度生成|Régénérer
+✅ 生成しました · 比率 {0} · サイズ {1}|✅ Généré · Ratio {0} · Taille {1}
+✅ 画像を生成しました：{0}|✅ Image générée : {0}
+❌ 生成に失敗：{0}|❌ Échec de la génération : {0}
+画像生成に失敗：{0}|Échec de la génération d'image : {0}
+❌ 設定の読み込みに失敗：{0}|❌ Échec du chargement des paramètres : {0}
+豆包で動画を生成|Générer une vidéo avec Doubao
+Seedance によるテキスト→動画。完了まで数十秒〜数分かかり、生成物は ds_files/blob に保存されます。|Texte-vers-vidéo avec Seedance. Cela prend de quelques dizaines de secondes à plusieurs minutes ; le résultat est enregistré dans ds_files/blob.
+動画のファイル名|Nom du fichier vidéo
+例：海辺の夕日|Ex. : coucher de soleil sur la mer
+動画の説明（プロンプト）|Description de la vidéo
+例：夕暮れの海辺をゆっくり歩く少女、カメラは背後から追従|Ex. : une fille marchant lentement sur une plage au crépuscule, caméra en suivi arrière
+長さ（秒）|Durée (s)
+音声も生成する|Générer aussi l'audio
+セリフ・効果音つきの動画を生成（対応モデルのみ）|Vidéo avec voix et effets sonores (modèles compatibles)
+ポーリング停止|Arrêter le suivi
+ポーリングを停止しました（タスクはサーバー側で継続）|Suivi arrêté (la tâche continue côté serveur)
+⚠️ 動画の説明を入力してください|⚠️ Saisissez une description
+タスクを作成中…|Création de la tâche…
+生成中… タスク {0}|Génération… tâche {0}
+⚠️ タイムアウトしました。タスクはサーバー側で継続中です：{0}|⚠️ Délai dépassé. La tâche continue côté serveur : {0}
+状態：{0} · 経過 {1} 秒|État : {0} · {1} s écoulées
+✅ 生成しました：{0}|✅ Généré : {0}
+✅ 動画を生成しました|✅ Vidéo générée
+生成された動画を開く（保存に失敗したため一時 URL）|Ouvrir la vidéo (URL temporaire, échec de l'enregistrement)
+⚠️ 生成は成功しましたが、保存に失敗しました|⚠️ Génération réussie mais échec de l'enregistrement
+⚠️ 生成は成功しましたが、ファイル情報がありません|⚠️ Génération réussie mais aucune information de fichier
+⚠️ 照会に失敗（再試行します）：{0}|⚠️ Échec de la vérification (nouvelle tentative) : {0}
+豆包ポッドキャスト|Podcast Doubao
+テーマから 2 人の掛け合い台本を生成し、音声に合成します。音声は ds_files/blob に保存されます。|Générez un script à deux voix à partir d'un thème et synthétisez-le. L'audio est enregistré dans ds_files/blob.
+テーマ|Thème
+例：秋の読書におすすめの小説 3 冊|Ex. : 3 romans à lire cet automne
+雰囲気・スタイル（任意）|Ton / style (facultatif)
+例：ゆるい雑談、テンポよく|Ex. : discussion détendue, rythme vif
+長さ（分）|Durée (min)
+例：秋の読書ポッドキャスト|Ex. : podcast lecture d'automne
+音色 A|Voix A
+音色 B|Voix B
+⚠️ テーマを入力してください|⚠️ Saisissez un thème
+台本を生成して音声合成中…（行数が多いと数分かかります）|Rédaction du script et synthèse… (peut prendre plusieurs minutes)
+音声をダウンロード|Télécharger l'audio
+台本をダウンロード|Télécharger le script
+台本の保存に失敗：{0}|Échec de l'enregistrement du script : {0}
+✅ 生成しました（{0} 行中 {1} 行は合成失敗）|✅ Généré ({1} lignes sur {0} en échec)
+✅ 生成しました · {0} 行|✅ Généré · {0} lignes
+✅ ポッドキャストを生成しました|✅ Podcast généré
+ポッドキャスト生成に失敗：{0}|Échec de la génération du podcast : {0}
+マイクに向かって話すと、豆包が認識→応答→読み上げまで行います。|Parlez dans le micro : Doubao reconnaît, répond et lit la réponse.
+対話：{0} · 認識：{1} · 合成：{2}|Dialogue : {0} · ASR : {1} · TTS : {2}
+⚠️ 先に設定で豆包 API Key を入力してください|⚠️ Saisissez d'abord la clé API Doubao dans les paramètres
+待機中|En attente
+通話を開始|Démarrer l'appel
+マイク ON|Micro ON
+マイク OFF|Micro OFF
+通話を終了|Terminer l'appel
+音声が使えない場合はここに入力|Saisissez ici si l'audio est indisponible
+送信|Envoyer
+通話を終了しました|Appel terminé
+マイクへのアクセスを要求しています…|Demande d'accès au microphone…
+マイクを使用できません：{0}。下の入力欄から送信できます。|Micro indisponible : {0}. Utilisez le champ ci-dessous.
+マイク使用不可|Micro indisponible
+通話を開始しました。話しかけてください。|Appel démarré. Parlez.
+聞き取り中…|Écoute…
+ミュート中|Muet
+考えています…|Réflexion…
+読み上げ中…|Lecture…
+通話でエラー：{0}|Erreur d'appel : {0}
+音声の再生に失敗しました|Échec de la lecture audio
+自動再生がブロックされました：{0}|Lecture automatique bloquée : {0}
+通話を開始してください|Démarrez d'abord un appel
+🔀 録音ファイルを検出したため豆包へ自動ルーティングしました（{0}）|🔀 Enregistrement détecté — routé vers Doubao ({0})
+`);
+
+/* 豆包：スタイル名・補助文言 */
+I18N.add('fr', `
+シネマティック|Cinématographique
+ピクセル|Pixel
+中国アニメ風|Animation chinoise
+二次元|Style 2D
+日本アニメ風|Animé japonais
+特撮風|Tokusatsu
+田野風|Campagnard
+ファイル名|Nom du fichier
+例：seed-tts-2.0|Ex. : seed-tts-2.0
+動画生成に失敗：{0}|Échec de la génération de vidéo : {0}
+音声の読み取りに失敗しました|Échec de la lecture de l'audio
+`);
+
+/* 豆包モード（左上の＋の左のトグル） */
+I18N.add('fr', `
+豆包モード：オン（送信は豆包モデル）|Mode 豆包 : activé (envoi via un modèle 豆包)
+豆包モード：オフ（送信は DeepSeek）|Mode 豆包 : désactivé (envoi via DeepSeek)
+⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください|⚠️ La clé API 豆包 n'est pas définie. Saisissez-la dans Réglages → 豆包
+豆包モードをオンにしました（モデル：{0}）|Mode 豆包 activé (modèle : {0})
+豆包モードをオフにしました（DeepSeek に戻ります）|Mode 豆包 désactivé (retour à DeepSeek)
+豆包|豆包
+豆包モデルが未開通です：{0}|Modèle Doubao non activé : {0}
+火山方舟コンソールの「開通管理」でこのモデルを開通してください。|Activez ce modèle dans la console Ark, rubrique « Gestion des activations ».
+豆包モデルが見つかりません：{0}|Modèle Doubao introuvable ou accès refusé : {0}
+モデルIDが正しいか、コンソールで確認してください。|Vérifiez l'ID du modèle ou l'endpoint (ep-...) dans la console.
+豆包 API Key が無効です|Clé API Doubao invalide
+設定画面で豆包 API Key を確認してください。|Vérifiez la clé API Doubao dans les paramètres.
+豆包アカウントの残高またはクォータが不足しています|Solde ou quota Doubao insuffisant
+リクエストが多すぎます。しばらく待ってから再試行してください。|Trop de requêtes. Réessayez plus tard.
+API 呼び出しに失敗しました|Échec de l'appel API
+コンソールのアドレスをコピー|Copier l'adresse de la console
+詳細：{0}|Détails : {0}
+エンドツーエンドリアルタイム音声（Seeduplex）|Voix en temps réel de bout en bout (Seeduplex)
+全双工のリアルタイム通話。ブラウザは独自ヘッダーを付けられないため、ローカルサービスが X-Api-Key を付けて wss へプロキシします。|Appel temps réel en full-duplex. Les navigateurs ne peuvent pas ajouter d'en-têtes personnalisés ; le service local ajoute donc X-Api-Key et relaie vers wss.
+全双工の音色（任意）|Voix full-duplex (facultatif)
+空欄なら音色 A を使用|Laisser vide pour utiliser la voix A
+全双工の言語|Langue du full-duplex
+全双工の人設プロンプト（任意）|Prompt de personnage full-duplex (facultatif)
+空欄なら既定の短文プロンプト|Laisser vide pour utiliser le prompt court par défaut
+RTC AI 音声・映像インタラクション|Interaction audio/vidéo RTC AI
+RTC 側はサーバー API（StartVoiceChat）でタスクを作成します。ブラウザで実際に音声・映像を送受信するには、公式 RTC Web SDK の導入が別途必要です。|Le côté RTC crée les tâches via l'API serveur (StartVoiceChat). Pour réellement envoyer et recevoir de l'audio/vidéo dans le navigateur, le SDK Web RTC officiel doit être ajouté séparément.
+RTC AppId|RTC AppId
+RoomId|RoomId
+既定のルーム ID|ID de salle par défaut
+AccessKey|AccessKey
+SecretKey|SecretKey
+変更しない場合は空欄|Laisser vide pour ne pas modifier
+S2S AppId|S2S AppId
+エンドツーエンド音声サービスの AppId|AppId du service vocal de bout en bout
+S2S Token|S2S Token
+通話モード|Mode d'appel
+ターン制（録音→認識→応答）|Par tours (enregistrer → reconnaître → répondre)
+全双工 Seeduplex（低遅延）|Full-duplex Seeduplex (faible latence)
+全双工モードに切り替えました。開始を押すとそのまま繋がります。|Passé en mode full-duplex. Appuyez sur Démarrer pour vous connecter.
+ターン制モードに切り替えました。|Passé en mode par tours.
+割り込み|Interrompre
+応答を割り込みました|Réponse interrompue
+全双工モードでのみ使用できます|Disponible uniquement en mode full-duplex
+全双工モジュールが読み込まれていません|Le module full-duplex n'est pas chargé
+接続済み（全双工）|Connecté (full-duplex)
+セッション終了|Session terminée
+音声認識に失敗しました|La reconnaissance vocale a échoué
+応答中…|Réponse en cours…
+不明なエラー|Erreur inconnue
+接続に失敗しました：{0}|Échec de la connexion : {0}
+接続失敗|Échec de la connexion
+豆包エラー：{0}|Erreur Doubao : {0}
+接続しています…|Connexion…
+⚠️ 先に設定で豆包 API Key を入力してください|⚠️ Veuillez d'abord saisir la clé API Doubao dans les réglages
+未設定|Non configuré
+設定の読み込みに失敗しました：{0}|Échec du chargement des réglages : {0}
+音声処理の初期化に失敗しました：{0}|Échec de l'initialisation du traitement audio : {0}
+WebSocket を作成できません：{0}|Impossible de créer le WebSocket : {0}
+全双工通話を開始しました。話しかけてください。|Appel full-duplex démarré. Vous pouvez parler.
+接続でエラーが発生しました（Key やネットワークを確認してください）|Une erreur de connexion est survenue (vérifiez la clé et le réseau)
+接続エラー|Erreur de connexion
+接続が切断されました（code={0}）|Connexion interrompue (code={0})
+モデルがツール呼び出しを要求しました（未実装のため実行しません）|Le modèle a demandé un appel d'outil (non implémenté, donc non exécuté)
+マイクを使用できません：{0}|Impossible d'utiliser le microphone : {0}
+豆包音声 API Key（Seeduplex 用）|Clé API voix Doubao (pour Seeduplex)
+方舟の API Key では 401 になります。豆包音声コンソールの API Key を入力してください。|La clé API d'Ark renvoie 401. Saisissez la clé API de la console voix Doubao.
 `);

@@ -44,6 +44,8 @@
         '.dsc-s-time',         // 時刻表示
         '.dsc-msg-time',       // メッセージ時刻
         '.dsc-think-body',     // AI の思考ログ
+        '.dsc-db-bubble',      // 豆包音声通話の発話ログ（ユーザー/AI 本文）
+        '.dsc-db-script',      // 豆包ポッドキャストの台本（生成コンテンツ）
     ].join(',');
 
     // SKIP 領域のうち、アプリ自身の UI 文言は翻訳対象に戻す
@@ -160,7 +162,14 @@
         var c = Object.create(null);
         for (var k in d) {
             if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
-            if (hasDigit(k)) c[normalize(k)] = d[k];
+            if (hasDigit(k)) {
+                c[normalize(k)] = d[k];
+            } else if (k.indexOf('#') >= 0) {
+                // 辞書側が最初から # プレースホルダで書かれている条目
+                // （例「全 # 件ヒット|# hits total」）は数字を含まないため
+                // 上の分岐に入らず、実行時の数字正規化と一致できなかった。
+                c[k] = d[k];
+            }
         }
         dictCache[code] = c;
         return c;

@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'doubao.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -205,19 +206,26 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
   void Function(String)? onContent,
   DsUsageAcc? usageAcc,
   bool clampMax = true,
+  String apiUrl = DS_API_URL,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 4096;
   if (clampMax && mt > 120000) mt = 120000;
+  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
   if (temperature < 0) temperature = 0;
 
+  // 方舟（豆包）は stream_options 非対応の可能性があるため DeepSeek のみ付与
+  // 豆包の「快速モード」有効時は深度思考を無効化する
+  // （実測：初回本文までの待ち時間 16.83s → 0.86s）
+  final thinkParam = apiUrl == DS_API_URL ? null : dbThinkingParam(model);
   final body = <String, dynamic>{
     'model': model,
     'messages': messages,
     'stream': true,
     'max_tokens': mt,
     'temperature': temperature,
-    'stream_options': dsUsageStreamOptions(),
+    if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
+    if (thinkParam != null) 'thinking': thinkParam,
   };
   if (tools != null && tools.isNotEmpty) {
     body['tools'] = tools;
@@ -225,12 +233,30 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
   }
 
   final client = globalHTTPClient;
-  final req = await client.postUrl(Uri.parse(DS_API_URL));
-  req.headers.set('Content-Type', 'application/json');
-  req.headers.set('Authorization', 'Bearer $apiKey');
-  req.headers.set('Accept', 'text/event-stream');
-  req.add(utf8.encode(jsonEncode(body)));
-  final resp = await req.close();
+
+  Future<HttpClientResponse> sendOnce(bool withThinking) async {
+    final b = Map<String, dynamic>.from(body);
+    if (!withThinking) b.remove('thinking');
+    final r = await client.postUrl(Uri.parse(apiUrl));
+    r.headers.set('Content-Type', 'application/json');
+    r.headers.set('Authorization', 'Bearer $apiKey');
+    r.headers.set('Accept', 'text/event-stream');
+    r.add(utf8.encode(jsonEncode(b)));
+    return r.close();
+  }
+
+  var resp = await sendOnce(thinkParam != null);
+  if (resp.statusCode == 400 && thinkParam != null) {
+    final txt = utf8.decode(
+        await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
+        allowMalformed: true);
+    if (txt.toLowerCase().contains('thinking')) {
+      logp('⚠️ 方舟が thinking パラメータを拒否しました。パラメータを外して再試行します');
+      resp = await sendOnce(false);
+    } else {
+      throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
+    }
+  }
 
   if (resp.statusCode != 200) {
     final txt = utf8.decode(await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
@@ -304,28 +330,47 @@ Future<({String content, String reasoning})> callDsChatAPI(
   double temperature,
   DsUsageAcc? usageAcc, {
   bool raw = false,
+  String apiUrl = DS_API_URL,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
   if (mt > 300000) mt = 300000;
+  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
   var temp = temperature;
   if (temp <= 0) temp = 1.0;
 
+  final thinkParam = apiUrl == DS_API_URL ? null : dbThinkingParam(model);
   final body = <String, dynamic>{
     'model': model,
     'messages': messages,
     'stream': false,
     'max_tokens': mt,
     'temperature': temp,
+    if (thinkParam != null) 'thinking': thinkParam,
   };
   final client = globalHTTPClientWithTimeout;
-  final req = await client.postUrl(Uri.parse(DS_API_URL));
-  req.headers.set('Content-Type', 'application/json');
-  req.headers.set('Authorization', 'Bearer $apiKey');
-  req.add(utf8.encode(jsonEncode(body)));
-  final resp = await req.close();
-  final rawBytes = await resp.fold<List<int>>([], (a, b) => a..addAll(b));
-  final txt = utf8.decode(rawBytes, allowMalformed: true);
+
+  Future<HttpClientResponse> sendOnce(bool withThinking) async {
+    final b = Map<String, dynamic>.from(body);
+    if (!withThinking) b.remove('thinking');
+    final r = await client.postUrl(Uri.parse(apiUrl));
+    r.headers.set('Content-Type', 'application/json');
+    r.headers.set('Authorization', 'Bearer $apiKey');
+    r.add(utf8.encode(jsonEncode(b)));
+    return r.close();
+  }
+
+  var resp = await sendOnce(thinkParam != null);
+  var rawBytes = await resp.fold<List<int>>([], (a, b) => a..addAll(b));
+  var txt = utf8.decode(rawBytes, allowMalformed: true);
+  if (resp.statusCode == 400 &&
+      thinkParam != null &&
+      txt.toLowerCase().contains('thinking')) {
+    logp('⚠️ 方舟が thinking パラメータを拒否しました。パラメータを外して再試行します');
+    resp = await sendOnce(false);
+    rawBytes = await resp.fold<List<int>>([], (a, b) => a..addAll(b));
+    txt = utf8.decode(rawBytes, allowMalformed: true);
+  }
 
   if (resp.statusCode != 200) {
     String msg = '';
@@ -360,11 +405,13 @@ Future<DsRawResponse> callDsChatAPIRaw(
   int maxTokens,
   double temperature,
   bool withTools,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
   if (mt > 300000) mt = 300000;
+  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
   if (temperature < 0) temperature = 0;
 
   final body = <String, dynamic>{
@@ -379,7 +426,7 @@ Future<DsRawResponse> callDsChatAPIRaw(
     body['tool_choice'] = 'auto';
   }
   final client = globalHTTPClient;
-  final req = await client.postUrl(Uri.parse(DS_API_URL));
+  final req = await client.postUrl(Uri.parse(apiUrl));
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.add(utf8.encode(jsonEncode(body)));
@@ -418,8 +465,9 @@ Future<void> callDsChatAPIStream(
   double temperature,
   void Function(String)? onReasoning,
   void Function(String)? onContent,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
   if (mt > 300000) mt = 300000;
@@ -432,10 +480,10 @@ Future<void> callDsChatAPIStream(
     'stream': true,
     'max_tokens': mt,
     'temperature': temp,
-    'stream_options': dsUsageStreamOptions(),
+    if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
   };
   final client = globalHTTPClient;
-  final req = await client.postUrl(Uri.parse(DS_API_URL));
+  final req = await client.postUrl(Uri.parse(apiUrl));
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.headers.set('Accept', 'text/event-stream');
@@ -480,8 +528,9 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
   Future<void> Function(String phase, String name, String args, String result)?
       onToolCall,
   void Function(String)? onReasoning,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   var maxIter = maxIterations <= 0 ? DS_TOOL_MAX_ITERATIONS : maxIterations;
   var mt = maxTokens <= 0 ? 330000 : maxTokens;
   temperature = 0.0; // 工具模式恒为 0（确定性输出）
@@ -506,6 +555,7 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
       onContent: onContent,
       usageAcc: usageAcc,
       clampMax: false,
+      apiUrl: apiUrl,
     );
 
     if (r.reasoning.trim().isNotEmpty) finalReasoning.write(r.reasoning);
@@ -589,8 +639,9 @@ Future<ToolStreamOutcome> callDsWithTools(
   int maxTokens,
   double temperature,
   int maxRounds,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   final maxIter = maxRounds <= 0 ? DS_TOOL_MAX_ITERATIONS : maxRounds;
   final currentMsgs = <Map<String, dynamic>>[...messages];
   final reasoningParts = <String>[];
@@ -600,7 +651,8 @@ Future<ToolStreamOutcome> callDsWithTools(
 
   for (var round = 0; round < maxIter; round++) {
     final resp = await callDsChatAPIRaw(
-        apiKey, model, currentMsgs, maxTokens, temperature, true, usageAcc);
+        apiKey, model, currentMsgs, maxTokens, temperature, true, usageAcc,
+        apiUrl: apiUrl);
     if (resp.reasoning.trim().isNotEmpty) reasoningParts.add(resp.reasoning);
     if (resp.toolCalls.isEmpty) {
       return ToolStreamOutcome(resp.content, reasoningParts.join('\n\n─────\n\n'), toolLogs);
@@ -675,12 +727,13 @@ Future<({String content, String reasoning})> callDsMultiRound(
   double temperature,
   int rounds,
   void Function(int round, int total, String stage)? progressFn,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   if (rounds < 1) rounds = 1;
   progressFn?.call(1, rounds, '正在生成初稿...');
   final first = await callDsChatAPI(
-      apiKey, model, messages, maxTokens, temperature, usageAcc);
+      apiKey, model, messages, maxTokens, temperature, usageAcc, apiUrl: apiUrl);
   if (rounds == 1) return (content: first.content, reasoning: first.reasoning);
 
   final reasoningParts = <String>[];
@@ -697,7 +750,7 @@ Future<({String content, String reasoning})> callDsMultiRound(
     ];
     try {
       final r = await callDsChatAPI(
-          apiKey, model, reflectMsgs, maxTokens, temperature, usageAcc);
+          apiKey, model, reflectMsgs, maxTokens, temperature, usageAcc, apiUrl: apiUrl);
       if (r.content.trim().isEmpty) break;
       currentReply = r.content;
       if (r.reasoning.trim().isNotEmpty) {
@@ -724,8 +777,9 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   void Function(int round, int total, String stage)? onRound,
   void Function(String)? onReasoning,
   void Function(String)? onContent,
-  DsUsageAcc? usageAcc,
-) async {
+  DsUsageAcc? usageAcc, {
+  String apiUrl = DS_API_URL,
+}) async {
   if (rounds < 1) rounds = 1;
   onRound?.call(1, rounds, '正在生成初稿...');
 
@@ -738,7 +792,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   }, (s) {
     firstContent.write(s);
     onContent?.call(s);
-  }, usageAcc);
+  }, usageAcc, apiUrl: apiUrl);
 
   if (rounds == 1) {
     return (
@@ -770,7 +824,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
       }, (s) {
         newContent.write(s);
         onContent?.call(s);
-      }, usageAcc);
+      }, usageAcc, apiUrl: apiUrl);
     } catch (e) {
       logp('⚠️ 第 $i ラウンドの内省に失敗しました: $e。前回の結果を使用します');
       break;
@@ -792,7 +846,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
 // ------------------------------------------------------------
 Future<String> callDsVisionAPI(String apiKey, String textPrompt,
     String imageBase64, String mime, int maxTokens, double temperature,
-    {String model = ''}) async {
+    {String model = '', String apiUrl = ''}) async {
   var mt = maxTokens <= 0 ? 300000 : maxTokens;
   var temp = temperature <= 0 ? 1.0 : temperature;
   final content = <Map<String, dynamic>>[];
@@ -817,7 +871,7 @@ Future<String> callDsVisionAPI(String apiKey, String textPrompt,
     'temperature': temp,
   };
   final client = globalHTTPClientWithTimeout;
-  final req = await client.postUrl(Uri.parse(DS_API_URL));
+  final req = await client.postUrl(Uri.parse(apiUrl.isNotEmpty ? apiUrl : DS_API_URL));
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.add(utf8.encode(jsonEncode(body)));

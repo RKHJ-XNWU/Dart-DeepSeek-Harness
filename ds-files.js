@@ -58,6 +58,7 @@
             case 'document': return '📄';
             case 'code': return '💻';
             case 'minecraft': return '🧱';
+            case 'audio': return '🎵';
             default: return '📦';
         }
     }

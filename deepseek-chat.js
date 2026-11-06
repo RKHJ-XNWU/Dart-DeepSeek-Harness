@@ -255,25 +255,113 @@
         if (!wrap) { console.log('[DSC]', msg); return; }
         var el = document.createElement('div');
         el.className = 'dsc-toast ' + (type || '');
-        el.textContent = msg;
+        el.textContent = dscT(msg);
         wrap.appendChild(el);
         setTimeout(function () { el.remove(); }, 2600);
     }
 
-    function showCenterError(msg) {
+    // 中央エラー表示（opts 省略時は従来と同一挙動）
+    // opts: { ms, closeable, action: { label, onClick } }
+    function showCenterError(msg, opts) {
+        opts = opts || {};
         var old = document.getElementById('dscCenterError');
         if (old) old.remove();
         var el = document.createElement('div');
         el.id = 'dscCenterError';
-        el.textContent = msg;
         el.style.cssText =
             'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
             'background:#4a4a4a;color:#ffffff;padding:14px 22px;border-radius:12px;' +
             'font-size:0.95rem;font-weight:500;line-height:1.5;letter-spacing:0.02em;' +
             'z-index:200000;box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;' +
-            'text-align:center;white-space:nowrap;';
+            'text-align:center;white-space:nowrap;max-width:86vw;';
+
+        var body = document.createElement('div');
+        body.textContent = (msg == null ? '' : String(msg));
+        body.style.cssText = 'white-space:pre-wrap;word-break:break-word;text-align:left;';
+        el.appendChild(body);
+
+        var act = opts.action;
+        if (act && act.label) {
+            el.style.pointerEvents = 'auto';
+            var abtn = document.createElement('button');
+            abtn.type = 'button';
+            abtn.textContent = act.label;
+            abtn.style.cssText = 'margin-top:10px;display:block;width:100%;padding:8px 12px;border:0;border-radius:8px;' +
+                'background:#2563eb;color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;font-family:inherit;';
+            abtn.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                try { if (typeof act.onClick === 'function') act.onClick(); } catch (eAct) {}
+            });
+            el.appendChild(abtn);
+        }
+        if (opts.closeable) {
+            el.style.pointerEvents = 'auto';
+            var xh = document.createElement('div');
+            xh.textContent = '\u2715';
+            xh.style.cssText = 'position:absolute;top:6px;right:10px;font-size:0.8rem;opacity:0.7;';
+            el.appendChild(xh);
+            el.addEventListener('click', function () { if (el.parentNode) el.remove(); });
+        }
+
         document.body.appendChild(el);
-        setTimeout(function () { if (el.parentNode) el.remove(); }, 3000);
+        var ms = (opts.ms == null ? 3000 : opts.ms);
+        if (ms > 0) setTimeout(function () { if (el.parentNode) el.remove(); }, ms);
+        return el;
+    }
+
+    // ============================================================
+    // ★ API エラー本文を、原因ごとに現在言語で分かりやすく提示する
+    //   （従来は原因を問わず「残高を確認」と表示しており、誤解を招いていた）
+    // ============================================================
+    var DSC_ARK_CONSOLE_URL = 'https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement';
+    function dscFormatApiError(raw) {
+        var s = (raw == null ? '' : String(raw)).trim();
+        var low = s.toLowerCase();
+        var reqId = '';
+        var mReq = s.match(/Request id:\s*([0-9A-Za-z]+)/i);
+        if (mReq) reqId = mReq[1];
+        var model = '';
+        var mModel = s.match(/model\s+(?:or\s+endpoint\s+)?([A-Za-z0-9._\-]+)/i);
+        if (mModel) model = mModel[1].replace(/[.,;:]+$/, '');
+
+        var kind = 'other';
+        var text = '';
+        var needConsole = false;
+
+        if (low.indexOf('has not activated the model') !== -1 || low.indexOf('activate the model service') !== -1) {
+            kind = 'not_activated';
+            needConsole = true;
+            text = dscT('豆包モデルが未開通です：{0}', model || '-') + '\n' +
+                   dscT('火山方舟コンソールの「開通管理」でこのモデルを開通してください。');
+        } else if (low.indexOf('does not exist or you do not have access') !== -1 ||
+                   low.indexOf('invalidendpointormodel') !== -1 ||
+                   low.indexOf('modelnotopen') !== -1 ||
+                   low.indexOf('model not found') !== -1) {
+            kind = 'no_model';
+            needConsole = true;
+            text = dscT('豆包モデルが見つかりません：{0}', model || '-') + '\n' +
+                   dscT('モデルIDが正しいか、コンソールで確認してください。');
+        } else if (low.indexOf('api key format is incorrect') !== -1 ||
+                   low.indexOf('invalid api key') !== -1 ||
+                   low.indexOf('unauthorized') !== -1 ||
+                   /\b401\b/.test(s)) {
+            kind = 'auth';
+            text = dscT('豆包 API Key が無効です') + '\n' + dscT('設定画面で豆包 API Key を確認してください。');
+        } else if (low.indexOf('insufficientbalance') !== -1 ||
+                   low.indexOf('insufficient balance') !== -1 ||
+                   low.indexOf('account balance') !== -1 ||
+                   low.indexOf('quota') !== -1 ||
+                   s.indexOf('残高') !== -1 || s.indexOf('余额') !== -1) {
+            kind = 'balance';
+            text = dscT('豆包アカウントの残高またはクォータが不足しています');
+        } else if (low.indexOf('ratelimit') !== -1 || low.indexOf('rate limit') !== -1 || /\b429\b/.test(s)) {
+            kind = 'rate';
+            text = dscT('リクエストが多すぎます。しばらく待ってから再試行してください。');
+        } else {
+            text = dscT('API 呼び出しに失敗しました') + '\n' + s;
+        }
+        if (reqId) text += '\n' + dscT('詳細：{0}', 'Request id: ' + reqId);
+        return { kind: kind, text: text, needConsole: needConsole, model: model, requestId: reqId };
     }
 
     function copyToClipboard(text) {
@@ -311,8 +399,8 @@
         return new Promise(function (resolve) {
             var overlay = $('dscConfirmOverlay');
             if (!overlay) { resolve(window.confirm(title + '\n' + msg)); return; }
-            $('dscConfirmTitle').textContent = title;
-            $('dscConfirmMsg').textContent = msg;
+            $('dscConfirmTitle').textContent = dscT(title);
+            $('dscConfirmMsg').textContent = dscT(msg);
             overlay.classList.add('open');
             state.confirmCb = function (ok) {
                 overlay.classList.remove('open');
@@ -462,8 +550,54 @@
         return { hit: hit, miss: miss, out: out, prompt: prompt, total: prompt + out };
     }
 
-    function dsUsageChipHtml(u) {
+    // ★ 豆包（火山方舟）モデルでは token／料金を表示しない。
+    //   豆包の課金単位・単価は DeepSeek と別系統で、当アプリ側では正確な金額を出せない。
+    //   不正確な数字を出すより「出さない」方が誠実なので、豆包では一切表示しない。
+    function dscIsDoubaoModelId(model) {
+        var v = String(model || '').trim();
+        if (!v) return false;
+        try {
+            if (typeof window.dscIsDoubaoModelId === 'function') return !!window.dscIsDoubaoModelId(v);
+        } catch (e) {}
+        return /^(doubao|glm|seed|volc)/i.test(v);
+    }
+
+    function dscHideUsage(model) {
+        // ① 豆包モード中は送信先が豆包へ差し替わるため、モデル値に関わらず必ず隠す
+        //    （モード中も state.currentModel は deepseek-flash のままなので、これが最優先）
+        try {
+            if (window.dscDoubaoModeOn && window.dscDoubaoModeOn()) return true;
+        } catch (e) {}
+        // ② そのメッセージ自身が豆包系モデルの出力なら隠す
+        var v = String(model || '').trim();
+        if (dscIsDoubaoModelId(v)) return true;
+        return false;
+    }
+
+    // 豆包へ自動ルーティングされた返信は、バックエンドが usage を返さない建前だが、
+    // 旧ビルドのバックエンドが返してきた場合に備えてフロントでも落とす（二重の防御）
+    function dscStripDoubaoUsage(payload) {
+        try {
+            var r = payload && payload.doubaoRoute;
+            if (!r || !r.routed) return;
+            var arr = (state && state.messages) ? state.messages : [];
+            for (var i = arr.length - 1; i >= 0; i--) {
+                if (arr[i] && arr[i].role !== 'user') {
+                    if (arr[i].usage) arr[i].usage = null;
+                    break;
+                }
+            }
+            var boxes = document.querySelectorAll('#dscMessages .dsc-msg-usage');
+            if (boxes && boxes.length) {
+                var last = boxes[boxes.length - 1];
+                if (last && last.parentNode) last.parentNode.removeChild(last);
+            }
+        } catch (e) {}
+    }
+
+    function dsUsageChipHtml(u, model) {
         if (!u) return '';
+        if (dscHideUsage(model)) return '';
         var t = dscNormalizeUsage(u);
         if (!t) return '';
         var hit = t.hit;
@@ -600,6 +734,7 @@
     }
     
     function dscCostChipHtml(u, model) {
+        if (dscHideUsage(model)) return '';
         var r = dscCalcCost(u, model);
         if (!r) return '';
         var tip = (r.peak ? dscT('ピーク') : dscT('アイドル')) + dscT('時間帯単価の計算（アイドル＝ピークの半額）：') +
@@ -613,7 +748,7 @@
     }
 
         function dsUsageBlockHtml(u, model) {
-        var chip = dsUsageChipHtml(u);
+        var chip = dsUsageChipHtml(u, model);
         if (!chip) return '';
         var costChip = dscCostChipHtml(u, model);
         return '<div class="dsc-msg-usage">' + chip + costChip + '</div>';
@@ -1392,7 +1527,7 @@
             if (empty) {
                 empty.style.display = 'block';
                 var p = empty.querySelector('p');
-                if (p) p.textContent = state.searchQuery ? '一致するセッションがありません' : 'セッションがまだありません';
+                if (p) p.textContent = dscT(state.searchQuery ? '一致するセッションがありません' : 'セッションがまだありません');
             }
         } else if (empty) {
             empty.style.display = 'none';
@@ -1407,7 +1542,7 @@
         var selectAll = $('dscBatchSelectAll');
         var selBtn = $('dscSelectModeBtn');
         if (batchBar) batchBar.classList.toggle('show', state.selectMode);
-        if (selBtn) selBtn.textContent = state.selectMode ? '✕ 複数選択を終了' : '☑️ 複数選択';
+        if (selBtn) selBtn.textContent = dscT(state.selectMode ? '✕ 複数選択を終了' : '☑️ 複数選択');
         var count = Object.keys(state.checkedIds).length;
         if (countEl) countEl.textContent = '選択 ' + count;
         var filtered = getFilteredSessions();
@@ -1607,7 +1742,7 @@
         if (sess) {
             if (subEl) subEl.textContent = (sess.title || dscT('無題')) + dscT(' · 全 {0} 件のセッション · {1}', state.sessions.length, state.currentModel);
         } else {
-            if (subEl) subEl.textContent = 'DeepSeek チャット · モデル: ' + state.currentModel;
+            if (subEl) subEl.textContent = dscT('DeepSeek チャット · モデル: ') + state.currentModel;
         }
     }
 
@@ -1886,7 +2021,7 @@
             '<div class="dsc-msg-avatar">🤖</div>' +
             '<div class="dsc-msg-content">' +
             '<div class="dsc-msg-bubble">' +
-            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + (label || dscT('生成中...')) + '</div>' +
+            '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:6px;">' + dscT(label || '生成中...') + '</div>' +
             '<div class="dsc-typing"><span></span><span></span><span></span></div>' +
             '</div>' +
             '</div>';
@@ -1957,8 +2092,15 @@
                 needRender = true;
             }
 
-            // ★ 描画頻度：70ms → 45ms
-            if (needRender && (!t.lastRenderTs || ts - t.lastRenderTs > 45)) {
+            // ★ 描画頻度：短文 40ms、長文は間引く
+            //  renderMarkdown は毎回全文を走査するため、長い応答では
+            //  描画間隔を広げないとメインスレッドを占有して「流れが遅く」見える
+            var renderInterval = 40;
+            var contentLen = t.contentBuf.length;
+            if (contentLen > 12000) renderInterval = 160;
+            else if (contentLen > 6000) renderInterval = 110;
+            else if (contentLen > 2500) renderInterval = 70;
+            if (needRender && (!t.lastRenderTs || ts - t.lastRenderTs > renderInterval)) {
                 t.lastRenderTs = ts;
                 if (t.bubbleEl) t.bubbleEl.innerHTML = renderMarkdown(t.contentShown);
                 if (t.thinkBodyEl) {
@@ -2227,7 +2369,7 @@
         if (thinkPanel && t.reasoningBuf.trim() !== '') {
             if (thinkLabel) {
                 if (toolModeActive) {
-                    thinkLabel.textContent = '🤖 思考チェーンとツール呼び出しの記録（全 ' + toolRound + ' ラウンド）';
+                    thinkLabel.textContent = dscT('🤖 思考チェーンとツール呼び出しの記録（全 ' + toolRound + ' ラウンド）');
                 } else {
                     thinkLabel.textContent = dscT('推論過程とツール呼び出しの記録');
                 }
@@ -2272,7 +2414,7 @@
         // ★ バックエンドが返す実際の usage を吹き出しの下に描画（メッセージから 0.2em）
         var usageBox = aiMsgEl.querySelector('.dsc-msg-usage');
         if (usageBox) {
-            var usageChip = dsUsageChipHtml(aiMessage.usage);
+            var usageChip = dsUsageChipHtml(aiMessage.usage, aiMessage.model || state.currentModel);
             if (usageChip) {
                 usageBox.innerHTML = usageChip + dscCostChipHtml(aiMessage.usage, aiMessage.model || state.currentModel);
                 usageBox.style.display = '';
@@ -2679,7 +2821,7 @@
         }
 
         var tipMsg = dscT('次で思考中: {0} ...', state.currentModel);
-        if (state.enableTools) tipMsg = '🤖 自律エージェント起動...';
+        if (state.enableTools) tipMsg = dscT('🤖 自律エージェント起動（最大 50 億ラウンド）');
         showTyping(tipMsg);
 
         var aiMsgElRef = null;
@@ -2745,6 +2887,8 @@
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 decorateContinueButton();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(dataStream);
+                if (typeof window.dscDoubaoRouteToast === 'function') window.dscDoubaoRouteToast(dataStream);
+                dscStripDoubaoUsage(dataStream);
                 toast(dscT('✅ 生成しました：{0} 字（{1}）', ((dataStream && dataStream.charCount) || 0).toLocaleString(), ((dataStream && dataStream.model) || state.currentModel)), 'success');
             } else {
                 var response = await fetch('/api/ds-chat/send', {
@@ -2784,6 +2928,8 @@
                 }
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(data);
+                if (typeof window.dscDoubaoRouteToast === 'function') window.dscDoubaoRouteToast(data);
+                dscStripDoubaoUsage(data);
                 toast('✅ 生成しました：' + (data.charCount || 0).toLocaleString() + ' 字', 'success');
             }
         } catch (e) {
@@ -2798,7 +2944,16 @@
             } else {
                 hideTyping();
                 if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('failed');
-                showCenterError('API 呼び出しに失敗しました。アカウント残高を確認してください');
+                var dscErrRaw = (e && e.message) ? e.message : String(e || '');
+                var dscErrInfo = dscFormatApiError(dscErrRaw);
+                var dscErrOpts = { ms: 12000, closeable: true };
+                if (dscErrInfo.needConsole) {
+                    dscErrOpts.action = {
+                        label: dscT('コンソールのアドレスをコピー'),
+                        onClick: function () { copyToClipboard(DSC_ARK_CONSOLE_URL); }
+                    };
+                }
+                showCenterError(dscErrInfo.text, dscErrOpts);
                 var idx2 = state.messages.findIndex(function (m) { return m.id === userMsg.id; });
                 if (idx2 !== -1) state.messages.splice(idx2, 1);
                 renderMessages();
@@ -2892,7 +3047,7 @@
             }, aiMsgEl, {
                 onEvent: function (ev, obj) {
                     if (ev === 'novel_progress') {
-                        tipEl.textContent = '📖 執筆済み ' + obj.done.toLocaleString() + ' / ' + obj.target.toLocaleString() + ' 字';
+                        tipEl.textContent = dscT('📖 執筆済み ' + obj.done.toLocaleString() + ' / ' + obj.target.toLocaleString() + ' 字');
                     } else if (ev === 'novel_segment') {
                         tipEl.textContent = '📖 執筆中：第 ' + obj.index + ' 段落...';
                     }
@@ -4105,7 +4260,7 @@
         h.innerHTML = '';
         var label = document.createElement('span');
         label.className = 'dsc-model-hint-label';
-        label.textContent = '追加済み ' + arr.length + ' 件：';
+        label.textContent = dscT('追加済み ' + arr.length + ' 件：');
         h.appendChild(label);
         for (var i = 0; i < arr.length; i++) {
             (function (name) {
@@ -5190,8 +5345,8 @@ function renderSearchHits(data, q, append) {
 
         var totalEl = document.createElement('div');
         totalEl.className = 'dsc-search-total';
-        totalEl.textContent = '全 ' + searchState.total + ' 件ヒット' +
-            (searchState.total > searchState.limit ? '（スクロールでさらに読み込み）' : '');
+        totalEl.textContent = dscT('全 ' + searchState.total + ' 件ヒット' +
+            (searchState.total > searchState.limit ? '（スクロールでさらに読み込み）' : ''));
         searchState.body.appendChild(totalEl);
     }
 
@@ -5203,7 +5358,7 @@ function renderSearchHits(data, q, append) {
 
             var titleEl = document.createElement('div');
             titleEl.className = 'dsc-search-group-title';
-            titleEl.textContent = h.title || h.sessionId || '無題のセッション';
+            titleEl.textContent = h.title || h.sessionId || dscT('無題のセッション');
             gEl.appendChild(titleEl);
 
             var listEl = document.createElement('div');
@@ -5438,7 +5593,7 @@ function highlightInElement(root, keyword) {
             el.className = 'dsc-cosplay-status';
             return;
         }
-        el.textContent = (cosplayState.enabled ? '✅ 演じています：' : '⏸ 停止中（未使用）：') +
+        el.textContent = dscT(cosplayState.enabled ? '✅ 演じています：' : '⏸ 停止中（未使用）：') +
             (role.emoji || '🎭') + ' ' + role.name;
         el.className = 'dsc-cosplay-status' + (cosplayState.enabled ? ' on' : '');
     }
@@ -5481,7 +5636,7 @@ function highlightInElement(root, keyword) {
 
             var bUse = document.createElement('button');
             bUse.className = 'dsc-btn ghost dsc-cosplay-mini';
-            bUse.textContent = r.id === cosplayState.activeRole ? '✓ 選択済み' : '選択';
+            bUse.textContent = dscT(r.id === cosplayState.activeRole ? '✓ 選択済み' : '選択');
             bUse.disabled = (r.id === cosplayState.activeRole);
             bUse.onclick = function () { cosplaySetActive(r.id); };
 
@@ -5537,7 +5692,7 @@ function highlightInElement(root, keyword) {
             cosplayApplyState(data.state);
         } catch (e) {
             if (st) {
-                st.textContent = '⚠️ キャラクターの読み込みに失敗：' + e.message;
+                st.textContent = dscT('⚠️ キャラクターの読み込みに失敗：') + e.message;
                 st.className = 'dsc-cosplay-status err';
             }
             toast(dscErrText('キャラクターの読み込みに失敗：', e.message), 'error');

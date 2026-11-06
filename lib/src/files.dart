@@ -313,6 +313,7 @@ String categorizeFile(String mimeType, String filename) {
   final ext = _extOf(filename);
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
   if (_codeExts.contains(ext)) return 'code';
   if (_docExts.contains(ext)) return 'document';
   if (_mcExts.contains(ext)) return 'minecraft';

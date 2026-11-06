@@ -21,6 +21,8 @@ import 'package:ddsh/src/chat_send.dart';
 import 'package:ddsh/src/cosplay.dart';
 import 'package:ddsh/src/deepseek_api.dart';
 import 'package:ddsh/src/devtools.dart';
+import 'package:ddsh/src/doubao.dart';
+import 'package:ddsh/src/doubao_realtime.dart';
 import 'package:ddsh/src/files.dart';
 import 'package:ddsh/src/forum.dart';
 import 'package:ddsh/src/globals.dart';
@@ -112,6 +114,26 @@ void registerRoutes() {
   _register('/api/ds-chat/stt', handleDsChatSTT);
   _register('/api/ds-chat/translate', handleDsChatTranslate);
   _register('/api/ds-chat/generate-image', handleDsGenerateImage);
+
+  // ---------- 豆包（火山方舟） ----------
+  _register('/api/doubao/config', handleDbConfig);
+  _register('/api/doubao/models', handleDbModels);
+  _register('/api/doubao/image', handleDbImage);
+  _register('/api/doubao/video', handleDbVideoCreate);
+  _register('/api/doubao/video/status', handleDbVideoStatus);
+  _register('/api/doubao/video/tasks', handleDbVideoTasks);
+  _register('/api/doubao/tts', handleDbTts);
+  _register('/api/doubao/podcast', handleDbPodcast);
+  _register('/api/doubao/asr', handleDbAsr);
+  _register('/api/doubao/voice/turn', handleDbVoiceTurn);
+  _register('/api/doubao/chat', handleDbChat);
+  _register('/api/doubao/analyze-audio', handleDbAudioAnalyze);
+  // 端到端实时语音（Seeduplex）：WebSocket 全双工
+  _register('/api/doubao/realtime', handleDbRealtime);
+  _register('/api/doubao/realtime/status', handleDbRealtimeStatus);
+  // RTC AI 音视频互动（服务端任务编排）
+  _register('/api/doubao/rtc/start', handleDbRtcStart);
+  _register('/api/doubao/rtc/stop', handleDbRtcStop);
 
   // ---------- DeepSeek 文件管理 ----------
   _register('/api/ds-files/upload/start', handleDsFileUploadStart);
