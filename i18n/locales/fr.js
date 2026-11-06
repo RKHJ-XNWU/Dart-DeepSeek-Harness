@@ -1540,5 +1540,6 @@ RTC のルーム ID|ID de salon RTC
 音声を生成する|Générer l’audio
 テキストを入力してください|Veuillez saisir le texte
 ✅ 音声を生成しました：{0}|✅ Audio généré : {0}
+豆包で音声生成|Génération audio Doubao
 オフにすると推論レベルはデフォルト Lv.|En le désactivant, le niveau de raisonnement revient à Lv.
 `);
