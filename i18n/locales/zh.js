@@ -1454,4 +1454,21 @@ WebSocket を作成できません：{0}|无法创建 WebSocket：{0}
 マイクを使用できません：{0}|无法使用麦克风：{0}
 豆包音声 API Key（Seeduplex 用）|豆包语音 API Key（Seeduplex 专用）
 方舟の API Key では 401 になります。豆包音声コンソールの API Key を入力してください。|方舟的 API Key 会返回 401，请填入豆包语音控制台的 API Key。
+豆包リアルタイム音声対話（Doubao-リアルタイム音声対話）|豆包实时语音对话（Doubao-实时语音交互）
+豆包録音ファイル認識（Doubao-録音ファイル認識2.0）|豆包录音文件识别（Doubao-录音文件识别2.0）
+Doubao-ストリーミング音声認識（ストリーミング認識）|Doubao-流式语音识别（流式识别）
+Doubao-音声ポッドキャスト（音声ポッドキャスト）|Doubao-语音播客（语音播客）
+Doubao-音声生成-1.0（音声生成）|Doubao-音频生成-1.0（生成音频）
+Doubao-Seedream-4.5（画像生成モデル4K）|Doubao-Seedream-4.5（生图模型4K）
+Doubao-Seedream-5.0-Lite（軽量画像生成）|Doubao-Seedream-5.0-Lite（轻量级生图）
+Doubao-Seedream-5.0-pro（高精度画像生成）|Doubao-Seedream-5.0-pro（精准生图）
+Doubao-Seedance-2.0-mini（動画生成）|Doubao-Seedance-2.0-mini（生成视频）
+Doubao-Seedance-2.0-fast（高速動画生成）|Doubao-Seedance-2.0-fast（快速生成视频）
+Doubao-Seedance-2.0（動画生成）|Doubao-Seedance-2.0（生成视频）
+GLM-5.2（コーディングモデル）|GLM-5.2（编程模型）
+Doubao-Seed-2.0-mini（言語モデル）|Doubao-Seed-2.0-mini（语言模型）
+Doubao-Seed-Evolving（エージェント言語モデル）|Doubao-Seed-Evolving（智能体语言模型）
+Doubao-Seed-2.1-pro（コーディング言語モデル）|Doubao-Seed-2.1-pro（编程语言模型）
+Doubao-Seed-2.1-turbo（言語モデル）|Doubao-Seed-2.1-turbo（语言模型）
+Doubao-Seed-2.0-lite（マルチモーダル推論モデル）|Doubao-Seed-2.0-lite（模态推理模型）
 `);

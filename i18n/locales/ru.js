@@ -1452,4 +1452,21 @@ WebSocket を作成できません：{0}|Не удалось создать WebS
 マイクを使用できません：{0}|Не удалось использовать микрофон: {0}
 豆包音声 API Key（Seeduplex 用）|API Key голосового сервиса Doubao (для Seeduplex)
 方舟の API Key では 401 になります。豆包音声コンソールの API Key を入力してください。|API Key из Ark вернёт 401. Введите API Key из консоли голосового сервиса Doubao.
+豆包リアルタイム音声対話（Doubao-リアルタイム音声対話）|Doubao голос в реальном времени (голосовое взаимодействие)
+豆包録音ファイル認識（Doubao-録音ファイル認識2.0）|Doubao распознавание аудиофайлов (распознавание аудио 2.0)
+Doubao-ストリーミング音声認識（ストリーミング認識）|Doubao потоковое распознавание речи (потоковое распознавание)
+Doubao-音声ポッドキャスト（音声ポッドキャスト）|Doubao голосовой подкаст (голосовой подкаст)
+Doubao-音声生成-1.0（音声生成）|Doubao генерация аудио 1.0 (генерация аудио)
+Doubao-Seedream-4.5（画像生成モデル4K）|Doubao-Seedream-4.5 (модель изображений 4K)
+Doubao-Seedream-5.0-Lite（軽量画像生成）|Doubao-Seedream-5.0-Lite (лёгкая генерация изображений)
+Doubao-Seedream-5.0-pro（高精度画像生成）|Doubao-Seedream-5.0-pro (точная генерация изображений)
+Doubao-Seedance-2.0-mini（動画生成）|Doubao-Seedance-2.0-mini (генерация видео)
+Doubao-Seedance-2.0-fast（高速動画生成）|Doubao-Seedance-2.0-fast (быстрая генерация видео)
+Doubao-Seedance-2.0（動画生成）|Doubao-Seedance-2.0 (генерация видео)
+GLM-5.2（コーディングモデル）|GLM-5.2 (модель для кодирования)
+Doubao-Seed-2.0-mini（言語モデル）|Doubao-Seed-2.0-mini (языковая модель)
+Doubao-Seed-Evolving（エージェント言語モデル）|Doubao-Seed-Evolving (агентная языковая модель)
+Doubao-Seed-2.1-pro（コーディング言語モデル）|Doubao-Seed-2.1-pro (языковая модель для кодирования)
+Doubao-Seed-2.1-turbo（言語モデル）|Doubao-Seed-2.1-turbo (языковая модель)
+Doubao-Seed-2.0-lite（マルチモーダル推論モデル）|Doubao-Seed-2.0-lite (мультимодальная модель рассуждений)
 `);

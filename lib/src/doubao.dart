@@ -35,32 +35,32 @@ class DbModelSpec {
 
 const List<DbModelSpec> dbModelCatalog = <DbModelSpec>[
   DbModelSpec('Doubao_scene_SLM_Doubao_realtime_voice_model',
-      '豆包实时语音交付（Doubao-实时语音交互）', 'realtime'),
-  DbModelSpec('Doubao_Seed_ASR_AUC_2.0', '豆包录音文件识别（Doubao-录音文件识别2.0）', 'asr'),
+      '豆包リアルタイム音声対話（Doubao-リアルタイム音声対話）', 'realtime'),
+  DbModelSpec('Doubao_Seed_ASR_AUC_2.0', '豆包録音ファイル認識（Doubao-録音ファイル認識2.0）', 'asr'),
   DbModelSpec(
-      'Doubao_Seed_ASR_Streaming_2.0', 'Doubao-流式语音识别（流式识别）', 'asr'),
+      'Doubao_Seed_ASR_Streaming_2.0', 'Doubao-ストリーミング音声認識（ストリーミング認識）', 'asr'),
   DbModelSpec('Doubao_scene_SLM_Doubao_Podcast_model',
-      'Doubao-语音播客（语音播客）', 'podcast'),
-  DbModelSpec('SeedAudio1.0', 'Doubao-音频生成-1.0（生成音频）', 'tts'),
-  DbModelSpec('doubao-seedream-4-5-251128', 'Doubao-Seedream-4.5（生图模型4K）', 'image'),
+      'Doubao-音声ポッドキャスト（音声ポッドキャスト）', 'podcast'),
+  DbModelSpec('SeedAudio1.0', 'Doubao-音声生成-1.0（音声生成）', 'tts'),
+  DbModelSpec('doubao-seedream-4-5-251128', 'Doubao-Seedream-4.5（画像生成モデル4K）', 'image'),
   DbModelSpec(
-      'doubao-seedream-5-0-260128', 'Doubao-Seedream-5.0-Lite（轻量级生图）', 'image'),
+      'doubao-seedream-5-0-260128', 'Doubao-Seedream-5.0-Lite（軽量画像生成）', 'image'),
   DbModelSpec(
-      'doubao-seedream-5-0-pro-260628', 'Doubao-Seedream-5.0-pro（精准生图）', 'image'),
-  DbModelSpec('doubao-seedance-2-0-mini-260615', 'Doubao-Seedance-2.0-mini（生成视频）',
+      'doubao-seedream-5-0-pro-260628', 'Doubao-Seedream-5.0-pro（高精度画像生成）', 'image'),
+  DbModelSpec('doubao-seedance-2-0-mini-260615', 'Doubao-Seedance-2.0-mini（動画生成）',
       'video'),
   DbModelSpec('doubao-seedance-2-0-fast-260128',
-      'Doubao-Seedance-2.0-fast（快速生成视频）', 'video'),
-  DbModelSpec('doubao-seedance-2-0-260128', 'Doubao-Seedance-2.0（生成视频）', 'video'),
-  DbModelSpec('glm-5-2-260617', 'GLM-5.2（编程模型）', 'chat'),
-  DbModelSpec('doubao-seed-2-0-mini-260428', 'Doubao-Seed-2.0-mini（语言模型）', 'chat'),
+      'Doubao-Seedance-2.0-fast（高速動画生成）', 'video'),
+  DbModelSpec('doubao-seedance-2-0-260128', 'Doubao-Seedance-2.0（動画生成）', 'video'),
+  DbModelSpec('glm-5-2-260617', 'GLM-5.2（コーディングモデル）', 'chat'),
+  DbModelSpec('doubao-seed-2-0-mini-260428', 'Doubao-Seed-2.0-mini（言語モデル）', 'chat'),
   DbModelSpec('doubao-seed-evolving-latest-version',
-      'Doubao-Seed-Evolving（智能体语言模型）', 'chat'),
+      'Doubao-Seed-Evolving（エージェント言語モデル）', 'chat'),
   DbModelSpec(
-      'doubao-seed-2-1-pro-260628', 'Doubao-Seed-2.1-pro（编程语言模型）', 'chat'),
-  DbModelSpec('doubao-seed-2-1-turbo-260628', 'Doubao-Seed-2.1-turbo（语言模型）', 'chat'),
+      'doubao-seed-2-1-pro-260628', 'Doubao-Seed-2.1-pro（コーディング言語モデル）', 'chat'),
+  DbModelSpec('doubao-seed-2-1-turbo-260628', 'Doubao-Seed-2.1-turbo（言語モデル）', 'chat'),
   DbModelSpec(
-      'doubao-seed-2-0-lite-260428', 'Doubao-Seed-2.0-lite（模态推理模型）', 'chat'),
+      'doubao-seed-2-0-lite-260428', 'Doubao-Seed-2.0-lite（マルチモーダル推論モデル）', 'chat'),
 ];
 
 /// 图片风格预置（前端展示，选中后拼进提示词；也允许自定义）

@@ -111,7 +111,7 @@
         items.forEach(function (m) {
             var o = document.createElement('option');
             o.value = m.value;
-            o.textContent = m.label + ' · ' + m.value;
+            o.textContent = T(m.label) + ' · ' + m.value;
             if (selected && selected === m.value) o.selected = true;
             sel.appendChild(o);
         });
@@ -179,10 +179,10 @@
     // メニュー項目は「日本語キー＋実行関数」で保持し、言語切替時はラベルだけ貼り替える。
     // 再読込なしで言語を変えても、以前の言語の文言が残らないようにするため。
     var MENU_ITEMS = [
-        { id: 'dscDbImageBtn', ic: '🎨', label: '豆包で画像生成', tip: '豆包生图', open: function () { openImageModal(); } },
-        { id: 'dscDbVideoBtn', ic: '🎬', label: '豆包で動画生成', tip: '豆包生成视频', open: function () { openVideoModal(); } },
-        { id: 'dscDbPodcastBtn', ic: '🎧', label: '豆包ポッドキャスト', tip: '豆包播客', open: function () { openPodcastModal(); } },
-        { id: 'dscDbCallBtn', ic: '📞', label: '豆包音声通話', tip: '豆包语音通话', open: function () { openCallModal(); } }
+        { id: 'dscDbImageBtn', ic: '🎨', label: '豆包で画像生成', tip: '豆包画像生成', open: function () { openImageModal(); } },
+        { id: 'dscDbVideoBtn', ic: '🎬', label: '豆包で動画生成', tip: '豆包動画生成', open: function () { openVideoModal(); } },
+        { id: 'dscDbPodcastBtn', ic: '🎧', label: '豆包ポッドキャスト', tip: '豆包ポッドキャスト', open: function () { openPodcastModal(); } },
+        { id: 'dscDbCallBtn', ic: '📞', label: '豆包音声通話', tip: '豆包音声通話', open: function () { openCallModal(); } }
     ];
 
     function applyMenuLabels() {
@@ -309,7 +309,7 @@
         options.forEach(function (o) {
             var op = document.createElement('option');
             if (typeof o === 'string') { op.value = o; op.textContent = o; }
-            else { op.value = o.value; op.textContent = o.label; }
+            else { op.value = o.value; op.textContent = T(o.label); }
             if (selected && selected === op.value) op.selected = true;
             s.appendChild(op);
         });
