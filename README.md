@@ -1,228 +1,574 @@
-# ddsh — Dart 重写版（v2.1.0）
+<div align="center">
 
-> **版本说明**：原文标题标注为 v2.0.0，但第 8 节「模型自动路由」明确为 v2.1.0 新增内容，且 `pubspec.yaml` 已升至 `2.1.0`，故本文统一为 v2.1.0。
+# 🐋 Dart · DeepSeek Harness
+
+**把整台安卓手机变成你的 AI 工作站**
+
+100% 纯 Dart 重写 · 零第三方依赖 · 单文件可执行 · 原生 Web UI
+
+[![Dart](https://img.shields.io/badge/Dart-3.0%2B-0175C2?logo=dart&logoColor=white)](https://dart.dev)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#-技术架构)
+[![Platform](https://img.shields.io/badge/platform-Android%20%2F%20Termux-3DDC84?logo=android&logoColor=white)](#-环境要求)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue)](#)
+[![i18n](https://img.shields.io/badge/i18n-6%20languages-orange)](#-多语言支持)
+[![License](https://img.shields.io/badge/license-未声明-lightgrey)](#-注意事项)
+
+</div>
 
 ---
 
-## 版权声明
+## 📖 目录
 
-> 本源码未直接或间接引用官方 `DeepSeek Harness` 的源代码，亦未引用任何他人编写的 `DeepSeek Harness` 源代码。它不属于官方或任何第三方 `DeepSeek Harness` 项目的衍生作品，与官方项目及任何第三方均无隶属关系。
->
-> 本源码作者严格遵守《中华人民共和国著作权法》《中华人民共和国刑法》《中华人民共和国治安管理处罚法》，并确信未侵犯任何人（包括第三方及官方 `DeepSeek Harness` 项目）的合法权益——因为本源码系作者从零编写，未参考任何其他源码或官方源码，故作者认为不构成侵权。
->
-> 本项目运行于 `Termux` 应用。经作者充分测试与最终确认，决定在 `GitHub`（即本站点）开源。版本更新将发布在 Discussions 板块。项目将长期维护，但更新间隔可能较长。
-
-## 非官方声明
-
-> 虽然我使用了 DeepSeek 官方的鲸鱼 logo，但这不代表我与 DeepSeek 存在任何关联，也不必然代表我从中复制了什么。在此承诺：除该鲸鱼 logo 图标外，我未从 DeepSeek 或任何第三方复制任何源代码。此外，DeepSeek 鲸鱼 logo 图标并非作为商标使用，仅用于新会话页面的装饰，不构成任何侵权。
+- [这是什么](#-这是什么)
+- [功能总览](#-功能总览)
+- [多语言支持](#-多语言支持)
+- [环境要求](#-环境要求)
+- [快速开始](#-快速开始)
+- [使用教程](#-使用教程)
+  - [1. 首次配置 API Key](#1-首次配置-api-key)
+  - [2. DeepSeek 聊天主界面](#2-deepseek-聊天主界面)
+  - [3. 深度思考 · 联网搜索 · 推理等级](#3-深度思考--联网搜索--推理等级)
+  - [4. 附件与图片自动路由](#4-附件与图片自动路由)
+  - [5. 豆包（火山方舟）模块](#5-豆包火山方舟模块)
+  - [6. 智能体工具模式](#6-智能体工具模式)
+  - [7. 角色扮演（Cosplay）](#7-角色扮演cosplay)
+  - [8. 数据备份与恢复](#8-数据备份与恢复)
+- [配置项说明](#-配置项说明)
+- [目录结构](#-目录结构)
+- [技术架构](#-技术架构)
+- [常见问题](#-常见问题)
+- [注意事项](#-注意事项)
 
 ---
 
-## 一键部署
+## 🌟 这是什么
+
+**Dart · DeepSeek Harness** 是一个运行在 Android 手机（Termux 环境）上的本地 AI 网关 + 网页客户端。
+
+它在本机启动一个 HTTP 服务（默认端口 `9999`），你在浏览器打开 `http://127.0.0.1:9999/` 就能得到一套完整的 AI 工作站界面：
+
+- 前端：原生 HTML / CSS / JavaScript，**无框架、无构建步骤、无 CDN 依赖**
+- 后端：由 Go 版 14,080 行代码 **100% 重写为纯 Dart**，`pubspec.yaml` 中 `dependencies: {}` 为空，HTTP 服务、AES-256-GCM 加密、tar.gz 打包全部手写实现
+- 一键 `dart compile exe` 生成单文件二进制，不依赖任何运行时库
+
+| 维度 | 说明 |
+| :--- | :--- |
+| 🎯 定位 | 手机上的一体化 AI 控制台 |
+| 🧩 模型 | DeepSeek 官方 API + 火山方舟豆包全家桶（17 个模型） |
+| 🖥 形态 | 本地 Web 服务 + 浏览器 UI（无 App 安装） |
+| 🤖 能力 | 除了聊天，还能调用 **90+ 工具** 真实操作手机 |
+| 🌐 语言 | 日本語 / 简体中文 / English / 한국어 / Русский / Français |
+
+---
+
+## ✨ 功能总览
+
+### 🧠 DeepSeek 核心对话
+
+| 功能 | 说明 |
+| :--- | :--- |
+| 💬 多会话管理 | 会话列表、单条/批量删除、全部清除、会话内引用（`session-mention`） |
+| ⚡ SSE 流式输出 | 逐字流式渲染，思考链（reasoning）与实际回答分离显示 |
+| 🔍 全文搜索 | 跨会话内容搜索，游标分页，命中片段高亮（摘要上限 300 字） |
+| 🧾 长文本模式 | 单次上下文默认放宽至 **150,000 字符** |
+| 📝 小说模式 | 分段续写生成，避免单次输出截断 |
+| 🌐 联网搜索 | 调用 DeepSeek 官方 `tools/search` 与 `tools/fetch` 接口 |
+| 💰 用量计费 | 每次对话/翻译按官方单价折算实际费用 |
+| 🔊 朗读（TTS） | Edge TTS 流式合成，按文本语种自动切换音色（日→Nanami、中→Xiaoxiao 等） |
+| 🎤 语音输入（STT） | 录音转文字后直接入框 |
+| 🌏 一键翻译 | 对任意回复生成译文，可复制、可朗读，并单独计费 |
+
+### 🎨 豆包（火山方舟）全家桶
+
+> 与 DeepSeek Key **分开保存**，互不覆盖；模型可单独指定，也可交由自动路由。
+
+| 模块 | 能力 | 可选模型 |
+| :--- | :--- | :--- |
+| 🖼 文生图 | 提示词生成图片，自动落盘 | Seedream 4.5 / 5.0 Lite / 5.0 pro |
+| 🖌 P 图 | 携带参考图做图像编辑（默认 `Seedream 5.0 pro`） | SeedEdit 3.0、Seedream 5.0 pro |
+| 🎬 视频生成 | 异步任务创建 + 状态轮询 + 任务历史列表 | Seedance 2.0 / 2.0 fast |
+| 🔊 音频生成 | 文本转语音，产物存入 `ds_files/blob` | SeedAudio 1.0 |
+| 🎧 播客 | 台本生成 → 语音合成，输出完整音频 | 播客模型 + TTS 模型组合 |
+| 🎤 录音识别 | 上传录音文件做 ASR 转写 | Seed ASR 2.0 / Streaming 2.0 |
+| 📞 语音通话 | 多轮语音会话（voice/turn） | 实时语音模型 |
+| 📊 音频分析 | 对音频内容做理解与摘要 | 多模态模型 |
+| 🔄 实时语音 | **Seeduplex 全双工**，WebSocket 由本地服务代理并注入鉴权头 | 端到端实时语音模型 |
+| 📹 RTC 互动 | 服务端编排 `StartVoiceChat` / `StopVoiceChat` 任务 | RTC 音视频智能体 |
+
+### 📱 手机实操能力（工具模式）
+
+内置 **90+ 工具的 JSON Schema 与执行器**，模型可自主规划并调用：
+
+```text
+📂 文件系统   list_dir · read_file · create_file · append_file · get_file_size
+🌐 网络       http_request · download_file
+⚙️ 进程       list_processes · kill_process
+🖥 Shell      execute_command · batch_command · run_background
+👆 界面控制   tap · long_press · swipe · batch_tap · batch_swipe · input_text · key_event
+🔎 控件识别   find_element · wait_for_element · ui_dump · get_screen_text · ocr_screen
+🧹 弹窗处理   is_popup_present · dismiss_popup · auto_dismiss_dialogs
+📦 应用管理   start_app · force_stop_app · list_packages · install_apk · uninstall_app
+🔐 权限设置   grant_permission · appops_set · settings_get / settings_put
+📶 系统状态   battery_status · wifi_info · wifi_scan · volume_set · brightness
+🎙 Termux API clipboard · notify · toast · tts_speak · vibrate · location · camera_photo
+```
+
+单次任务支持最多 **50,000 轮**工具调用循环，真正把「说一句话，手机自己动」变成现实。
+
+### 🗂 附加模块
+
+<table>
+<tr><td width="50%" valign="top">
+
+**📁 文件管理**
+分片上传（断点续传）、下载、按分类检索、按月归档元数据，单文件上限 5GB。
+
+**📚 日语单词本**
+单词按首字分片存储，图片按哈希分入 256 个桶，删词自动清理空桶。
+
+**💬 论坛 · 帖子广场**
+发帖、置顶、精选、屏蔽、批量删除；标题 ≤ 5000 字，正文 ≤ 500 万字。
+
+**📢 公告系统**
+定时生效、强制置顶、优先级排序，最多同时 5 条。
+
+</td><td width="50%" valign="top">
+
+**⏰ 峰谷提醒**
+DeepSeek 官方峰谷定价时段判定，内置 11 个时区与夏令时规则，支持 7 种推送渠道：
+Server酱 · Bark · DingTalk · WeCom · Telegram · Feishu · 自定义 Webhook。
+
+**🎭 角色扮演**
+兼容 Tavern v2 字段（personality / style / rules / scenario / first_mes …），可随时开关。
+
+**🐦 X（Twitter）**
+发布推文、拉取时间线。
+
+**🛠 开发者工具**
+Prompt 模板的集中管理与批量删除。
+
+</td></tr>
+</table>
+
+---
+
+## 🌐 多语言支持
+
+界面语种以**日文为源语言**，其余语种通过 `i18n/locales/*.js` 的「原文|译文」对照表覆盖：
+
+| 代码 | 语言 | 文件 |
+| :--- | :--- | :--- |
+| `ja` | 日本語（源语言） | 内置 |
+| `zh` | 简体中文 | `i18n/locales/zh.js` |
+| `en` | English | `i18n/locales/en.js` |
+| `ko` | 한국어 | `i18n/locales/ko.js` |
+| `ru` | Русский | `i18n/locales/ru.js` |
+| `fr` | Français | `i18n/locales/fr.js` |
+
+- 切换方式：URL 参数 `?lang=zh`、浏览器语言、或页面内的语言选择（记住到本地存储）
+- 数字会在匹配前统一归一化为 `#`，避免「剩余 5 条」这类动态文案漏翻
+- 新增语种只需按同样格式追加一个文件，无须改动逻辑代码
+- AI 回复的语言也会跟随界面语种自动切换
+
+---
+
+## 📦 环境要求
+
+| 项目 | 要求 |
+| :--- | :--- |
+| 系统 | Android（Termux），其他 Linux 亦可运行 |
+| 运行时 | **Dart SDK ≥ 3.0.0**（`pkg install dart`） |
+| 可选 | Python 3（仅用于 `st.py` 一键脚本） |
+| 可选 | Termux:API 应用（启用通知、剪贴板、震动等系统级工具） |
+| 磁盘 | 建议 ≥ 200MB（含编译产物） |
+| 网络 | 可访问 `api.deepseek.com` 与 `ark.cn-beijing.volces.com` |
+
+---
+
+## 🚀 快速开始
+
+### 方式一：一键脚本（推荐）
 
 ```bash
-git clone https://github.com/RKHJ-XNWU/Dart-DeepSeek-Harness && mv Dart-DeepSeek-Harness ddsh && chmod +x ddsh/st.py && ./ddsh/st.py
+# 进入项目目录
+cd ~/ddsh
+
+# 前台运行（需要时自动 AOT 编译）
+python3 st.py
+
+# 后台守护运行（关闭 Termux 窗口也不退出，自动持锁防休眠）
+python3 st.py --daemon
+
+# 注册为 termux-services 服务（崩溃自动拉起 + 开机自启）
+python3 st.py --install-service
 ```
 
-> 提示词（prompt）内容可在论坛 Discussion 板块的版本更新日志中查找。
+常用子命令：
 
----
+| 命令 | 作用 |
+| :--- | :--- |
+| `python3 st.py` | 编译（必要时）并前台运行 |
+| `python3 st.py --daemon` | 编译后后台运行 + wake-lock |
+| `python3 st.py --status` | 查看后台进程是否存活 |
+| `python3 st.py --logs` | 实时查看运行日志 |
+| `python3 st.py --restart` | 停止并重新后台启动 |
+| `python3 st.py --stop` | 停止后台进程 |
+| `python3 st.py --rebuild` | 强制重新编译 |
+| `python3 st.py --skip-build` | 跳过编译直接运行 |
+| `python3 st.py --no-aot` | 跳过 AOT，直接 `dart run`（省编译时间） |
+| `python3 st.py --install-service` | 注册守护服务 |
+| `python3 st.py --remove-service` | 卸载守护服务 |
 
-## 项目背景
-
-本目录最初是一个 **Go 项目（14,080 行代码）**，现已在 **Dart 上完成 100% 重写**。所有 Go 源文件与编译产物（`*.go` / `go.mod` / `go.sum` / `app`）均已移除。
-
-- **前端资源**（`index.html` / `*.js` / `*.css` / 图片）**原样保留**——它们不是 Go 代码，一个字节都未改动。
-- `data/` 目录下的 **`.sts` 存储格式逐字节保持一致**，因此既有历史数据可直接读取（已验证）。
-
----
-
-## 目录导航
-
-| 章节 | 内容 |
-| --- | --- |
-| [1. 目录结构](#1-目录结构) | 源码文件与职责一览 |
-| [2. 运行](#2-运行) | 启动方式与环境变量 |
-| [3. 编译](#3-编译) | AOT 打包为可执行文件 |
-| [4. 数据兼容性](#4-数据兼容性已验证) | 各 `.sts` 文件的兼容验证结果 |
-| [5. 与 Go 版本的差异](#5-与-go-版本的差异如实说明均为实现层的等价替代) | 实现层等价替代说明 |
-| [6. 已知环境限制](#6-已知环境限制非代码问题) | 网络环境导致的未验证项 |
-| [7. 已知问题](#7-已知问题非-bug) | 自动旋转相关说明 |
-| [8. 模型自动路由](#8-模型自动路由v210-新增) | v2.1.0 新特性 |
-
----
-
-## 1. 目录结构
-
-```
-pubspec.yaml                 零第三方依赖（仅 dart:io / dart:convert）
-bin/main.dart                入口：.env 加载、模块初始化、路由表、HttpServer
-lib/src/
-  globals.dart               路径常量 / escDs·unescDs 转义 / 时间格式化 / 日志
-  httpsrv.dart               HTTP 辅助（CORS、日志、SSE、静态文件、Range、RFC5987）
-  net.dart                   共享 HttpClient（连接池 + 代理探测）
-  aes_gcm.dart               纯 Dart AES-256-GCM（对齐 Go crypto/aes + GCM）
-  ds_crypto.dart             主密钥 + DSENC1| 配置加解密
-  ds_usage.dart              真实 token 用量累计（服务商计费依据）
-  sessions.dart              .sts 会话/消息存储、迁移、分页、续写合并
-  devtools.dart              注入提示词（Injected-prompt）增删改查
-  files.dart                 ds_files 分块上传/下载/元数据
-  deepseek_api.dart          DeepSeek API（流式/非流式/工具循环/反思/视觉/官方搜索/小说/TTS 切分）
-  tools.dart                 90+ AI 工具 schema 与执行（shell / Termux API / UI 自动化 / 弹窗）
-  cosplay.dart               角色扮演（角色卡 .sts / persona / SillyTavern v2 / 工具）
-  session_ref.dart           跨会话引用（dsh-session: URI / 快照预算）
-  search.dart                会话全文搜索（缓存 + 游标分页）
-  chat_handlers.dart         config/sessions/messages/reasoning/test/image/tts/stt/abort/continue
-  chat_send.dart             /send、SSE 流式、小说模式
-  model_router.dart          模型自动路由（图片 → 视觉模型检测/配置/日志）
-  peakvalley.dart            峰谷时段提醒（7 条推送通道 + 定时调度）
-  xtweet.dart                X/Twitter 多后端并发抓取
-  tts_edge.dart              Edge TTS（WebSocket + Sec-MS-GEC 签名）
-  backup.dart                tar.gz 备份 / 分片恢复
-```
-
-## 2. 运行
+### 方式二：手动编译
 
 ```bash
-cd ddsh
-dart pub get
-dart analyze          # 应输出 "No issues found"
+# 1) 静态检查
+dart analyze
+
+# 2) 直接运行（JIT，调试用）
 dart run bin/main.dart
-# 浏览器打开 http://localhost:9999/
-```
 
-可选环境变量：
-
-| 变量 | 说明 |
-| --- | --- |
-| `DSH_BASE` | 项目根目录（默认 `/data/data/com.termux/files/home/ddsh`） |
-| `DSH_PORT` | 监听端口（默认 `9999`） |
-| `DSH_WORKSPACE` | AI 工具的工作目录（默认 `$HOME`） |
-| `DS_MASTER_KEY` | 覆盖 `data/deepseek_chat/ds_master.key` 的主密钥（hex / base64 / 原始 32 字节） |
-| `PROXY` / `SOCKS5_PROXY` / `HTTPS_PROXY` | 出站代理（也可写入 `proxy.conf`） |
-
-## 3. 编译（由你执行）
-
-```bash
-# AOT 单文件可执行（替代原 Go 的 `app` 二进制；启动快，无 JIT）
+# 3) 编译原生可执行文件（AOT，推荐）
 dart compile exe bin/main.dart -o app
 
-# 指定目标平台（如有需要）
-dart compile exe bin/main.dart --target-os=android -o app
-
-# 体积优化（可选）
-dart compile exe bin/main.dart -o app && strip app 2>/dev/null || true
+# 4) 运行
+./app
 ```
 
-生成 `app` 后，直接 `./app` 启动即可（前提是工作目录 / `DSH_BASE` 指向项目根目录）。
-
-> **注意：本仓库没有替你执行编译**——按你的要求，编译由你自己运行。
-
-## 4. 数据兼容性（已验证）
-
-| 数据 | 格式 | 验证结果 |
-| --- | --- | --- |
-| `data/deepseek_chat/ds_chat_config.sts` | `DSENC1\|b64(nonce+ct+tag)×3` | 用 Dart AES-256-GCM 解密成功（model=deepseek-flash，密钥掩码正确） |
-| `data/deepseek_chat/ds_master.key` | hex(64) | 直接读取成功 |
-| `data/deepseek_chat/sessions/*.sts` | `#S\|…` / `#M\|id\|role\|content\|createdAt\|attachments\|reasoning\|usage` | 写入 → 读取 → 搜索 → 分页 → 推理链截断全部通过 |
-| `data/cosplay/*.sts` | `#STATE\|…` / `#R\|` 20 个段落 | 成功读取真实角色「蓝色大肥鱼」；增/改/删后格式不变 |
-| `data/deepseek_chat/devtools/inject_prompts.sts` | `id\|title\|content\|createdAt` | 成功读取真实注入提示词 |
-| `data/ds_files/meta/ds_file_YYYY-MM.sts` | `id\|name\|size\|mime\|category\|createdAt\|relPath\|source\|prompt` | 上传 → 列表 → 下载 → Range → 删除全部通过 |
-| 备份产物 | tar.gz（ustar） | 可被系统 `tar -tzf` / `tar -xzf` 解析；解包文件与原始文件逐字节一致 |
-
-`.sts` 的转义规则完全一致：`\` → `\\`，`|` → `\p`，换行 → `\n`。
-
-## 5. 与 Go 版本的差异（如实说明：均为实现层的等价替代）
-
-1. **AES-256-GCM / SHA-256 / HMAC / tar**：Go 使用标准库；Dart 标准库无对应实现，且「零第三方依赖」是硬性要求，因此在 `aes_gcm.dart` / `sha256.dart` / `backup.dart` 中以纯 Dart 实现，并用 NIST/RFC 测试向量自校验（同时用真实密文验证）。
-2. **IANA 时区**：Go 用 `time.LoadLocation` 读内嵌 tzdata；`dart:io` 没有时区数据库，因此 `peakvalley.dart` 内嵌本项目所需的完整 `pvTimezones` 集合（11 个时区），采用固定偏移加欧盟/美国夏令时规则——行为等价。
-3. **SOCKS5 拨号**：Go 手写了 SOCKS5 dialer；`dart:io HttpClient` 没有拨号钩子，因此仅支持 HTTP/HTTPS 代理（`findProxy`）。检测到 SOCKS5 时会打印日志并走直连。DNS 缓存 / HTTP/2 由 Dart 运行时自身处理。
-4. **Edge TTS**：Go 用 `edge-tts-go` 库；Dart 直接实现同一协议（WebSocket + SSML + 二进制音频帧），并补上了新版必需的 `Sec-MS-GEC` 签名。
-5. **`wait_seconds`**：Go 用阻塞 sleep；Dart 用 `Future.delayed`（不阻塞事件循环，并发请求不受影响）。
-6. **修复了原 Go 版本的一处数据风险**：`migrateDsChatToPerSession` 曾把 `ds_chat_config.sts`（加密配置）误判为旧会话文件并重命名为 `.migrated_bak`。Dart 版增加了文件名排除与 `dsc_` 前缀检查，首次启动不再破坏配置。
-
-## 6. 已知环境限制（非代码问题）
-
-- **Edge TTS**：本机网络出口被微软语音服务拒绝（HTTP 403，`X-MSEdge-Ref: TYO…`），已通过官方 curl 与 Dart WebSocket 双重确认。代码路径与签名均按新协议实现，待网络可用后即可验证。
-- **X/Twitter**：`api.fxtwitter.com` 等镜像在当前网络下对单条推文返回 404/空，因此端到端抓取未能验证；各解析器（fx / syndication / nitter）均已通过完整离线样本验证。
-
-## 7. 已知问题（非 bug）
-
-- **自动旋转屏幕**：这指的是手机的自动旋转屏幕功能。它在任务执行过程中会被意外打开，尽管我已加入提示词约束来阻止——但这不是 bug。
-- **为什么不算 bug**：因为运行自动化任务首先需要拉起 adb shell 环境，环境起来后必须跑一次测试，而测试内容就是调用手机的屏幕自动旋转功能。调用成功则说明任务可以正常运行。本质上这是在测试功能是否可用，而非 bug。
-- **该问题已修复**：基于实际测试，很难把它归为 bug，但它确实是个问题，因此我按实际情况做了修复。
-
-## 8. 模型自动路由（v2.1.0 新增）
-
-### 解决的问题
-
-发往 `/api/ds-chat/send` 的图片原本并不是以 image block 的形式发给模型，而是由视觉端点先**把图片提取成文本**，再拼进提示词。改动之前，这一步传的是 `model: model`——意思是：**如果你选了 `deepseek-v4-pro` 作为聊天模型，就等于让一个纯文本模型去读图**。结果不是报错，而是「【第 N 张图片内容提取失败】」这种静默降级——最难排查的那类问题。
-
-### 当前行为（决策矩阵）
-
-| 本轮是否含图 | 所选模型 | 主请求模型 | 图片提取模型 | reason |
-| --- | --- | --- | --- | --- |
-| 无 | 任意 | 所选模型不变 | 所选模型（若支持视觉），否则用兜底模型 | `no-image` |
-| 有 | `deepseek-flash` 等支持视觉的 | 所选模型 | 所选模型 | `selected-supports-vision` |
-| 有 | `deepseek-v4-pro` 等不支持视觉的 | **自动切换为 `deepseek-flash`** | `deepseek-flash` | `image-route` |
-| 有 | 不支持视觉 + 路由已关闭 | 所选模型（不变） | 仍用兜底模型提取 | `router-disabled` |
-
-- 未知模型保守视为**纯文本**（只要带图就走路由），避免静默降级；
-- 主请求是否跟随切换由 `routeMain` 控制：关闭时回复仍由所选模型生成，仅「看图」这一步用视觉模型；
-- `deepseek-v4-flash`（旧别名）明确标记为纯文本——不要把它当成 flash 的视觉能力，只有 `deepseek-flash` 和 `deepseek-v4-flash-vision-exp` 才算视觉模型。
-
-### 配置
-
-存放于 `data/deepseek_chat/model_router.sts`（明文，同一套转义规则）：
+### 访问服务
 
 ```
-#MR|mr1|enabled|routeMain|visionModel|extraVision|extraText
+http://127.0.0.1:9999/
 ```
 
-默认值：`enabled=1`、`routeMain=1`、`visionModel=deepseek-flash`。
-
-前端：在 `⚙️ DeepSeek 设置`弹窗底部新增「🔀 模型自动路由」卡片（`dsc-model-route.js`），可开关、可改视觉模型、可把额外的自定义模型声明为支持或支持图片。发生路由时聊天页会弹出提示：`🔀 本轮含图片，已自动路由 A → B`。
-
-### API
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/ds-chat/model-router` | 返回配置 + 内置能力表 + 最近 40 条路由记录 |
-| GET | `/api/ds-chat/model-router?model=deepseek-v4-pro&hasImage=1` | 额外附带一次干跑（dry-run）的 `preview` |
-| POST | `/api/ds-chat/model-router` | 保存 `{enabled, routeMain, visionModel, extraVision, extraText}` |
-
-`/send` 的响应（流式时为 SSE `done` 事件）新增 `modelRoute` 字段：
-`{requested, effective, visionModel, reason, routed, hasImage, requestedSupportsVision}`。
-
-### 验证（编译后由你运行）
-
-```bash
-dart analyze                                   # 已确认：No issues found
-
-# 1) 干跑：应返回 effective=deepseek-flash、reason=image-route
-curl -s 'http://127.0.0.1:9999/api/ds-chat/model-router?model=deepseek-v4-pro&hasImage=1' | head -c 400
-
-# 2) 端到端：在 UI 里选 deepseek-v4-pro → 上传一张图片 → 发送
-#    日志应出现：🔀 模型路由: deepseek-v4-pro → deepseek-flash（image-route）
-#    并且「⚠️ 第 1 张图片提取失败」不应再出现
-```
-
-> 本次改动**未执行编译，也未启动服务**（按你的要求，编译由你执行）。
-
-### 改动清单（改了什么、如何回退）
-
-| 文件 | 改动 | 回退方式 |
-| --- | --- | --- |
-| `lib/src/model_router.dart` | **新增**（能力检测 + 决策 + 配置读写 + `/api/ds-chat/model-router`） | 删除该文件 |
-| `dsc-model-route.js` | **新增**（设置卡片 + 路由提示） | 删除该文件 |
-| `lib/src/chat_send.dart` | ① import ② 在 `fileCtx` 之后插入路由决策块 ③ 视觉提取改用 `route.visionModel` ④ 给 `handleDsChatSendStream` 增加可选参数 `route` ⑤ 在 done/JSON 两条路径中增加 `modelRoute` 字段 | 移除这 5 处（可用 `// ============ 模型自动路由` 或 `modelRoute` 定位） |
-| `bin/main.dart` | import + 注册 `/api/ds-chat/model-router` + 版本号 2.1.0 | 删除对应行 |
-| `index.html` | 加载 `dsc-model-route.js?v=1`；`deepseek-chat.js` 版本串改为 `?v=20261025modelroute` 以强制刷新缓存 | 还原这两行 |
-| `deepseek-chat.js` | 两处 `done` 之后调用 `window.dscModelRouteToast(...)` | 删除这两行 |
-| `pubspec.yaml` | `version: 2.0.0` → `2.1.0` | 改回去 |
+> 端口被修改过？请以启动日志中的 `✅ サーバーが起動しました。http://localhost:XXXX/` 为准。
 
 ---
 
-## 附注（本设备执行方的硬性说明）
+## 📘 使用教程
 
-第 7 节把「自动旋转被打开」描述为功能测试而非 bug。无论文档如何表述，**本设备上不会开启屏幕自动旋转**，且一旦检测到该开关被打开，会立即关闭并复验。这一条不因 README 的说明而改变。
+### 1. 首次配置 API Key
+
+打开页面后，点击右上角 **⚙ 設定（设置）**：
+
+```text
+┌─ 連接情報 ─────────────────────────────┐
+│  DeepSeek API Key   [ sk-•••••••• ]    │
+│  モデル              [ deepseek-chat ]  │
+│  画像 API Key       [ 可选，独立计费 ]   │
+└────────────────────────────────────────┘
+
+┌─ 豆包（火山方舟）──────────────────────┐
+│  ARK API Key        [ 与 DeepSeek 分开保存 ] │
+│  ベース URL          [ https://ark.cn-beijing.volces.com/api/v3 ] │
+│  対話 / 画像 / 動画 / 音声 / 播客 / ASR モデル │
+└────────────────────────────────────────┘
+```
+
+保存后，状态栏会显示 `✅ Key 已设置 · 対話モデル：xxx`。
+
+> 🔐 Key 用 `POST /api/ds-chat/config` 写入本地，界面上只回显掩码（前 4 位 + 后 4 位）。
+
+### 2. DeepSeek 聊天主界面
+
+| 位置 | 操作 |
+| :--- | :--- |
+| 左上角标题 | 点按 → 打开会话列表，切换 / 新建 / 删除会话 |
+| 输入框左侧 📎 | 附加图片、文档、视频、任意文件 |
+| 输入框上方开关 | 深度思考、联网搜索、长文本、小说模式 |
+| 推理等级按钮 | 点按打开滑杆，普通模式默认 15 级，高级模式默认 30 级 |
+| 消息气泡下方 | 朗读 🔊、翻译 🌐、复制、重新生成 |
+| 顶栏搜索图标 | 跨会话全文搜索 |
+
+### 3. 深度思考 · 联网搜索 · 推理等级
+
+- **深度思考**：开启后展示模型的思维链（reasoning），与最终答案分区渲染
+- **联网搜索**：调用官方检索与抓取接口，结果自动拼入上下文
+- **推理等级**：等级越高，模型内部推理预算越大，响应更慢但更严谨
+- **长文本模式**：把单次上下文上限抬到 150,000 字符，适合整本资料投喂
+
+### 4. 附件与图片自动路由
+
+这是本项目一个容易被忽视但很关键的机制：
+
+> 你选中的模型如果是纯文本模型（例如 `deepseek-chat`），直接让它读图必然失败。
+> 系统会通过 **模型能力判定 → 自动路由** 改用视觉模型先提取图片内容，再拼进 prompt 交给主模型。
+
+路由结果由三层决定：内置型号能力表 → 第三方型号模式匹配 → 用户自定义白/黑名单。
+
+### 5. 豆包（火山方舟）模块
+
+配置好 ARK Key 后，底部工具栏会出现 7 个入口：
+
+```text
+🔊 音频生成   🎨 生图   🎬 视频   🎧 播客   📞 语音通话   🎤 录音识别   🖌 P图
+```
+
+**P 图（图像编辑）示例：**
+
+1. 点击 **🖌 豆包P图**
+2. 上传一张参考图
+3. 填写编辑指令，例如「把背景换成海边黄昏，保留人物」
+4. 默认使用 `Seedream 5.0 pro`，点击生成
+5. 产物自动保存到 `data/ds_files/blob/`
+
+**实时语音（Seeduplex）：**
+
+浏览器无法给 WebSocket 附加自定义请求头，因此本项目用本地 Dart 服务做代理，由服务端注入 `X-Api-Key` 后转发到火山引擎。请注意：**端到端语音必须使用豆包语音控制台的 Key，方舟的 Key 会返回 401。**
+
+### 6. 智能体工具模式
+
+当模型判断需要操作手机时，会进入工具循环：**规划 → 调用工具 → 读取结果 → 自我修正**，直到任务达成。
+
+典型用法：
+
+```text
+「帮我打开微信，搜索联系人张三并发送消息」
+「把当前屏幕截图保存到 Downloads 目录」
+「每天 9 点给我发一条提醒通知」
+「读取剪贴板内容并整理成表格」
+```
+
+安全提醒见 [注意事项](#-注意事项) 第 6 条。
+
+### 7. 角色扮演（Cosplay）
+
+点击 🎭 进入角色面板，可创建多个角色，字段与 Tavern v2 对齐：
+
+| 字段 | 含义 |
+| :--- | :--- |
+| `name` / `emoji` | 角色名与图标 |
+| `personality` | 性格内核 |
+| `style` | 说话风格 |
+| `rules` | 行为准则（该做 / 不该做） |
+| `scenario` | 世界观与关系设定 |
+| `first_mes` | 开场白 |
+
+角色数据保存在 `data/cosplay/cos_<时间戳>_<随机>.sts`，开关状态在 `cosplay_state.sts`。
+
+### 8. 数据备份与恢复
+
+| 操作 | 位置 | 行为 |
+| :--- | :--- | :--- |
+| 📦 数据备份 | 设置 → 数据备份 | 打包 `data/` 与 `imgs/` 为 `.tar.gz` 下载 |
+| ♻️ 从备份恢复 | 设置 → 数据恢复 | 上传 `.tar.gz`，**覆盖现有全部数据** |
+
+> ⚠️ 恢复操作不可撤销。请务必先执行一次备份。
+
+---
+
+## ⚙️ 配置项说明
+
+服务启动时会依次尝试读取 `$BASE_DIR/.env` 与 `./.env`。
+
+| 变量 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `DSH_BASE` | `/data/data/com.termux/files/home/ddsh` | 项目根目录，数据存放位置 |
+| `DSH_PORT` | `9999` | HTTP 服务端口 |
+| `DS_MASTER_KEY` | 自动生成 | AES-256-GCM 主密钥（64 位十六进制），用于加密聊天记录 |
+| `DS_WORKSPACE` | `$HOME` | 工具的默认工作目录 |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `PROXY` / `SOCKS5_PROXY` | 空 | 出站代理 |
+| `DSH_DEBUG` | 空 | 设为 `1` 时打印异常堆栈 |
+
+示例：
+
+```bash
+cat > ~/ddsh/.env <<'EOF'
+DSH_PORT=9999
+DSH_BASE=/data/data/com.termux/files/home/ddsh
+DSH_DEBUG=0
+EOF
+```
+
+---
+
+## 🗂 目录结构
+
+```text
+ddsh/
+├── bin/main.dart            # 入口：目录初始化 → 路由注册 → 启动 HTTP 服务
+├── lib/src/                 # 后端全部实现（纯 Dart，无第三方包）
+│   ├── globals.dart         #   全局常量 / 环境变量 / 日志
+│   ├── httpsrv.dart         #   HTTP 工具、CORS、静态资源、JSON 响应
+│   ├── deepseek_api.dart    #   DeepSeek 调用层（流式 / 工具循环 / 搜索 / 视觉）
+│   ├── chat_send.dart       #   发送、SSE 流式、小说模式
+│   ├── chat_handlers.dart   #   会话、配置、消息、推理、翻译、TTS/STT
+│   ├── sessions.dart        #   会话存取（.sts 明文格式）
+│   ├── tools.dart           #   90+ 工具的 Schema 与执行器
+│   ├── model_router.dart    #   模型能力判定与自动路由
+│   ├── doubao.dart          #   火山方舟：生图 / P图 / 视频 / TTS / 播客 / ASR
+│   ├── doubao_realtime.dart #   Seeduplex 全双工 + RTC 编排
+│   ├── cosplay.dart         #   角色扮演
+│   ├── files.dart           #   分片上传 / 下载 / 元数据
+│   ├── backup.dart          #   tar.gz 打包与解包（手写 ustar 实现）
+│   ├── ds_crypto.dart       #   AES-256-GCM + SHA-256
+│   ├── tts_edge.dart        #   Edge TTS 流式合成
+│   ├── tts_drm.dart         #   Sec-MS-GEC v2 签名
+│   ├── peakvalley.dart      #   峰谷提醒（时区 + 7 通道推送 + 定时调度）
+│   ├── vocab.dart           #   日语单词本
+│   ├── forum.dart           #   论坛
+│   ├── announcements.dart   #   公告
+│   ├── search.dart          #   全文搜索
+│   ├── xtweet.dart          #   X（Twitter）
+│   └── ...                  #   devtools / net / displaymodels / session_ref
+├── index.html               # 主页面
+├── deepseek-chat.js/.css    # 聊天前端核心
+├── dsc-doubao.js/.css       # 豆包模块前端
+├── dsc-cosplay / vocab / forum / devtools / ...   # 各功能模块前端
+├── i18n/                    # 多语言（locales: ja zh en ko ru fr）
+├── data/                    # 运行数据（已被 .gitignore 排除）
+│   ├── deepseek_chat/       #   会话与消息
+│   ├── ds_files/            #   上传文件与生成产物
+│   ├── cosplay/  vocab/  forum/  dispost/  announcements/
+├── st.py                    # 一键：编译 / 前台 / 后台 / 守护服务
+├── adb_up.sh                # 建立本机 adb 连接（127.0.0.1:5555）
+├── auto.py                  # 安卓全自动操作引擎（adb shell 权限）
+└── app                      # AOT 编译产物（已被 .gitignore 排除）
+```
+
+---
+
+## 🏗 技术架构
+
+```text
+┌───────────────────────────────────────────────────────┐
+│  浏览器 UI（原生 HTML / CSS / JS，无框架）              │
+└───────────────────────┬───────────────────────────────┘
+                        │ HTTP + SSE / WebSocket
+┌───────────────────────▼───────────────────────────────┐
+│  Dart HTTP 服务（dart:io HttpServer，默认 :9999）      │
+│                                                        │
+│   精确路由表  _routes[path]                            │
+│   前缀路由    _prefixRoutes（/api/peakvalley/）        │
+│   中间件      loggerMiddleware → corsMiddleware        │
+│   静态资源    命中失败时回退 index.html                │
+└───────────────────────┬───────────────────────────────┘
+                        │
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+   DeepSeek API    火山方舟 API    手机本体
+   chat/completions images/video    shell / am / input
+   tools/search     duplex(wss)     Termux API
+```
+
+**几个值得一说的实现细节：**
+
+- **零依赖**：`pubspec.yaml` 的 `dependencies` 为空，AES-256-GCM、SHA-256、tar/ustar 打包全部手写
+- **强制关闭 gzip**：`server.autoCompress = false`。Dart 默认会把 SSE 也纳入压缩，字节被编码器内部缓冲，导致「一直思考、不出回答」
+- **单请求异常隔离**：每个请求独立 `try/catch`，配合 `runZonedGuarded`，任何未捕获异常只记日志、绝不退出进程
+- **端口占用重试**：启动时最多重试 10 次（间隔 300ms），避免旧实例未释放就启动失败
+- **SSE 心跳**：`server.idleTimeout` 设为 120 秒
+
+---
+
+## ❓ 常见问题
+
+<details>
+<summary><b>启动后浏览器打不开页面？</b></summary>
+
+1. 看启动日志里的端口号是否为预期值（`DSH_PORT` 可覆盖）
+2. `curl -I http://127.0.0.1:9999/` 检查是否有响应
+3. 若进程存在但端口无监听，通常是残留实例占位，执行 `python3 st.py --restart`
+</details>
+
+<details>
+<summary><b>豆包接口返回 404 <code>InvalidEndpointOrModel.NotFound</code>？</b></summary>
+
+这是**模型名与端点不匹配**，不是权限问题。例如把播客模型 `Doubao_scene_SLM_Doubao_Podcast_model` 发给 `/chat/completions` 就会 404。本项目已在代码层做了收敛：台本生成只接受 `chat` 类模型，语音合成只接受 `tts` 类模型，非法模型名会自动回退到默认值。
+</details>
+
+<details>
+<summary><b>端到端语音一直 401？</b></summary>
+
+Seeduplex 需要**豆包语音控制台**的 API Key，用方舟（ARK）的 Key 一定 401。请在设置中单独填写「豆包音声 API Key（Seeduplex 用）」。
+</details>
+
+<details>
+<summary><b>朗读没有声音？</b></summary>
+
+Edge TTS 依赖微软的签名机制（`Sec-MS-GEC` v2），且对 `User-Agent` 敏感。本项目已用自定义 WebSocket 客户端规避。若仍失败，请检查网络出口是否能访问 `speech.platform.bing.com`。
+</details>
+
+<details>
+<summary><b>后台运行一段时间就断了？</b></summary>
+
+安卓省电策略会回收后台进程。建议：
+1. 用 `python3 st.py --daemon` 启动（自动持 wake-lock）
+2. 用 `python3 st.py --install-service` 注册守护服务（崩溃自动拉起 + 开机自启）
+3. 在系统设置中把 Termux 加入电池优化白名单
+</details>
+
+<details>
+<summary><b>我想改端口 / 迁移目录？</b></summary>
+
+改 `.env` 里的 `DSH_PORT` 与 `DSH_BASE`，然后重启服务。注意 `DSH_BASE` 同时也是数据的存放位置，迁移前请先做一次备份。
+</details>
+
+---
+
+## ⚠️ 注意事项
+
+> **以下每一条都来自实际踩过的坑，请务必阅读。**
+
+**1. API Key 为本地明文存储**
+
+- 豆包 ARK Key 以明文写入 `.sts` 文件（界面已如实标注）
+- 聊天记录的加密依赖 `DS_MASTER_KEY`，**该密钥一旦丢失，历史会话将无法解密**
+- `.env`、`*.key`、`data/` 均已在 `.gitignore` 中排除，请勿强行提交到公开仓库
+
+**2. 恢复备份会覆盖全部数据**
+
+「从备份恢复」会用上传的 `.tar.gz` 覆盖当前 `data/` 与 `imgs/` 全部内容，**不可撤销**。操作前请先备份。
+
+**3. 端口默认 9999，不是 9998**
+
+服务默认端口由 `DSH_PORT` 决定，未设置时为 `9999`。请以启动日志为准。
+
+**4. 前端改动即时生效，后端改动必须重新编译**
+
+`.js` / `.css` / `.html` 是静态文件，刷新页面即生效；`lib/src/*.dart` 属于后端，必须重新 `dart compile exe` 或 `dart run` 才会生效。
+
+**5. 豆包模型必须与端点匹配**
+
+| 端点 | 只能接受 |
+| :--- | :--- |
+| `/chat/completions` | `chat` 类模型 |
+| `/images/generations` | `image` / `imageedit` 类模型 |
+| `/audio/speech` | `tts` 类模型 |
+
+混用会直接 404，且不会消耗配额。项目内已做兜底收敛。
+
+**6. 工具模式会真实操作你的手机**
+
+`execute_command`、`tap`、`uninstall_app`、`settings_put`、`kill_process` 等工具是**真实执行**的，没有沙箱。请：
+
+- 不要在无人看管时让它执行删除、卸载、转账类指令
+- 涉及支付、删除、卸载的操作，务必人工确认
+
+**7. 界面自动旋转相关设置请勿改动**
+
+本项目运行期间不修改系统屏幕方向配置，避免自动化点击坐标错位。
+
+**8. 关于 adb 权限**
+
+`adb_up.sh` 通过本机无线调试端口 `127.0.0.1:5555` 建立 `uid=2000(shell)` 连接，`auto.py` 在此权限下工作。前置条件：**设置 → 开发者选项 → 无线调试** 已开启。Project 内部已移除对 Shizuku 的依赖。
+
+**9. RTC 功能需要额外 SDK**
+
+服务端可以正常创建 `StartVoiceChat` 任务，但浏览器端要真正收发音视频，需要自行引入官方 **RTC Web SDK** 并加入同一房间（本仓库未内置）。
+
+**10. 许可证**
+
+本仓库目前**未包含 LICENSE 文件**。在权利人明确授权前，请勿用于商业分发。
+
+---
+
+<div align="center">
+
+**🐋 Dart · DeepSeek Harness v2.1.0**
+
+从 14,080 行 Go 到 100% 纯 Dart · 零依赖 · 一个浏览器窗口控制整台手机
+
+`dart compile exe bin/main.dart -o app`
+
+</div>

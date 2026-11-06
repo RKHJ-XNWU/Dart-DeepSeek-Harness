@@ -2771,6 +2771,86 @@
         }
     }
 
+    // ============================================================
+    // 外部機能（豆包の録音ファイル認識など）から、文字起こし結果を
+    // 「ユーザーメッセージ」として現在の対話へ差し込むための入口。
+    //   ★ モデル API は一切呼び出さない → DeepSeek の用量は消費しない。
+    //   /api/ds-chat/abort-save は「ユーザーメッセージの保存のみ」を行う既存端点で、
+    //   aiContent / messageId を送らなければモデル呼び出しは発生しない。
+    // ============================================================
+    async function dscInjectUserMessage(content) {
+        var text = String(content == null ? '' : content).trim();
+        if (!text) return { ok: false, error: '内容が空です' };
+        try {
+            // 対話が未作成なら作る（メッセージ API には sessionId が必須のため）
+            if (!state.currentSessionId) {
+                var res0 = await fetch('/api/ds-chat/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: (window.t ? window.t('新しい対話') : '新しい対話') })
+                });
+                var data0 = await res0.json();
+                if (!data0 || !data0.session) throw new Error('セッションの作成に失敗');
+                state.sessions.unshift(data0.session);
+                state.currentSessionId = data0.session.id;
+                state.messages = [];
+                state.hasMore = false;
+                state.renderedStart = 0;
+                renderMessages();
+                renderSessions();
+                updateTitle();
+            }
+
+            var now = new Date();
+            var msg = {
+                id: 'tmp_u_' + now.getTime(),
+                sessionId: state.currentSessionId,
+                role: 'user',
+                content: text,
+                createdAt: now.toISOString(),
+                attachments: ''
+            };
+            state.messages.push(msg);
+            appendMessageEl(msg);
+            dscSaveMsgsSnap();
+
+            // 保存のみ（AI 応答は生成しない＝モデル課金なし）
+            var savedMsg = null;
+            try {
+                var r = await fetch('/api/ds-chat/abort-save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: state.currentSessionId,
+                        content: text,
+                        fileIds: []
+                    })
+                });
+                var raw = {};
+                try { raw = await r.json(); } catch (e) { raw = {}; }
+                if (!r.ok) throw new Error((raw && (raw.error || raw.message)) || ('HTTP ' + r.status));
+                savedMsg = raw && raw.userMessage;
+            } catch (eSave) {
+                toast(dscErrText('対話への保存に失敗: ', eSave.message), 'error');
+                return { ok: false, error: eSave.message, sessionId: state.currentSessionId };
+            }
+
+            // 仮 ID をサーバ発行の実 ID に置き換える（以後の再送・削除で必要）
+            if (savedMsg && savedMsg.id) {
+                for (var i = state.messages.length - 1; i >= 0; i--) {
+                    if (state.messages[i].id === msg.id) { state.messages[i].id = savedMsg.id; break; }
+                }
+            }
+            loadSessions();
+            updateTitle();
+            dscSaveMsgsSnap();
+            return { ok: true, sessionId: state.currentSessionId };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+    window.dscInjectUserMessage = dscInjectUserMessage;
+
     async function sendMessage() {
         if (state.isSending) { requestStop(); return; }
         var inputEl = $('dscInput');

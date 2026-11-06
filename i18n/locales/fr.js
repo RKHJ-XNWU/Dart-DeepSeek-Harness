@@ -1469,4 +1469,76 @@ Doubao-Seed-Evolving（エージェント言語モデル）|Doubao-Seed-Evolving
 Doubao-Seed-2.1-pro（コーディング言語モデル）|Doubao-Seed-2.1-pro (modèle linguistique de code)
 Doubao-Seed-2.1-turbo（言語モデル）|Doubao-Seed-2.1-turbo (modèle linguistique)
 Doubao-Seed-2.0-lite（マルチモーダル推論モデル）|Doubao-Seed-2.0-lite (modèle de raisonnement multimodal)
+録音ファイルを豆包で認識|Reconnaître un fichier audio avec Doubao
+豆包録音ファイル認識|Reconnaissance de fichiers audio Doubao
+録音ファイルを選択|Choisir un fichier audio
+まだ選択されていません|Pas encore sélectionné
+録音ファイルを選択してください|Veuillez sélectionner un fichier audio
+音声が短すぎます|L’audio est trop court
+豆包で認識中…（{0}）|Reconnaissance avec Doubao… ({0})
+豆包が空の認識結果を返しました|Doubao a renvoyé un résultat de reconnaissance vide
+✅ 認識しました（{0} 文字）。対話へ差し込みます…|✅ Reconnu ({0} caractères). Insertion dans la conversation…
+認識に失敗：{0}|Échec de la reconnaissance : {0}
+✅ 対話に差し込みました（{0} 文字・DeepSeek 用量は消費していません）|✅ Inséré dans la conversation ({0} caractères ; aucun quota DeepSeek consommé)
+✅ 認識結果を対話に差し込みました|✅ Résultat de reconnaissance inséré dans la conversation
+対話への差し込みに失敗：{0}|Échec de l’insertion dans la conversation : {0}
+自動差し込みに失敗したため入力欄へ入れました。送信は手動で行ってください|L’insertion automatique a échoué, le texte a été placé dans le champ de saisie. Envoyez-le manuellement
+対話画面が見つかりません|Écran de conversation introuvable
+音声理解モデル：{0}（録音の文字起こしに使用・モデル API は呼びません）|Modèle de compréhension audio : {0} (pour la transcription ; l’API du modèle n’est pas appelée)
+録音ファイルを豆包で文字起こしし、結果をこの対話のメッセージとして差し込みます。モデル API は呼ばないため、DeepSeek の用量は消費しません。|Transcrivez le fichier audio avec Doubao et insérez le résultat comme message dans cette conversation. L’API du modèle n’est pas appelée, donc aucun quota DeepSeek n’est consommé.
+録音ファイルを選び「認識して対話に送る」を押してください|Choisissez un fichier audio, puis appuyez sur « Reconnaître et envoyer au chat »
+認識して対話に送る|Reconnaître et envoyer au chat
+認識結果（そのまま対話に差し込みます。必要なら編集してください）|Résultat de reconnaissance (inséré tel quel ; modifiez si nécessaire)
+文字起こしに使うモデル：{0}（豆包・DeepSeek の用量は消費しません）|Modèle utilisé pour la transcription : {0} (aucun quota Doubao ni DeepSeek consommé)
+録音ファイルを豆包で文字起こしします。結果は下の欄に表示されるので、そのままコピーできます。対話へは自動送信しません。|Transcrivez le fichier audio avec Doubao. Le résultat s’affiche dans le champ ci-dessous et peut être copié directement. Il n’est pas envoyé automatiquement dans la conversation.
+認識結果（そのままコピーできます。必要なら編集してください）|Résultat de reconnaissance (copiable directement ; modifiez si nécessaire)
+録音ファイルを選び「豆包で認識」を押してください|Choisissez un fichier audio, puis appuyez sur « Reconnaître avec Doubao »
+結果をコピー|Copier le résultat
+対話に差し込む|Insérer dans le chat
+豆包で認識|Reconnaître avec Doubao
+認識モデル：{0} · 端点：{1}|Modèle de reconnaissance : {0} · Point de terminaison : {1}
+✅ 認識しました（{0} 文字）。下の欄からコピーできます（対話へは自動送信しません）|✅ Reconnu ({0} caractères). Copiez depuis le champ ci-dessous (pas d’envoi automatique dans la conversation)
+✅ 認識結果を表示しました（{0} 文字）|✅ Résultat de reconnaissance affiché ({0} caractères)
+📋 結果をコピーしました（{0} 文字）|📋 Résultat copié ({0} caractères)
+コピーに失敗しました。長押しで選択してコピーしてください|Échec de la copie. Appuyez longuement pour sélectionner et copier
+先に認識してください|Veuillez d’abord lancer la reconnaissance
+豆包P图|Retouche d’image Doubao
+画像をアップロードし、どう直すかを伝えると豆包が修正します。結果は ds_files/blob に保存されます。|Importez une image et décrivez la modification souhaitée ; Doubao la retouchera. Le résultat est enregistré dans ds_files/blob.
+画像を選択|Choisir une image
+P图要求（どこをどう直すか）|Instructions de retouche (quoi modifier et comment)
+例：背景を海辺に変える／人物をそのままに髪色を黒へ／服を白いシャツに|Ex. : remplacer le fond par une plage / garder la personne mais noircir les cheveux / remplacer les vêtements par une chemise blanche
+出力サイズ|Taille de sortie
+豆包にP图してもらう|Laisser Doubao retoucher l’image
+先に画像を選択してください|Veuillez d’abord choisir une image
+P图要求を入力してください|Veuillez saisir les instructions de retouche
+画像が大きすぎます（上限 12MB）|Image trop volumineuse (limite 12 Mo)
+豆包がP图中…（最大 1〜2 分かかります）|Doubao retouche l’image… (peut prendre 1 à 2 minutes)
+✅ P图が完成しました：{0}|✅ Retouche terminée : {0}
+P图に失敗：{0}|Échec de la retouche : {0}
+もう一度P图|Retoucher à nouveau
+画像の読み込みに失敗しました|Échec du chargement de l’image
+既定（Seedream 5.0 pro）|Par défaut (Seedream 5.0 pro)
+豆包 SeedEdit 3.0（画像編集・P图モデル）|Doubao SeedEdit 3.0 (modèle de retouche d’image)
+台本生成モデル|Modèle de génération de script
+RTC アプリの AppId|AppId de l’application RTC
+RTC のルーム ID|ID de salon RTC
+空欄なら既定|Vide = valeur par défaut
+⚠️ このモデルは未開通のため、{0} に自動切替して生成します…|⚠️ Ce modèle n’est pas activé ; bascule automatique vers {0}…
+⚠️ このモデルは未開通のため、{0} で生成しました|⚠️ Ce modèle n’est pas activé ; généré avec {0}
+ℹ️ {0} は利用不可のため {1} で生成しました|ℹ️ {0} est indisponible ; généré avec {1}
+翻訳に失敗しました|Échec de la traduction
+翻訳に失敗|Échec de la traduction
+読み上げに失敗|Échec de la lecture audio
+切り替えに失敗|Échec du changement
+一括削除に失敗|Échec de la suppression groupée
+対話への保存に失敗|Échec de l’enregistrement dans la conversation
+テキストから音声を合成します。生成物は ds_files/blob に保存されます。|Synthétise la parole à partir du texte. Le résultat est enregistré dans ds_files/blob.
+読み上げるテキスト|Texte à lire
+例：こんにちは。今日はいい天気ですね。|Ex. : Bonjour. Il fait beau aujourd’hui.
+音声のファイル名|Nom du fichier audio
+例：ナレーション1|Ex. : narration1
+音声を生成する|Générer l’audio
+テキストを入力してください|Veuillez saisir le texte
+✅ 音声を生成しました：{0}|✅ Audio généré : {0}
+オフにすると推論レベルはデフォルト Lv.|En le désactivant, le niveau de raisonnement revient à Lv.
 `);

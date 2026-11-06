@@ -119,6 +119,7 @@ void registerRoutes() {
   _register('/api/doubao/config', handleDbConfig);
   _register('/api/doubao/models', handleDbModels);
   _register('/api/doubao/image', handleDbImage);
+  _register('/api/doubao/image-edit', handleDbImageEdit);
   _register('/api/doubao/video', handleDbVideoCreate);
   _register('/api/doubao/video/status', handleDbVideoStatus);
   _register('/api/doubao/video/tasks', handleDbVideoTasks);

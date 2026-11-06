@@ -21,8 +21,11 @@
         imgBusy: false,
         vidBusy: false,
         podBusy: false,
+        ttsBusy: false,
         pollTimer: null,
-        call: null
+        call: null,
+        asrBusy: false,
+        editBusy: false
     };
 
     var RATIOS = ['16:9', '3:4', '4:3', '19:6', '21:9', '1:1', '9:16'];
@@ -179,10 +182,13 @@
     // メニュー項目は「日本語キー＋実行関数」で保持し、言語切替時はラベルだけ貼り替える。
     // 再読込なしで言語を変えても、以前の言語の文言が残らないようにするため。
     var MENU_ITEMS = [
+        { id: 'dscDbTtsBtn', ic: '🔊', label: '豆包で音声生成', tip: '豆包音声生成', open: function () { openTtsModal(); } },
         { id: 'dscDbImageBtn', ic: '🎨', label: '豆包で画像生成', tip: '豆包画像生成', open: function () { openImageModal(); } },
         { id: 'dscDbVideoBtn', ic: '🎬', label: '豆包で動画生成', tip: '豆包動画生成', open: function () { openVideoModal(); } },
         { id: 'dscDbPodcastBtn', ic: '🎧', label: '豆包ポッドキャスト', tip: '豆包ポッドキャスト', open: function () { openPodcastModal(); } },
-        { id: 'dscDbCallBtn', ic: '📞', label: '豆包音声通話', tip: '豆包音声通話', open: function () { openCallModal(); } }
+        { id: 'dscDbCallBtn', ic: '📞', label: '豆包音声通話', tip: '豆包音声通話', open: function () { openCallModal(); } },
+        { id: 'dscDbAsrBtn', ic: '🎤', label: '録音ファイルを豆包で認識', tip: '豆包録音ファイル認識', open: function () { openAsrModal(); } },
+        { id: 'dscDbEditBtn', ic: '🖌️', label: '豆包P图', tip: '豆包P图', open: function () { openEditModal(); } }
     ];
 
     function applyMenuLabels() {
@@ -198,9 +204,11 @@
     function injectMenu() {
         var menu = $('dscMoreMenu');
         if (!menu) return;
-        if ($('dscDbImageBtn')) { applyMenuLabels(); return; }
         var first = menu.firstChild;
+        // 既存ボタンは飛ばし、欠けている項目だけを個別に補う
+        // （旧版が 1 度でも描画したページでも、新規項目が必ず出るようにする）
         MENU_ITEMS.forEach(function (it) {
+            if ($(it.id)) return;
             var b = el('button', 'dsc-more-item');
             b.id = it.id;
             b.title = T(it.tip);
@@ -650,6 +658,323 @@
     }
 
     // ------------------------------------------------------------
+    // 音声生成（TTS）
+    // ------------------------------------------------------------
+    function openTtsModal() {
+        ensureModal('dscDbTtsOverlay', buildTtsModal, S.ttsBusy);
+        loadConfig().then(function (c) {
+            var v = $('dscDbTtsVoice');
+            if (v && !v.value) v.value = c.voice || '';
+            return loadTtsModels();
+        }).catch(function (e) {
+            setStatus($('dscDbTtsStatus'), '❌ ' + T('設定の読み込みに失敗：{0}', e.message), 'err');
+        });
+        openModal('dscDbTtsOverlay');
+    }
+
+    function buildTtsModal() {
+        var md = buildModal('dscDbTtsOverlay', '🔊', '豆包で音声生成',
+            'テキストから音声を合成します。生成物は ds_files/blob に保存されます。');
+        md.appendChild(field('読み上げるテキスト', textarea('dscDbTtsText', '例：こんにちは。今日はいい天気ですね。')));
+
+        var grid = el('div', 'dsc-db-grid');
+        grid.appendChild(field('音声のファイル名', input('dscDbTtsName', 'text', '例：ナレーション1')));
+        grid.appendChild(field('話速', select('dscDbTtsSpeed', ['0.5', '0.75', '1.0', '1.25', '1.5', '2.0'], '1.0')));
+        md.appendChild(grid);
+
+        var grid2 = el('div', 'dsc-db-grid');
+        grid2.appendChild(field('音色', input('dscDbTtsVoice', 'text', 'zh_female_xiaohe_uranus_bigtts')));
+        grid2.appendChild(field('音声合成モデル', select('dscDbTtsPick', [])));
+        md.appendChild(grid2);
+
+        var st = el('div', 'dsc-db-status');
+        st.id = 'dscDbTtsStatus';
+        md.appendChild(st);
+        var res = el('div', 'dsc-db-result');
+        res.id = 'dscDbTtsResult';
+        md.appendChild(res);
+
+        var foot = el('div', 'dsc-db-footer');
+        var close = el('button', 'dsc-db-btn', T('閉じる'));
+        close.type = 'button';
+        var go = el('button', 'dsc-db-btn primary', T('音声を生成する'));
+        go.type = 'button';
+        go.id = 'dscDbTtsGo';
+        foot.appendChild(close);
+        foot.appendChild(go);
+        md.appendChild(foot);
+        close.addEventListener('click', function () { closeModal('dscDbTtsOverlay'); });
+        go.addEventListener('click', generateTts);
+    }
+
+    // 音声生成パネル専用のモデル選択。
+    // 設定パネルにも「音声合成モデル」があり、以前は同じ id を使っていたため
+    // document.getElementById が設定パネル側を返し、このパネルの select が
+    // 空のまま残っていた。パネル内スコープで引くことで衝突を断つ。
+    function ttsModelSel() {
+        var ov = $('dscDbTtsOverlay');
+        return ov ? ov.querySelector('#dscDbTtsPick') : null;
+    }
+
+    function fillTtsModels() {
+        var sel = ttsModelSel();
+        if (!sel) return;
+        var items = modelsByCat('tts').map(function (m) { return { value: m.value, label: m.label }; });
+        // カタログが空でも選択肢をゼロにしない（必ず 1 件は選べる状態にする）
+        if (!items.length) {
+            items = [{ value: 'SeedAudio1.0', label: 'Doubao-音声生成-1.0（音声生成）' }];
+        }
+        var want = (S.cfg && S.cfg.ttsModel) || '';
+        if (want && !items.some(function (m) { return m.value === want; })) {
+            items.push({ value: want, label: want });
+        }
+        fillSelect(sel, items, want || items[0].value);
+        if (!sel.value) sel.value = items[0].value;
+    }
+
+    // カタログ未取得のまま開かれた場合に備え、/models を取り直してから埋める
+    function loadTtsModels() {
+        fillTtsModels();
+        if ((S.catalog || []).length) return Promise.resolve();
+        return api('/models').then(function (d) {
+            S.catalog = (d && d.models) || [];
+            fillTtsModels();
+        }).catch(function () {});
+    }
+
+    async function generateTts() {
+        if (S.ttsBusy) return;
+        var st = $('dscDbTtsStatus');
+        var btn = $('dscDbTtsGo');
+        var text = ($('dscDbTtsText') || {}).value || '';
+        if (!text.trim()) { setStatus(st, '⚠️ ' + T('テキストを入力してください'), 'err'); return; }
+        var body = {
+            text: text,
+            voice: (($('dscDbTtsVoice') || {}).value || '').trim(),
+            model: (ttsModelSel() || {}).value || '',
+            speed: (($('dscDbTtsSpeed') || {}).value || '1.0'),
+            format: 'mp3',
+            name: (($('dscDbTtsName') || {}).value || '').trim(),
+            lang: lang()
+        };
+        S.ttsBusy = true;
+        if (btn) btn.disabled = true;
+        setStatus(st, T('合成中…'), 'busy');
+        try {
+            var d = await api('/tts', { method: 'POST', body: body });
+            var f = d.file || {};
+            var box = $('dscDbTtsResult');
+            box.innerHTML = '';
+            var au = document.createElement('audio');
+            au.src = fileUrl(f) + '&_t=' + Date.now();
+            au.controls = true;
+            au.style.width = '100%';
+            box.appendChild(au);
+            box.appendChild(el('div', 'dsc-db-filename', T('ファイル名：{0}', f.name || '')));
+            var row = el('div', 'dsc-db-row');
+            var dl = el('button', 'dsc-db-btn primary', T('音声をダウンロード'));
+            dl.type = 'button';
+            dl.addEventListener('click', function () { openExternal(downloadUrl(f)); });
+            var again = el('button', 'dsc-db-btn ghost', T('もう一度生成'));
+            again.type = 'button';
+            again.addEventListener('click', function () { generateTts(); });
+            row.appendChild(dl);
+            row.appendChild(again);
+            box.appendChild(row);
+            setStatus(st, T('✅ 音声を生成しました：{0}', f.name || ''), 'ok');
+            toast(T('✅ 音声を生成しました：{0}', f.name || ''), 'success');
+            refreshFiles();
+        } catch (e) {
+            setStatus(st, '❌ ' + T('音声生成に失敗：{0}', e.message), 'err');
+            toast(T('音声生成に失敗：{0}', e.message), 'error');
+        } finally {
+            S.ttsBusy = false;
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 録音ファイル認識（ASR）
+    //   豆包の音声認識で文字起こしし、結果をそのまま現在の対話へ差し込む。
+    //   ★ 認識は豆包（方舟 /audio/transcriptions → 失敗時ローカル whisper）、
+    //     差し込みは既存のユーザーメッセージ保存端点のみを使う。
+    //     どちらもモデル API を呼ばないため、DeepSeek の用量は一切消費しない。
+    // ------------------------------------------------------------
+    function fmtSize(n) {
+        n = Number(n) || 0;
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function openAsrModal() {
+        ensureModal('dscDbAsrOverlay', buildAsrModal, S.asrBusy);
+        loadConfig().then(function (c) {
+            var st = $('dscDbAsrStatus');
+            if (st && !st.textContent) {
+                setStatus(st, T('文字起こしに使うモデル：{0}（豆包・DeepSeek の用量は消費しません）', (c && c.chatModel) || 'doubao-seed'), '');
+            }
+        }).catch(function () {});
+        openModal('dscDbAsrOverlay');
+    }
+
+    function buildAsrModal() {
+        var md = buildModal('dscDbAsrOverlay', '🎤', '録音ファイルを豆包で認識',
+            '録音ファイルを豆包で文字起こしします。結果は下の欄に表示されるので、そのままコピーできます。対話へは自動送信しません。');
+
+        var pick = el('div', 'dsc-db-filepick');
+        var file = document.createElement('input');
+        file.type = 'file';
+        file.id = 'dscDbAsrFile';
+        file.className = 'dsc-db-file';
+        file.accept = 'audio/*,.m4a,.amr,.mp3,.wav,.ogg,.aac,.flac,.webm,.opus';
+        var pickBtn = el('button', 'dsc-db-btn', T('録音ファイルを選択'));
+        pickBtn.type = 'button';
+        pickBtn.id = 'dscDbAsrPick';
+        var info = el('span', 'dsc-db-filename', T('まだ選択されていません'));
+        info.id = 'dscDbAsrFileInfo';
+        pickBtn.addEventListener('click', function () { file.click(); });
+        file.addEventListener('change', function () {
+            var f = file.files && file.files[0];
+            info.textContent = f ? (f.name + ' · ' + fmtSize(f.size)) : T('まだ選択されていません');
+        });
+        pick.appendChild(file);
+        pick.appendChild(pickBtn);
+        pick.appendChild(info);
+        md.appendChild(pick);
+
+        md.appendChild(field('認識結果（そのままコピーできます。必要なら編集してください）',
+            textarea('dscDbAsrText', '録音ファイルを選び「豆包で認識」を押してください')));
+
+        var metaLine = el('div', 'dsc-db-hint');
+        metaLine.id = 'dscDbAsrMeta';
+        md.appendChild(metaLine);
+
+        var st = el('div', 'dsc-db-status');
+        st.id = 'dscDbAsrStatus';
+        md.appendChild(st);
+
+        var foot = el('div', 'dsc-db-footer');
+        var close = el('button', 'dsc-db-btn', T('閉じる'));
+        close.type = 'button';
+        var copy = el('button', 'dsc-db-btn', T('結果をコピー'));
+        copy.type = 'button';
+        copy.id = 'dscDbAsrCopy';
+        var ins = el('button', 'dsc-db-btn ghost', T('対話に差し込む'));
+        ins.type = 'button';
+        ins.id = 'dscDbAsrInsert';
+        var go = el('button', 'dsc-db-btn primary', T('豆包で認識'));
+        go.type = 'button';
+        go.id = 'dscDbAsrGo';
+        foot.appendChild(copy);
+        foot.appendChild(ins);
+        foot.appendChild(close);
+        foot.appendChild(go);
+        md.appendChild(foot);
+        close.addEventListener('click', function () { closeModal('dscDbAsrOverlay'); });
+        copy.addEventListener('click', function () { copyAsrText(false); });
+        ins.addEventListener('click', function () {
+            var box = $('dscDbAsrText');
+            deliverAsrToChat(box ? box.value : '', $('dscDbAsrStatus'));
+        });
+        go.addEventListener('click', recognizeAsrFile);
+    }
+
+    async function recognizeAsrFile() {
+        if (S.asrBusy) return;
+        var st = $('dscDbAsrStatus');
+        var btn = $('dscDbAsrGo');
+        var inp = $('dscDbAsrFile');
+        var out = $('dscDbAsrText');
+        var f = inp && inp.files && inp.files[0];
+        if (!f) { setStatus(st, '⚠️ ' + T('録音ファイルを選択してください'), 'err'); return; }
+        if (f.size < 200) { setStatus(st, '⚠️ ' + T('音声が短すぎます'), 'err'); return; }
+        S.asrBusy = true;
+        if (btn) btn.disabled = true;
+        setStatus(st, T('豆包で認識中…（{0}）', fmtSize(f.size)), 'busy');
+        try {
+            var fd = new FormData();
+            fd.append('audio', f, f.name || 'audio.m4a');
+            var res = await fetch(API + '/asr', { method: 'POST', body: fd, cache: 'no-store' });
+            var data = {};
+            try { data = await res.json(); } catch (e) { data = {}; }
+            if (!res.ok) throw new Error((data && (data.error || data.message)) || ('HTTP ' + res.status));
+            var text = String((data && data.text) || '').trim();
+            if (!text) throw new Error(T('豆包が空の認識結果を返しました'));
+            if (out) out.value = text;
+            var m = String((data && data.model) || '');
+            var ep = String((data && data.endpoint) || '');
+            var mt = $('dscDbAsrMeta');
+            if (mt) mt.textContent = T('認識モデル：{0} · 端点：{1}', m || '-', ep || '-');
+            setStatus(st, T('✅ 認識しました（{0} 文字）。下の欄からコピーできます（対話へは自動送信しません）', text.length), 'ok');
+            toast(T('✅ 認識結果を表示しました（{0} 文字）', text.length), 'success');
+            copyAsrText(true);
+        } catch (e) {
+            setStatus(st, '❌ ' + T('認識に失敗：{0}', e.message), 'err');
+            toast(T('認識に失敗：{0}', e.message), 'error');
+        } finally {
+            S.asrBusy = false;
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // 認識結果をクリップボードへコピー（自動送信はしない。失敗時は選択コピーへ退避）
+    async function copyAsrText(silent) {
+        var out = $('dscDbAsrText');
+        var st = $('dscDbAsrStatus');
+        var txt = out ? String(out.value || '') : '';
+        if (!txt.trim()) {
+            if (!silent) setStatus(st, '⚠️ ' + T('先に認識してください'), 'err');
+            return false;
+        }
+        var ok = false;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(txt);
+                ok = true;
+            }
+        } catch (e) { ok = false; }
+        if (!ok) {
+            try {
+                out.focus();
+                out.select();
+                ok = document.execCommand('copy');
+            } catch (e) { ok = false; }
+        }
+        if (!silent) {
+            setStatus(st, ok ? T('📋 結果をコピーしました（{0} 文字）', txt.length)
+                : '⚠️ ' + T('コピーに失敗しました。長押しで選択してコピーしてください'),
+                ok ? 'ok' : 'err');
+        }
+        return ok;
+    }
+
+    async function deliverAsrToChat(text, st) {
+        var t = String(text || '').trim();
+        if (!t) return;
+        // 本命：現在の対話へユーザーメッセージとして差し込む（モデル呼び出しなし）
+        if (typeof window.dscInjectUserMessage === 'function') {
+            var r = await window.dscInjectUserMessage(t);
+            if (r && r.ok) {
+                setStatus(st, T('✅ 対話に差し込みました（{0} 文字・DeepSeek 用量は消費していません）', t.length), 'ok');
+                toast(T('✅ 認識結果を対話に差し込みました'), 'success');
+                setTimeout(function () { closeModal('dscDbAsrOverlay'); }, 900);
+                return;
+            }
+            setStatus(st, '⚠️ ' + T('対話への差し込みに失敗：{0}', (r && r.error) || 'unknown'), 'err');
+        }
+        // 代替：入力欄へ入れる（失敗を隠さない）
+        var box = document.getElementById('dscInput');
+        if (box) {
+            box.value = box.value ? (box.value + '\n' + t) : t;
+            try { box.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+            setStatus(st, '⚠️ ' + T('自動差し込みに失敗したため入力欄へ入れました。送信は手動で行ってください'), 'err');
+        } else {
+            setStatus(st, '❌ ' + T('対話画面が見つかりません'), 'err');
+        }
+    }
+
+    // ------------------------------------------------------------
     // 画像生成
     // ------------------------------------------------------------
     function openImageModal() {
@@ -759,7 +1084,23 @@
         if (btn) btn.disabled = true;
         setStatus(st, T('生成中…（最大 1〜2 分かかります）'), 'busy');
         try {
-            var d = await api('/image', { method: 'POST', body: body });
+            var d;
+            try {
+                d = await api('/image', { method: 'POST', body: body });
+            } catch (e) {
+                var em = (e && e.message) || '';
+                var fb = (S.cfg && S.cfg.imageModel) ? S.cfg.imageModel : '';
+                if (fb && body.model && body.model !== fb && /404|does not exist|not have access/i.test(em)) {
+                    setStatus(st, T('⚠️ このモデルは未開通のため、{0} に自動切替して生成します…', fb), 'busy');
+                    d = await api('/image', { method: 'POST', body: Object.assign({}, body, { model: fb }) });
+                    toast(T('⚠️ このモデルは未開通のため、{0} で生成しました', fb), 'info');
+                } else {
+                    throw e;
+                }
+            }
+            if (d && d.fallbackFrom) {
+                toast(T('ℹ️ {0} は利用不可のため {1} で生成しました', d.fallbackFrom, d.model || ''), 'info');
+            }
             var f = d.file || {};
             var box = $('dscDbImgResult');
             box.innerHTML = '';
@@ -786,6 +1127,198 @@
             toast(T('画像生成に失敗：{0}', e.message), 'error');
         } finally {
             S.imgBusy = false;
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 豆包P图（画像編集）
+    //   ローカル画像を豆包へ渡し、指示どおりに修正させる。
+    //   ブラウザ側で長辺 2048 / JPEG 92% に縮小してから送る（大きすぎる画像で失敗しないように）。
+    // ------------------------------------------------------------
+    function openEditModal() {
+        ensureModal('dscDbEditOverlay', buildEditModal, S.editBusy);
+        loadConfig().then(fillEditModels).catch(function (e) {
+            setStatus($('dscDbEditStatus'), T('❌ 設定の読み込みに失敗：{0}', e.message), 'err');
+        });
+        openModal('dscDbEditOverlay');
+    }
+
+    function buildEditModal() {
+        var md = buildModal('dscDbEditOverlay', '🖌️', '豆包P图',
+            '画像をアップロードし、どう直すかを伝えると豆包が修正します。結果は ds_files/blob に保存されます。');
+
+        var pick = el('div', 'dsc-db-filepick');
+        var file = document.createElement('input');
+        file.type = 'file';
+        file.id = 'dscDbEditFile';
+        file.className = 'dsc-db-file';
+        file.accept = 'image/*';
+        var pickBtn = el('button', 'dsc-db-btn', T('画像を選択'));
+        pickBtn.type = 'button';
+        pickBtn.id = 'dscDbEditPick';
+        var info = el('span', 'dsc-db-filename', T('まだ選択されていません'));
+        info.id = 'dscDbEditFileInfo';
+        pickBtn.addEventListener('click', function () { file.click(); });
+        file.addEventListener('change', function () {
+            var f = file.files && file.files[0];
+            info.textContent = f ? (f.name + ' · ' + fmtSize(f.size)) : T('まだ選択されていません');
+            var box = $('dscDbEditPreview');
+            if (box) {
+                box.innerHTML = '';
+                if (f) {
+                    var im = document.createElement('img');
+                    im.src = URL.createObjectURL(f);
+                    box.appendChild(im);
+                }
+            }
+        });
+        pick.appendChild(file);
+        pick.appendChild(pickBtn);
+        pick.appendChild(info);
+        md.appendChild(pick);
+
+        var prev = el('div', 'dsc-db-preview');
+        prev.id = 'dscDbEditPreview';
+        md.appendChild(prev);
+
+        md.appendChild(field('P图要求（どこをどう直すか）',
+            textarea('dscDbEditPrompt', '例：背景を海辺に変える／人物をそのままに髪色を黒へ／服を白いシャツに')));
+
+        var grid = el('div', 'dsc-db-grid');
+        grid.appendChild(field('モデル', select('dscDbEditModel', [])));
+        grid.appendChild(field('出力サイズ', select('dscDbEditRes', ['2K', '4K'], '2K')));
+        md.appendChild(grid);
+
+        var st = el('div', 'dsc-db-status');
+        st.id = 'dscDbEditStatus';
+        md.appendChild(st);
+
+        var res = el('div', 'dsc-db-result');
+        res.id = 'dscDbEditResult';
+        md.appendChild(res);
+
+        var foot = el('div', 'dsc-db-footer');
+        var open = el('button', 'dsc-db-btn ghost', T('ファイル管理を開く'));
+        open.type = 'button';
+        var close = el('button', 'dsc-db-btn', T('閉じる'));
+        close.type = 'button';
+        var go = el('button', 'dsc-db-btn primary', T('豆包にP图してもらう'));
+        go.type = 'button';
+        go.id = 'dscDbEditGo';
+        foot.appendChild(open);
+        foot.appendChild(close);
+        foot.appendChild(go);
+        md.appendChild(foot);
+
+        close.addEventListener('click', function () { closeModal('dscDbEditOverlay'); });
+        open.addEventListener('click', function () {
+            closeModal('dscDbEditOverlay');
+            var b = $('dscFilesToggle');
+            if (b) b.click();
+        });
+        go.addEventListener('click', editImage);
+    }
+
+    function fillEditModels() {
+        var sel = $('dscDbEditModel');
+        if (!sel) return;
+        var EDIT_DEFAULT = 'doubao-seedream-5-0-pro-260628';
+        var all = modelsByCat('imageedit').concat(modelsByCat('image'));
+        var head = all.filter(function (m) { return m.value === EDIT_DEFAULT; });
+        var rest = all.filter(function (m) { return m.value !== EDIT_DEFAULT; });
+        var items = head.concat(rest).map(function (m) { return { value: m.value, label: m.label }; });
+        if (!items.length) items = [{ value: '', label: T('既定（Seedream 5.0 pro）') }];
+        var pick = items.some(function (m) { return m.value === EDIT_DEFAULT; }) ? EDIT_DEFAULT : items[0].value;
+        fillSelect(sel, items, pick);
+    }
+
+    // 画像を長辺 maxSide に縮小して dataURL 化（縮小不要なら元の dataURL をそのまま返す）
+    function readImageDataUrl(file, maxSide, quality) {
+        return new Promise(function (resolve, reject) {
+            var fr = new FileReader();
+            fr.onerror = function () { reject(new Error(T('画像の読み込みに失敗しました'))); };
+            fr.onload = function () {
+                var src = String(fr.result || '');
+                if (!src) { reject(new Error(T('画像の読み込みに失敗しました'))); return; }
+                var img = new Image();
+                img.onerror = function () { resolve(src); };
+                img.onload = function () {
+                    try {
+                        var w = img.naturalWidth || img.width || 0;
+                        var h = img.naturalHeight || img.height || 0;
+                        var scale = (w > 0 && h > 0) ? Math.min(1, maxSide / Math.max(w, h)) : 1;
+                        if (scale >= 1 && src.length <= 3.5 * 1024 * 1024) { resolve(src); return; }
+                        var cv = document.createElement('canvas');
+                        cv.width = Math.max(1, Math.round(w * scale));
+                        cv.height = Math.max(1, Math.round(h * scale));
+                        var ctx = cv.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, cv.width, cv.height);
+                        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+                        resolve(cv.toDataURL('image/jpeg', quality || 0.92));
+                    } catch (e) { resolve(src); }
+                };
+                img.src = src;
+            };
+            fr.readAsDataURL(file);
+        });
+    }
+
+    async function editImage() {
+        if (S.editBusy) return;
+        var st = $('dscDbEditStatus');
+        var btn = $('dscDbEditGo');
+        var inp = $('dscDbEditFile');
+        var f = inp && inp.files && inp.files[0];
+        if (!f) { setStatus(st, '⚠️ ' + T('先に画像を選択してください'), 'err'); return; }
+        var prompt = (($('dscDbEditPrompt') || {}).value || '').trim();
+        if (!prompt) { setStatus(st, '⚠️ ' + T('P图要求を入力してください'), 'err'); return; }
+        if (f.size > 12 * 1024 * 1024) { setStatus(st, '⚠️ ' + T('画像が大きすぎます（上限 12MB）'), 'err'); return; }
+        S.editBusy = true;
+        if (btn) btn.disabled = true;
+        setStatus(st, T('豆包がP图中…（最大 1〜2 分かかります）'), 'busy');
+        try {
+            var dataUrl = await readImageDataUrl(f, 2048, 0.92);
+            var d = await api('/image-edit', {
+                method: 'POST',
+                body: {
+                    imageBase64: dataUrl,
+                    fileName: f.name || 'image.png',
+                    prompt: prompt,
+                    model: ($('dscDbEditModel') || {}).value || '',
+                    resolution: ($('dscDbEditRes') || {}).value || '2K'
+                }
+            });
+            if (d && d.fallbackFrom) {
+                toast(T('ℹ️ {0} は利用不可のため {1} で生成しました', d.fallbackFrom, d.model || ''), 'info');
+            }
+            var meta = d.file || {};
+            var box = $('dscDbEditResult');
+            box.innerHTML = '';
+            var img = document.createElement('img');
+            img.src = fileUrl(meta) + '&_t=' + Date.now();
+            img.alt = meta.name || 'doubao edit';
+            box.appendChild(img);
+            box.appendChild(el('div', 'dsc-db-filename', T('ファイル名：{0}', meta.name || '')));
+            var row = el('div', 'dsc-db-row');
+            var dl = el('button', 'dsc-db-btn primary', T('ダウンロード'));
+            dl.type = 'button';
+            dl.addEventListener('click', function () { openExternal(downloadUrl(meta)); });
+            var again = el('button', 'dsc-db-btn', T('もう一度P图'));
+            again.type = 'button';
+            again.addEventListener('click', function () { editImage(); });
+            row.appendChild(dl);
+            row.appendChild(again);
+            box.appendChild(row);
+            setStatus(st, T('✅ P图が完成しました：{0}', meta.name || ''), 'ok');
+            toast(T('✅ P图が完成しました：{0}', meta.name || ''), 'success');
+            refreshFiles();
+        } catch (e) {
+            setStatus(st, '❌ ' + T('P图に失敗：{0}', e.message), 'err');
+            toast(T('P图に失敗：{0}', e.message), 'error');
+        } finally {
+            S.editBusy = false;
             if (btn) btn.disabled = false;
         }
     }
@@ -987,7 +1520,7 @@
         grid.appendChild(field('ファイル名', input('dscDbPodName', 'text', '例：秋の読書ポッドキャスト')));
         grid.appendChild(field('音色 A', input('dscDbPodVoiceA', 'text', 'zh_female_xiaohe_uranus_bigtts')));
         grid.appendChild(field('音色 B', input('dscDbPodVoiceB', 'text', 'zh_male_qingshuangnanda_mars_bigtts')));
-        grid.appendChild(field('モデル', select('dscDbPodModel', [])));
+        grid.appendChild(field('台本生成モデル', select('dscDbPodModel', [])));
         md.appendChild(grid);
 
         var st = el('div', 'dsc-db-status');
@@ -1013,8 +1546,11 @@
     function fillPodcastModels() {
         var sel = $('dscDbPodModel');
         if (!sel) return;
-        fillSelect(sel, modelsByCat('podcast').map(function (m) { return { value: m.value, label: m.label }; }),
-            S.cfg ? S.cfg.podcastModel : '');
+        // 台本の生成は対話モデルで行う。ポッドキャストモデルを model として
+        // 送ると方舟 /chat/completions が 404（model does not exist）を返すため、
+        // ここでは対話モデルを列挙し、既定値も対話モデルにする。
+        fillSelect(sel, modelsByCat('chat').map(function (m) { return { value: m.value, label: m.label }; }),
+            S.cfg ? S.cfg.chatModel : '');
     }
 
     async function generatePodcast() {

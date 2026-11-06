@@ -457,3 +457,30 @@
     white-space: normal;
     word-break: break-word;
 }
+
+/* 録音ファイル認識：ファイル選択行 */
+.dsc-db-filepick {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.dsc-db-file { display: none; }
+.dsc-db-filepick .dsc-db-filename {
+    font-size: 0.74rem;
+    color: #6b7280;
+    word-break: break-all;
+}
+
+/* 豆包P图：アップロードした元画像のプレビュー */
+.dsc-db-preview {
+    margin: 6px 0 10px;
+    text-align: center;
+}
+.dsc-db-preview img {
+    max-width: 100%;
+    max-height: 220px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+}

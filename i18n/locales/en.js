@@ -1469,4 +1469,76 @@ Doubao-Seed-Evolving（エージェント言語モデル）|Doubao-Seed-Evolving
 Doubao-Seed-2.1-pro（コーディング言語モデル）|Doubao-Seed-2.1-pro (coding language model)
 Doubao-Seed-2.1-turbo（言語モデル）|Doubao-Seed-2.1-turbo (language model)
 Doubao-Seed-2.0-lite（マルチモーダル推論モデル）|Doubao-Seed-2.0-lite (multimodal reasoning model)
+録音ファイルを豆包で認識|Recognize audio file with Doubao
+豆包録音ファイル認識|Doubao audio file recognition
+録音ファイルを選択|Select audio file
+まだ選択されていません|Not selected yet
+録音ファイルを選択してください|Please select an audio file
+音声が短すぎます|Audio is too short
+豆包で認識中…（{0}）|Recognizing with Doubao… ({0})
+豆包が空の認識結果を返しました|Doubao returned an empty recognition result
+✅ 認識しました（{0} 文字）。対話へ差し込みます…|✅ Recognized ({0} characters). Inserting into the conversation…
+認識に失敗：{0}|Recognition failed: {0}
+✅ 対話に差し込みました（{0} 文字・DeepSeek 用量は消費していません）|✅ Inserted into the conversation ({0} characters; no DeepSeek quota used)
+✅ 認識結果を対話に差し込みました|✅ Recognition result inserted into the conversation
+対話への差し込みに失敗：{0}|Failed to insert into the conversation: {0}
+自動差し込みに失敗したため入力欄へ入れました。送信は手動で行ってください|Automatic insertion failed, so the text was placed in the input field. Please send it manually
+対話画面が見つかりません|Conversation view not found
+音声理解モデル：{0}（録音の文字起こしに使用・モデル API は呼びません）|Speech understanding model: {0} (used for transcription; the model API is not called)
+録音ファイルを豆包で文字起こしし、結果をこの対話のメッセージとして差し込みます。モデル API は呼ばないため、DeepSeek の用量は消費しません。|Transcribe the audio file with Doubao and insert the result as a message in this conversation. The model API is not called, so no DeepSeek quota is used.
+録音ファイルを選び「認識して対話に送る」を押してください|Select an audio file, then tap “Recognize and send to chat”
+認識して対話に送る|Recognize and send to chat
+認識結果（そのまま対話に差し込みます。必要なら編集してください）|Recognition result (inserted as-is; edit if needed)
+文字起こしに使うモデル：{0}（豆包・DeepSeek の用量は消費しません）|Model used for transcription: {0} (consumes no Doubao or DeepSeek quota)
+録音ファイルを豆包で文字起こしします。結果は下の欄に表示されるので、そのままコピーできます。対話へは自動送信しません。|Transcribe the audio file with Doubao. The result appears in the field below and can be copied directly. It is not sent to the conversation automatically.
+認識結果（そのままコピーできます。必要なら編集してください）|Recognition result (copy directly; edit if needed)
+録音ファイルを選び「豆包で認識」を押してください|Select an audio file, then tap “Recognize with Doubao”
+結果をコピー|Copy result
+対話に差し込む|Insert into chat
+豆包で認識|Recognize with Doubao
+認識モデル：{0} · 端点：{1}|Recognition model: {0} · Endpoint: {1}
+✅ 認識しました（{0} 文字）。下の欄からコピーできます（対話へは自動送信しません）|✅ Recognized ({0} characters). Copy from the field below (not sent to the conversation automatically)
+✅ 認識結果を表示しました（{0} 文字）|✅ Recognition result displayed ({0} characters)
+📋 結果をコピーしました（{0} 文字）|📋 Result copied ({0} characters)
+コピーに失敗しました。長押しで選択してコピーしてください|Copy failed. Long-press to select and copy manually
+先に認識してください|Please recognize first
+豆包P图|Doubao Image Edit
+画像をアップロードし、どう直すかを伝えると豆包が修正します。結果は ds_files/blob に保存されます。|Upload an image and describe the change you want; Doubao will edit it. The result is saved to ds_files/blob.
+画像を選択|Select image
+P图要求（どこをどう直すか）|Edit instructions (what to change and how)
+例：背景を海辺に変える／人物をそのままに髪色を黒へ／服を白いシャツに|e.g. change the background to a beach / keep the person but make the hair black / change the clothes to a white shirt
+出力サイズ|Output size
+豆包にP图してもらう|Let Doubao edit the image
+先に画像を選択してください|Please select an image first
+P图要求を入力してください|Please enter edit instructions
+画像が大きすぎます（上限 12MB）|Image is too large (limit 12MB)
+豆包がP图中…（最大 1〜2 分かかります）|Doubao is editing the image… (may take 1–2 minutes)
+✅ P图が完成しました：{0}|✅ Image edit completed: {0}
+P图に失敗：{0}|Image edit failed: {0}
+もう一度P图|Edit again
+画像の読み込みに失敗しました|Failed to load the image
+既定（Seedream 5.0 pro）|Default (Seedream 5.0 pro)
+豆包 SeedEdit 3.0（画像編集・P图モデル）|Doubao SeedEdit 3.0 (image editing model)
+台本生成モデル|Script generation model
+RTC アプリの AppId|RTC app AppId
+RTC のルーム ID|RTC room ID
+空欄なら既定|Blank uses default
+⚠️ このモデルは未開通のため、{0} に自動切替して生成します…|⚠️ This model is not activated; switching to {0} automatically…
+⚠️ このモデルは未開通のため、{0} で生成しました|⚠️ This model is not activated; generated with {0}
+ℹ️ {0} は利用不可のため {1} で生成しました|ℹ️ {0} is unavailable; generated with {1}
+翻訳に失敗しました|Translation failed
+翻訳に失敗|Translation failed
+読み上げに失敗|Speech playback failed
+切り替えに失敗|Switch failed
+一括削除に失敗|Bulk delete failed
+対話への保存に失敗|Failed to save to chat
+テキストから音声を合成します。生成物は ds_files/blob に保存されます。|Synthesize speech from text. The output is saved to ds_files/blob.
+読み上げるテキスト|Text to read aloud
+例：こんにちは。今日はいい天気ですね。|e.g. Hello. Nice weather today.
+音声のファイル名|Audio file name
+例：ナレーション1|e.g. narration1
+音声を生成する|Generate audio
+テキストを入力してください|Please enter text
+✅ 音声を生成しました：{0}|✅ Audio generated: {0}
+オフにすると推論レベルはデフォルト Lv.|Turning it off sets the reasoning level to the default Lv.
 `);
