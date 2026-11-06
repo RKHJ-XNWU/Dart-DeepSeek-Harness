@@ -5,6 +5,7 @@
 // ============================================================
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'cosplay.dart';
@@ -36,6 +37,8 @@ Future<void> handleDsChatSendStream(
   bool enableTools, {
   ModelRouteDecision? route,
   String apiUrl = DS_API_URL,
+  /// 方舟专用附加字段（如 thinking）。DeepSeek 通道保持为 null。
+  Map<String, dynamic>? extraBody,
 }) async {
   final sse = Sse(req.response);
 
@@ -227,6 +230,7 @@ Future<void> handleDsChatSendStream(
       },
       usageAcc,
       apiUrl: apiUrl,
+      extraBody: extraBody,
     );
   } catch (e) {
     await sse.send('error', {'message': '$e'});
@@ -590,6 +594,30 @@ Future<void> handleDsChatSend(HttpRequest req) async {
 
   final fileCtx = buildFileContext(fileIDs);
 
+  // ========== 豆包通道：音频 / 视频理解能力校验 ==========
+  // 豆包模式下媒体附件必须由具备对应能力的豆包模型直接理解：
+  //   · 绝不把音视频降级成「文件名」文本偷偷送去 DeepSeek（会消耗 DeepSeek 用量）
+  //   · 模型不具备该能力时如实报错，并列出可切换的模型
+  final mediaLang = dsRequestLang(req, body);
+  if (useDoubao) {
+    if (fileCtx.audioFileIds.isNotEmpty && !dbSupportsAudioInput(model)) {
+      await dsJSONErr(
+          res,
+          400,
+          dbLocalized(mediaLang, 'audioUnsupported',
+              [model, dbAudioCapableModels.join(' / ')]));
+      return;
+    }
+    if (fileCtx.videoFileIds.isNotEmpty && !dbSupportsVideoInput(model)) {
+      await dsJSONErr(
+          res,
+          400,
+          dbLocalized(mediaLang, 'videoUnsupported',
+              [model, dbVideoCapableModels.join(' / ')]));
+      return;
+    }
+  }
+
   // ============ 模型自动路由（本轮含图片 → 视觉模型）============
   // 改造前：图片提取直接传 model，选 pro 就等于用纯文本模型读图，
   // 结果是「图片内容提取失败」这种静默降级。现在统一由 model_router 判定：
@@ -625,8 +653,14 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   }
 
   if (webSearch && content.isNotEmpty) {
-    final ctx = await buildWebSearchContext(content);
-    if (ctx.isNotEmpty) userPrompt += ctx;
+    if (useDoubao) {
+      // 豆包通道禁止调用 DeepSeek 的 /v1/tools/search，避免消耗 DeepSeek 用量
+      logp('⛔ 豆包モード：DeepSeek の联网検索は呼び出しません（用量保護）');
+      userPrompt += '\n\n' + dbLocalized(mediaLang, 'searchBlockedNote');
+    } else {
+      final ctx = await buildWebSearchContext(content);
+      if (ctx.isNotEmpty) userPrompt += ctx;
+    }
   }
   if (userPrompt.trim().isEmpty) userPrompt = 'アップロードしたファイルを確認してください。';
 
@@ -635,8 +669,9 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     userPrompt += '''\n\n【重要指令 · 超長文モード】\n完全な長文をそのまま出力してください。目標文字数は $target 文字（約 $target 文字相当）。\n要件:\n1. 「これから...」「以下は...」「まとめ」といった前置きや結びは一切書かないこと\n2. 本文から直接始め、章立てを明確にし、内容を充実させること\n3. 長さ制限を理由に早く終わらせず、可能な限り書き切ること\n4. 内容の質を保ち、繰り返しの水増しを避けること''';
   }
 
-  // 图片内容提取（视觉模型）
-  if (fileCtx.imageFileIds.isNotEmpty) {
+  // 图片内容提取（仅 DeepSeek 通道需要：先让视觉模型转述，再交给文本模型）
+  // 豆包通道不转述：原图直接交给模型本人看，由它自己回答并思考。
+  if (!useDoubao && fileCtx.imageFileIds.isNotEmpty) {
     final visionDescs = <String>[];
     for (var i = 0; i < fileCtx.imageFileIds.length; i++) {
       final imgID = fileCtx.imageFileIds[i];
@@ -669,6 +704,79 @@ Future<void> handleDsChatSend(HttpRequest req) async {
           '${visionDescs.join('\n\n')}';
       logp('✅ すべての画像の内容抽出が完了し、プロンプトに結合しました');
     }
+  }
+
+  // ========== 豆包通道：媒体附件以原生多模态形式提交 ==========
+  // 图片 → image_url、音频 → input_audio、视频 → video_url，
+  // 全部原样交给豆包本人理解；同时开启深度思考（thinking）。
+  var useTools = enableTools;
+  Map<String, dynamic>? dbExtraBody;
+  final dbMediaParts = <Map<String, dynamic>>[];
+  if (useDoubao && fileCtx.hasMedia) {
+    for (final id in fileCtx.imageFileIds) {
+      final b64 = dsFileToBase64(id);
+      if (b64.error == null && b64.b64.isNotEmpty) {
+        dbMediaParts.add(dbImagePart(b64.mime, b64.b64));
+      } else {
+        logp('⚠️ 画像の読み込みに失敗しました（豆包へは送信しません）: ${b64.error}');
+      }
+    }
+    for (final id in fileCtx.audioFileIds) {
+      final meta = getDsFileMeta(id);
+      if (meta == null) continue;
+      final f = File('$DSFilesBlobDir/${meta.relPath}');
+      if (!f.existsSync()) continue;
+      final raw = f.readAsBytesSync();
+      if (raw.length > 40 * 1024 * 1024) {
+        await dsJSONErr(
+            res, 400, dbLocalized(mediaLang, 'audioTooLarge', [meta.name]));
+        return;
+      }
+      final prepared = await dbPrepareAudioForArk(raw, meta.name);
+      dbMediaParts.add(dbAudioPart(prepared.format, base64Encode(prepared.bytes)));
+      logp('🎧 音声を豆包の音声理解へ直接送信: ${meta.name} (${prepared.format})');
+    }
+    for (final id in fileCtx.videoFileIds) {
+      final meta = getDsFileMeta(id);
+      if (meta == null) continue;
+      final f = File('$DSFilesBlobDir/${meta.relPath}');
+      if (!f.existsSync()) continue;
+      final raw = f.readAsBytesSync();
+      if (raw.length > 40 * 1024 * 1024) {
+        await dsJSONErr(
+            res, 400, dbLocalized(mediaLang, 'videoTooLarge', [meta.name]));
+        return;
+      }
+      final mime = meta.mimeType.toLowerCase().startsWith('video/')
+          ? meta.mimeType
+          : 'video/mp4';
+      dbMediaParts.add(dbVideoPart(mime, base64Encode(raw)));
+      logp('🎬 動画を豆包の動画理解へ直接送信: ${meta.name} ($mime)');
+    }
+    // 画像 / 音声 / 動画を見たうえで、まず考えてから答える
+    dbExtraBody = dbThinkingEnableParam(model);
+    if (dbExtraBody != null) {
+      logp('🧠 豆包の深度思考を有効化（メディア理解後に思考して回答）');
+    }
+    // ツールモードのリクエスト形式は thinking と併用できないため、
+    // メディア添付時のみ自動解除する（黙って無視はしない）。
+    if (useTools) {
+      useTools = false;
+      // 工具模式曾把 temperature 压到 0，这里恢复默认采样温度
+      temperature = 1.0;
+      logp('ℹ️ メディア添付のためツールモードを自動解除しました（思考を優先）');
+    }
+  }
+  // DeepSeek 通道不具备音视频理解能力，如实告知而不是假装已读
+  if (!useDoubao &&
+      (fileCtx.audioFileIds.isNotEmpty || fileCtx.videoFileIds.isNotEmpty)) {
+    final names = <String>[
+      ...fileCtx.audioFileIds.map((id) => getDsFileMeta(id)?.name ?? id),
+      ...fileCtx.videoFileIds.map((id) => getDsFileMeta(id)?.name ?? id),
+    ];
+    logp('⚠️ DeepSeek 通道は音声・動画理解に非対応: ${names.join('、')}');
+    userPrompt +=
+        '\n\n' + dbLocalized(mediaLang, 'noMediaNote', [names.join('、')]);
   }
 
   // 跨会话引用
@@ -705,18 +813,30 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       apiMessages.add({'role': 'user', 'content': snap});
     }
   }
-  apiMessages.add({'role': 'user', 'content': userPrompt});
+  if (dbMediaParts.isNotEmpty) {
+    apiMessages.add({
+      'role': 'user',
+      'content': <Map<String, dynamic>>[
+        {'type': 'text', 'text': userPrompt},
+        ...dbMediaParts,
+      ],
+    });
+  } else {
+    apiMessages.add({'role': 'user', 'content': userPrompt});
+  }
 
   // ============ 流式分支 ============
   if (stream && !longTextMode) {
     await handleDsChatSendStream(req, callKey, model, apiMessages,
-        maxTokens, temperature, rounds, sessionID, content, fileIDs, enableTools,
-        route: route, apiUrl: callUrl);
+        maxTokens, temperature, rounds, sessionID, content, fileIDs, useTools,
+        route: route,
+        apiUrl: callUrl,
+        extraBody: dbExtraBody);
     return;
   }
 
   // ============ 工具模式（非流式） ============
-  if (enableTools) {
+  if (useTools) {
     logp('🔧 ツールモードを有効化し、マルチターンの function calling を開始します（最大 $DS_TOOL_MAX_ITERATIONS ラウンド）');
     final usageAcc = DsUsageAcc();
     final agentMsgs = <Map<String, dynamic>>[
@@ -801,7 +921,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   String reasoning;
   try {
     final r = await callDsMultiRound(callKey, model, apiMessages, maxTokens,
-        temperature, rounds, null, usageAcc, apiUrl: callUrl);
+        temperature, rounds, null, usageAcc,
+        apiUrl: callUrl, extraBody: dbExtraBody);
     reply = r.content;
     reasoning = r.reasoning;
   } catch (e) {

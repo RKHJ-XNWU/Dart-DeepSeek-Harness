@@ -56,14 +56,11 @@ const List<DbModelSpec> dbModelCatalog = <DbModelSpec>[
       'Doubao-Seedance-2.0-fast（高速動画生成）', 'video'),
   DbModelSpec('doubao-seedance-2-0-260128', 'Doubao-Seedance-2.0（動画生成）', 'video'),
   DbModelSpec('glm-5-2-260617', 'GLM-5.2（コーディングモデル）', 'chat'),
-  DbModelSpec('doubao-seed-2-0-mini-260428', 'Doubao-Seed-2.0-mini（言語モデル）', 'chat'),
-  DbModelSpec('doubao-seed-evolving-latest-version',
-      'Doubao-Seed-Evolving（エージェント言語モデル）', 'chat'),
-  DbModelSpec(
-      'doubao-seed-2-1-pro-260628', 'Doubao-Seed-2.1-pro（コーディング言語モデル）', 'chat'),
-  DbModelSpec('doubao-seed-2-1-turbo-260628', 'Doubao-Seed-2.1-turbo（言語モデル）', 'chat'),
-  DbModelSpec(
-      'doubao-seed-2-0-lite-260428', 'Doubao-Seed-2.0-lite（マルチモーダル推論モデル）', 'chat'),
+  DbModelSpec('doubao-seed-2-0-mini-260428', 'Doubao-Seed-2.0-mini', 'chat'),
+  DbModelSpec('doubao-seed-evolving-latest-version', 'Doubao-Seed-Evolving', 'chat'),
+  DbModelSpec('doubao-seed-2-1-pro-260628', 'Doubao-Seed-2.1-pro', 'chat'),
+  DbModelSpec('doubao-seed-2-1-turbo-260628', 'Doubao-Seed-2.1-turbo', 'chat'),
+  DbModelSpec('doubao-seed-2-0-lite-260428', 'Doubao-Seed-2.0-lite', 'chat'),
 ];
 
 /// 图片风格预置（前端展示，选中后拼进提示词；也允许自定义）
@@ -89,6 +86,235 @@ const String DB_DEFAULT_ASR_MODEL = 'Doubao_Seed_ASR_AUC_2.0';
 const String DB_DEFAULT_REALTIME_MODEL = 'Doubao_scene_SLM_Doubao_realtime_voice_model';
 const String DB_DEFAULT_VOICE = 'zh_female_xiaohe_uranus_bigtts';
 const String DB_DEFAULT_VOICE_B = 'zh_male_qingshuangnanda_mars_bigtts';
+
+// ------------------------------------------------------------
+// 多言語メッセージ（6 言語）
+//   UI 言語に合わせて直接その言語で返すため、前端の二次翻訳に依存しない。
+//   key ごとに ja / zh / en / ko / ru / fr を必ず揃える。
+// ------------------------------------------------------------
+const Map<String, Map<String, String>> _dbMsgTable = <String, Map<String, String>>{
+  'audioUnsupported': <String, String>{
+    'ja': '選択中の豆包モデル（{0}）は音声理解に対応していません。'
+        '音声理解対応モデル（{1}）に切り替えてください。'
+        '音声を DeepSeek へ送信することはありません。',
+    'zh': '当前所选豆包模型（{0}）不支持音频理解。'
+        '请切换到支持音频理解的模型（{1}）。音频不会发送给 DeepSeek。',
+    'en': 'The selected Doubao model ({0}) does not support audio understanding. '
+        'Switch to an audio-capable model ({1}). '
+        'Your audio is never sent to DeepSeek.',
+    'ko': '선택한 더우바오 모델({0})은 오디오 이해를 지원하지 않습니다. '
+        '오디오 이해 지원 모델({1})로 전환해 주세요. '
+        '오디오는 DeepSeek으로 전송되지 않습니다.',
+    'ru': 'Выбранная модель Doubao ({0}) не поддерживает понимание аудио. '
+        'Переключитесь на модель с поддержкой аудио ({1}). '
+        'Аудио не отправляется в DeepSeek.',
+    'fr': 'Le modèle Doubao sélectionné ({0}) ne prend pas en charge la compréhension audio. '
+        'Passez à un modèle compatible ({1}). '
+        'Votre audio n’est jamais envoyé à DeepSeek.',
+  },
+  'videoUnsupported': <String, String>{
+    'ja': '選択中の豆包モデル（{0}）は動画理解に対応していません。'
+        '動画理解対応モデル（{1}）に切り替えてください。'
+        '動画を DeepSeek へ送信することはありません。',
+    'zh': '当前所选豆包模型（{0}）不支持视频理解。'
+        '请切换到支持视频理解的模型（{1}）。视频不会发送给 DeepSeek。',
+    'en': 'The selected Doubao model ({0}) does not support video understanding. '
+        'Switch to a video-capable model ({1}). '
+        'Your video is never sent to DeepSeek.',
+    'ko': '선택한 더우바오 모델({0})은 동영상 이해를 지원하지 않습니다. '
+        '동영상 이해 지원 모델({1})로 전환해 주세요. '
+        '동영상은 DeepSeek으로 전송되지 않습니다.',
+    'ru': 'Выбранная модель Doubao ({0}) не поддерживает понимание видео. '
+        'Переключитесь на модель с поддержкой видео ({1}). '
+        'Видео не отправляется в DeepSeek.',
+    'fr': 'Le modèle Doubao sélectionné ({0}) ne prend pas en charge la compréhension vidéo. '
+        'Passez à un modèle compatible ({1}). '
+        'Votre vidéo n’est jamais envoyée à DeepSeek.',
+  },
+  'audioTooLarge': <String, String>{
+    'ja': '音声ファイルが大きすぎます（上限 40MB）：{0}',
+    'zh': '音频文件过大（上限 40MB）：{0}',
+    'en': 'Audio file is too large (limit 40MB): {0}',
+    'ko': '오디오 파일이 너무 큽니다(최대 40MB): {0}',
+    'ru': 'Аудиофайл слишком большой (лимит 40MB): {0}',
+    'fr': 'Fichier audio trop volumineux (limite 40 Mo) : {0}',
+  },
+  'videoTooLarge': <String, String>{
+    'ja': '動画ファイルが大きすぎます（上限 40MB）：{0}',
+    'zh': '视频文件过大（上限 40MB）：{0}',
+    'en': 'Video file is too large (limit 40MB): {0}',
+    'ko': '동영상 파일이 너무 큽니다(최대 40MB): {0}',
+    'ru': 'Видеофайл слишком большой (лимит 40MB): {0}',
+    'fr': 'Fichier vidéo trop volumineux (limite 40 Mo) : {0}',
+  },
+  'keyMissingForModel': <String, String>{
+    'ja': '豆包モデルを選択中ですが、豆包 API Key が未設定です',
+    'zh': '已选择豆包模型，但豆包 API Key 未填写',
+    'en': 'A Doubao model is selected, but the Doubao API Key is not set.',
+    'ko': '더우바오 모델을 선택했지만 더우바오 API Key가 설정되지 않았습니다.',
+    'ru': 'Выбрана модель Doubao, но API-ключ Doubao не задан.',
+    'fr': 'Un modèle Doubao est sélectionné, mais la clé API Doubao n’est pas définie.',
+  },
+  'searchBlockedNote': <String, String>{
+    'ja': '【联网検索について】本サイトは豆包モードでのウェブ検索に対応していません。'
+        '豆包の検索機能を別途追加する必要もありません。'
+        'ウェブ検索が必要な場合は、豆包モードをオフにして、DeepSeek モードで検索してください。',
+    'zh': '【关于联网搜索】本网站不支持豆包模式下的联网搜索，也没有必要额外支持豆包搜索。'
+        '如需联网搜索，请关闭豆包模式，改用 DeepSeek 模式进行搜索。',
+    'en': '[About web search] This site does not support web search in Doubao mode, '
+        'and there is no need to add Doubao search separately. '
+        'If you need web search, turn off Doubao mode and search in DeepSeek mode instead.',
+    'ko': '[웹 검색 안내] 본 사이트는 더우바오 모드에서의 웹 검색을 지원하지 않으며, '
+        '더우바오 검색을 별도로 추가할 필요도 없습니다. '
+        '웹 검색이 필요하면 더우바오 모드를 끄고 DeepSeek 모드에서 검색해 주세요.',
+    'ru': '[О веб-поиске] Этот сайт не поддерживает веб-поиск в режиме Doubao, '
+        'и отдельно добавлять поиск Doubao не требуется. '
+        'Если нужен веб-поиск, отключите режим Doubao и выполняйте поиск в режиме DeepSeek.',
+    'fr': '[À propos de la recherche web] Ce site ne prend pas en charge la recherche web '
+        'en mode Doubao, et il n’est pas nécessaire d’ajouter une recherche Doubao. '
+        'Si vous avez besoin d’une recherche web, désactivez le mode Doubao '
+        'et utilisez la recherche en mode DeepSeek.',
+  },
+  'noMediaNote': <String, String>{
+    'ja': '【重要】この経路（DeepSeek）は音声・動画の内容理解に対応していません。'
+        '対象ファイル（{0}）の中身は読まれていません。'
+        '音声・動画を理解させたい場合は、豆包モードに切り替えて'
+        '音声理解・動画理解対応モデルを選んでください。',
+    'zh': '【重要】当前通道（DeepSeek）不支持音频、视频内容理解。'
+        '目标文件（{0}）的内容并未被读取。'
+        '如需理解音频、视频，请切换到豆包模式，并选择支持音频理解、视频理解的模型。',
+    'en': '[Important] This route (DeepSeek) does not support understanding audio or video. '
+        'The contents of these files ({0}) were not read. '
+        'To let a model understand audio or video, switch to Doubao mode and pick '
+        'an audio/video capable model.',
+    'ko': '[중요] 현재 경로(DeepSeek)는 오디오·동영상 내용 이해를 지원하지 않습니다. '
+        '대상 파일({0})의 내용은 읽히지 않았습니다. '
+        '오디오·동영상을 이해시키려면 더우바오 모드로 전환하고 '
+        '오디오·동영상 이해 지원 모델을 선택해 주세요.',
+    'ru': '[Важно] Этот канал (DeepSeek) не поддерживает понимание аудио и видео. '
+        'Содержимое файлов ({0}) не было прочитано. '
+        'Чтобы модель поняла аудио или видео, переключитесь в режим Doubao и выберите '
+        'модель с поддержкой аудио/видео.',
+    'fr': '[Important] Cette voie (DeepSeek) ne prend pas en charge la compréhension '
+        'de l’audio ni de la vidéo. Le contenu de ces fichiers ({0}) n’a pas été lu. '
+        'Pour faire comprendre un audio ou une vidéo, passez en mode Doubao et choisissez '
+        'un modèle compatible audio/vidéo.',
+  },
+  'transcribeNote': <String, String>{
+    'ja': '選択モデルは音声理解に非対応のため、文字起こし後に分析しました',
+    'zh': '所选模型不支持音频理解，因此先转写文字再进行分析',
+    'en': 'The selected model lacks audio understanding, so the audio was transcribed first '
+        'and then analyzed.',
+    'ko': '선택한 모델이 오디오 이해를 지원하지 않아 먼저 텍스트로 변환한 뒤 분석했습니다.',
+    'ru': 'Выбранная модель не поддерживает понимание аудио, поэтому сначала выполнена '
+        'расшифровка, затем анализ.',
+    'fr': 'Le modèle sélectionné ne comprend pas l’audio : une transcription a été faite '
+        'avant l’analyse.',
+  },
+};
+
+/// 取得指定语言的文案；args 依次替换 {0} {1} …
+String dbLocalized(String lang, String key, [List<String> args = const <String>[]]) {
+  final raw = lang.trim().toLowerCase();
+  // 'zh-CN' / 'en-US' 这类带地区的写法也要能命中（取前两位）
+  final code = raw.length >= 2 ? raw.substring(0, 2) : raw;
+  final row = _dbMsgTable[key];
+  if (row == null) return key;
+  var text = row[code] ?? row['ja'] ?? key;
+  for (var i = 0; i < args.length; i++) {
+    text = text.replaceAll('{$i}', args[i]);
+  }
+  return text;
+}
+
+// ------------------------------------------------------------
+// 模型能力表（音频理解 / 视频理解）
+//   只有下表列出的模型才能直接接收原始音频 / 视频。
+//   表外模型（含 2.1 系列）不具备音频理解，传入音频会 400，
+//   因此必须在请求前拦截并如实告知，绝不静默丢弃。
+// ------------------------------------------------------------
+
+/// 支持「音频理解」的模型：可直接把音频字节作为 input_audio 送入对话。
+const Set<String> dbAudioUnderstandModels = <String>{
+  'doubao-seed-2-0-mini-260428',
+  'doubao-seed-2-0-lite-260428',
+};
+
+/// 支持「视频理解」的模型：可直接把视频字节作为 video_url 送入对话。
+/// 注意：2.1 系列（turbo / pro / evolving）只支持视频理解，不支持音频理解。
+const Set<String> dbVideoUnderstandModels = <String>{
+  'doubao-seed-2-0-mini-260428',
+  'doubao-seed-2-0-lite-260428',
+  'doubao-seed-2-1-turbo-260628',
+  'doubao-seed-2-1-pro-260628',
+  'doubao-seed-evolving-latest-version',
+};
+
+/// 该模型能否直接理解原始音频
+bool dbSupportsAudioInput(String model) =>
+    dbAudioUnderstandModels.contains(model.trim().toLowerCase());
+
+/// 该模型能否直接理解原始视频
+bool dbSupportsVideoInput(String model) =>
+    dbVideoUnderstandModels.contains(model.trim().toLowerCase());
+
+/// 具备音频理解能力的模型清单（用于前端提示与错误话术）
+List<String> get dbAudioCapableModels =>
+    dbAudioUnderstandModels.toList(growable: false);
+
+/// 具备视频理解能力的模型清单（用于前端提示与错误话术）
+List<String> get dbVideoCapableModels =>
+    dbVideoUnderstandModels.toList(growable: false);
+
+/// 构造「开启深度思考」参数：让豆包在理解图片 / 音频 / 视频后
+/// 先思考再回答。仅 doubao-seed 系列接受该字段。
+Map<String, dynamic>? dbThinkingEnableParam(String model) {
+  final m = model.trim().toLowerCase();
+  if (m.isEmpty) return null;
+  if (!m.startsWith('doubao-seed')) return null;
+  return <String, dynamic>{
+    'thinking': <String, dynamic>{'type': 'enabled'},
+  };
+}
+
+/// 图片内容片段（data URL 直传，模型自己看原图，不做二次转述）
+Map<String, dynamic> dbImagePart(String mime, String base64) => <String, dynamic>{
+      'type': 'image_url',
+      'image_url': <String, dynamic>{
+        'url': 'data:${mime.isEmpty ? 'image/png' : mime};base64,$base64',
+      },
+    };
+
+/// 音频内容片段（方舟原生音频理解输入）
+Map<String, dynamic> dbAudioPart(String format, String base64) => <String, dynamic>{
+      'type': 'input_audio',
+      'input_audio': <String, dynamic>{
+        'data': base64,
+        'format': format.isEmpty ? 'mp3' : format,
+      },
+    };
+
+/// 视频内容片段（方舟原生视频理解输入）
+Map<String, dynamic> dbVideoPart(String mime, String base64) => <String, dynamic>{
+      'type': 'video_url',
+      'video_url': <String, dynamic>{
+        'url': 'data:${mime.isEmpty ? 'video/mp4' : mime};base64,$base64',
+      },
+    };
+
+/// 音频字节直接送方舟理解时的格式名（与 _audioFormatOf 保持一致的取值域）
+String dbAudioFormatOf(String fileName) => _audioFormatOf(fileName);
+
+/// 把任意来源音频规范成方舟可接受的 mp3；无法转换时原样返回并给出真实格式名。
+/// 聊天链路（chat_send）需要它，因此以公开函数暴露。
+Future<({List<int> bytes, String format})> dbPrepareAudioForArk(
+    List<int> audio, String fileName) async {
+  final converted = await _ensureMp3Bytes(audio, fileName);
+  if (!identical(converted, audio) && converted.isNotEmpty) {
+    return (bytes: converted, format: 'mp3');
+  }
+  return (bytes: audio, format: _audioFormatOf(fileName));
+}
 
 // ------------------------------------------------------------
 // 配置（明文 JSON，存放在 .sts 内）
@@ -389,6 +615,51 @@ Future<String> dbChatText(
     'stream': false,
     'max_tokens': maxTokens,
     'temperature': temperature,
+  };
+  final r = await _httpRaw('POST', dbChatEndpoint(),
+      headers: _jsonHeaders(cfg.apiKey),
+      body: utf8.encode(jsonEncode(body)),
+      timeout: timeout);
+  if (r.code != 200) {
+    throw Exception('豆包 API HTTP ${r.code}: ${_errFromBytes(r.bytes)}');
+  }
+  final j = asMap(jsonDecode(utf8.decode(r.bytes, allowMalformed: true)));
+  final choices = asList(j['choices']);
+  if (choices.isEmpty) throw Exception('豆包 API 返回了空响应');
+  final msg = asMap(asMap(choices[0])['message']);
+  final c = mStr(msg, 'content');
+  if (c.trim().isEmpty) {
+    final rc = mStr(msg, 'reasoning_content');
+    if (rc.trim().isNotEmpty) return rc;
+  }
+  return c;
+}
+
+/// 单轮直连方舟：支持多模态 content（图片 / 音频 / 视频）与深度思考开关。
+/// 该函数只访问豆包（火山方舟），任何时候都不会触及 DeepSeek 接口。
+Future<String> _dbChatRawOnce(
+  DbConfig cfg,
+  String model,
+  List<Map<String, dynamic>> messages, {
+  int maxTokens = 4096,
+  double temperature = 0.8,
+  bool thinking = false,
+  String systemPrompt = '',
+  Duration timeout = const Duration(seconds: 180),
+}) async {
+  _requireKey(cfg);
+  final msgs = <Map<String, dynamic>>[];
+  if (systemPrompt.trim().isNotEmpty) {
+    msgs.add({'role': 'system', 'content': systemPrompt});
+  }
+  msgs.addAll(messages);
+  final body = <String, dynamic>{
+    'model': model,
+    'messages': msgs,
+    'stream': false,
+    'max_tokens': maxTokens,
+    'temperature': temperature,
+    if (thinking) 'thinking': <String, dynamic>{'type': 'enabled'},
   };
   final r = await _httpRaw('POST', dbChatEndpoint(),
       headers: _jsonHeaders(cfg.apiKey),
@@ -1724,7 +1995,17 @@ Map<String, dynamic> _modelListJson() {
   final cfg = getDbConfig();
   final list = <Map<String, dynamic>>[
     for (final m in dbModelCatalog)
-      {'value': m.value, 'label': m.label, 'category': m.cat, 'custom': false}
+      {
+        'value': m.value,
+        'label': m.label,
+        'category': m.cat,
+        'custom': false,
+        // 能力标记：前端据此显示「音声理解」「動画理解」，避免用户误判
+        if (m.cat == 'chat') ...{
+          'audioInput': dbSupportsAudioInput(m.value),
+          'videoInput': dbSupportsVideoInput(m.value),
+        },
+      }
   ];
   for (final c in cfg.customModels) {
     final v = c.trim();
@@ -1732,7 +2013,12 @@ Map<String, dynamic> _modelListJson() {
     if (list.any((e) => e['value'] == v)) continue;
     list.add({'value': v, 'label': v, 'category': 'chat', 'custom': true});
   }
-  return {'models': list, 'styles': dbImageStyles};
+  return {
+    'models': list,
+    'styles': dbImageStyles,
+    'audioCapableModels': dbAudioCapableModels,
+    'videoCapableModels': dbVideoCapableModels,
+  };
 }
 
 Map<String, dynamic> _configJson() {
@@ -2275,19 +2561,77 @@ Future<void> handleDbAudioAnalyze(HttpRequest req) async {
     return;
   }
   final fileID = mStr(body, 'fileId');
+  final cfg = getDbConfig();
+  final prompt = mStr(body, 'prompt');
+  final wantModel = trimOr(mStr(body, 'model'), cfg.chatModel);
   try {
-    final text = await dbTranscribeFile(fileID);
-    final prompt = mStr(body, 'prompt');
-    String analysis = '';
-    if (prompt.trim().isNotEmpty) {
-      analysis = await dbChatText(
-          '你是音频内容分析专家，请用简体中文简洁地分析。',
-          [
-            {'role': 'user', 'content': '音声の書き起こし:\n$text\n\n依頼: $prompt'}
-          ],
-          model: mStr(body, 'model'));
+    final meta = getDsFileMeta(fileID);
+    if (meta == null) throw Exception('找不到音频文件：$fileID');
+    final f = File('$DSFilesBlobDir/${meta.relPath}');
+    if (!f.existsSync()) throw Exception('找不到音频文件本体：${meta.name}');
+    final bytes = f.readAsBytesSync();
+    if (bytes.length > 40 * 1024 * 1024) {
+      throw Exception('音频文件过大（上限 40MB）');
     }
-    await dsJSONOk(res, 200, {'success': true, 'text': text, 'analysis': analysis});
+
+    // ① 主路径：模型本身支持音频理解 → 音频原文直接送入方舟，
+    //    由豆包自己听、自己总结，并先思考再作答（不做二次转述）。
+    if (dbSupportsAudioInput(wantModel)) {
+      final prepared = await dbPrepareAudioForArk(bytes, meta.name);
+      final question = prompt.trim().isEmpty
+          ? 'この音声の内容を詳しく教えてください。何が話されていますか。'
+              '要点を整理してまとめてください。'
+          : prompt.trim();
+      final content = <Map<String, dynamic>>[
+        dbAudioPart(prepared.format, base64Encode(prepared.bytes)),
+        {'type': 'text', 'text': question},
+      ];
+      final answer = await _dbChatRawOnce(
+        cfg,
+        wantModel,
+        <Map<String, dynamic>>[
+          {'role': 'user', 'content': content}
+        ],
+        maxTokens: intArgDefault(body, 'maxTokens', 4096),
+        temperature: 0.6,
+        thinking: true,
+      );
+      await dsJSONOk(res, 200, {
+        'success': true,
+        'text': answer,
+        'analysis': answer,
+        'nativeAudio': true,
+        'model': wantModel,
+      });
+      return;
+    }
+
+    // ② 回退：模型不支持音频理解 → 用豆包做文字转写，再让豆包文本模型分析。
+    //    这条路径消耗的同样是豆包（方舟）用量，不涉及 DeepSeek。
+    final text = await dbTranscribeFile(fileID);
+    var analysis = '';
+    if (prompt.trim().isNotEmpty) {
+      analysis = await _dbChatRawOnce(
+        cfg,
+        _dbPickChatModel(wantModel, cfg),
+        <Map<String, dynamic>>[
+          {'role': 'user', 'content': '音声の書き起こし:\n$text\n\n依頼: $prompt'}
+        ],
+        maxTokens: 4096,
+        temperature: 0.7,
+        thinking: false,
+        systemPrompt: '你是音频内容分析专家。请依据给定的转写文本作答，'
+            '不要编造转写中不存在的内容。',
+      );
+    }
+    await dsJSONOk(res, 200, {
+      'success': true,
+      'text': text,
+      'analysis': analysis,
+      'nativeAudio': false,
+      'model': _dbPickChatModel(wantModel, cfg),
+      'note': dbLocalized(dsRequestLang(req, body), 'transcribeNote'),
+    });
   } catch (e) {
     await dsJSONErr(res, 500, dbErrText(e));
   }

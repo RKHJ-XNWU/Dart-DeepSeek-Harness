@@ -1542,4 +1542,18 @@ RTC のルーム ID|ID de salon RTC
 ✅ 音声を生成しました：{0}|✅ Audio généré : {0}
 豆包で音声生成|Génération audio Doubao
 オフにすると推論レベルはデフォルト Lv.|En le désactivant, le niveau de raisonnement revient à Lv.
+音声理解に対応：doubao-seed-2-0-mini / doubao-seed-2-0-lite。動画理解に対応：上記 2 モデルに加え doubao-seed-2-1-turbo / doubao-seed-2-1-pro / doubao-seed-evolving。2.1 系は動画理解のみで音声理解には非対応です。|Compréhension audio : doubao-seed-2-0-mini / doubao-seed-2-0-lite. Compréhension vidéo : les deux modèles ci-dessus plus doubao-seed-2-1-turbo / doubao-seed-2-1-pro / doubao-seed-evolving. La série 2.1 ne gère que la vidéo, pas l’audio.
+文字起こしに使うモデル：{0}（音声理解）／{1}（音声認識）。豆包の用量を消費し、DeepSeek の用量は消費しません。|Modèle utilisé pour la transcription : {0} (compréhension audio) / {1} (reconnaissance vocale). Consomme le quota Doubao, pas celui de DeepSeek.
+`);
+
+I18N.add('fr', `
+（音声理解・動画理解）|(compréhension audio et vidéo)
+（動画理解）|(compréhension vidéo)
+（音声理解）|(compréhension audio)
+音声生成に失敗：{0}|Échec de la génération audio : {0}
+✅ 対話に差し込みました（{0} 文字）|✅ Inséré dans la conversation ({0} caractères)
+合成中…|Synthèse en cours…
+話速|Vitesse
+音色|Timbre
+設定の読み込みに失敗：{0}|Échec du chargement des paramètres : {0}
 `);

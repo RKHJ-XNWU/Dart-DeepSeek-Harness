@@ -108,13 +108,30 @@
         return (S.catalog || []).filter(function (m) { return !cat || m.category === cat; });
     }
 
+    // 模型能力标签：模型名保持语言无关（拉丁字母/数字），
+    // 能力说明由后端 audioInput / videoInput 布尔字段驱动并走字典本地化，
+    // 这样新增模型不会再出现「日语残留」或半日半中混排。
+    function capSuffix(m) {
+        if (!m) return '';
+        var a = !!m.audioInput;
+        var v = !!m.videoInput;
+        var txt = '';
+        if (a && v) txt = T('（音声理解・動画理解）');
+        else if (v) txt = T('（動画理解）');
+        else if (a) txt = T('（音声理解）');
+        if (!txt) return '';
+        // 中日文用全角括号，前面不再补空格；其他语言补一个空格更易读
+        var lg = lang();
+        return (lg === 'zh' || lg === 'ja') ? txt : ' ' + txt;
+    }
+
     function fillSelect(sel, items, selected) {
         if (!sel) return;
         sel.innerHTML = '';
         items.forEach(function (m) {
             var o = document.createElement('option');
             o.value = m.value;
-            o.textContent = T(m.label) + ' · ' + m.value;
+            o.textContent = T(m.label) + capSuffix(m) + ' · ' + m.value;
             if (selected && selected === m.value) o.selected = true;
             sel.appendChild(o);
         });
@@ -317,7 +334,7 @@
         options.forEach(function (o) {
             var op = document.createElement('option');
             if (typeof o === 'string') { op.value = o; op.textContent = o; }
-            else { op.value = o.value; op.textContent = T(o.label); }
+            else { op.value = o.value; op.textContent = T(o.label) + capSuffix(o); }
             if (selected && selected === op.value) op.selected = true;
             s.appendChild(op);
         });
@@ -372,27 +389,15 @@
         card.appendChild(field('ベース URL', input('dscDbBaseUrl', 'text', DB_BASE_PH(), ''), '既定：https://ark.cn-beijing.volces.com/api/v3'));
 
         var grid = el('div', 'dsc-db-grid');
-        grid.appendChild(field('対話モデル', select('dscDbChatModel', modelsByCat('chat').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('画像モデル', select('dscDbImageModel', modelsByCat('image').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('動画モデル', select('dscDbVideoModel', modelsByCat('video').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('音声合成モデル', select('dscDbTtsModel', modelsByCat('tts').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('ポッドキャストモデル', select('dscDbPodcastModel', modelsByCat('podcast').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('音声認識モデル', select('dscDbAsrModel', modelsByCat('asr').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
-        grid.appendChild(field('リアルタイム音声モデル', select('dscDbRealtimeModel', modelsByCat('realtime').map(function (m) {
-            return { value: m.value, label: m.label };
-        }))));
+        grid.appendChild(field('対話モデル', select('dscDbChatModel', modelsByCat('chat'))));
+        card.appendChild(el('div', 'dsc-db-sub',
+            T('音声理解に対応：doubao-seed-2-0-mini / doubao-seed-2-0-lite。動画理解に対応：上記 2 モデルに加え doubao-seed-2-1-turbo / doubao-seed-2-1-pro / doubao-seed-evolving。2.1 系は動画理解のみで音声理解には非対応です。')));
+        grid.appendChild(field('画像モデル', select('dscDbImageModel', modelsByCat('image'))));
+        grid.appendChild(field('動画モデル', select('dscDbVideoModel', modelsByCat('video'))));
+        grid.appendChild(field('音声合成モデル', select('dscDbTtsModel', modelsByCat('tts'))));
+        grid.appendChild(field('ポッドキャストモデル', select('dscDbPodcastModel', modelsByCat('podcast'))));
+        grid.appendChild(field('音声認識モデル', select('dscDbAsrModel', modelsByCat('asr'))));
+        grid.appendChild(field('リアルタイム音声モデル', select('dscDbRealtimeModel', modelsByCat('realtime'))));
         grid.appendChild(field('TTS リソース ID（任意）', input('dscDbTtsRes', 'text', '例：seed-tts-2.0', '')));
         card.appendChild(grid);
 
@@ -523,7 +528,7 @@
             if (!sel) return;
             var cat = catMap[id][0];
             var key = catMap[id][1];
-            var items = modelsByCat(cat).map(function (m) { return { value: m.value, label: m.label }; });
+            var items = modelsByCat(cat);
             if (items.length === 0) return;
             fillSelect(sel, items, c[key]);
         });
@@ -719,7 +724,7 @@
     function fillTtsModels() {
         var sel = ttsModelSel();
         if (!sel) return;
-        var items = modelsByCat('tts').map(function (m) { return { value: m.value, label: m.label }; });
+        var items = modelsByCat('tts');
         // カタログが空でも選択肢をゼロにしない（必ず 1 件は選べる状態にする）
         if (!items.length) {
             items = [{ value: 'SeedAudio1.0', label: 'Doubao-音声生成-1.0（音声生成）' }];
@@ -796,9 +801,9 @@
     // ------------------------------------------------------------
     // 録音ファイル認識（ASR）
     //   豆包の音声認識で文字起こしし、結果をそのまま現在の対話へ差し込む。
-    //   ★ 認識は豆包（方舟 /audio/transcriptions → 失敗時ローカル whisper）、
+    //   ★ 認識は豆包（方舟の音声理解 → /audio/transcriptions → 失敗時ローカル whisper）、
     //     差し込みは既存のユーザーメッセージ保存端点のみを使う。
-    //     どちらもモデル API を呼ばないため、DeepSeek の用量は一切消費しない。
+    //     ★ 認識は豆包（方舟）の用量を消費する。DeepSeek の用量は消費しない。
     // ------------------------------------------------------------
     function fmtSize(n) {
         n = Number(n) || 0;
@@ -812,7 +817,8 @@
         loadConfig().then(function (c) {
             var st = $('dscDbAsrStatus');
             if (st && !st.textContent) {
-                setStatus(st, T('文字起こしに使うモデル：{0}（豆包・DeepSeek の用量は消費しません）', (c && c.chatModel) || 'doubao-seed'), '');
+                setStatus(st, T('文字起こしに使うモデル：{0}（音声理解）／{1}（音声認識）。豆包の用量を消費し、DeepSeek の用量は消費しません。',
+                    (c && c.chatModel) || 'doubao-seed', (c && c.asrModel) || 'Doubao_Seed_ASR_AUC_2.0'), '');
             }
         }).catch(function () {});
         openModal('dscDbAsrOverlay');
@@ -956,7 +962,7 @@
         if (typeof window.dscInjectUserMessage === 'function') {
             var r = await window.dscInjectUserMessage(t);
             if (r && r.ok) {
-                setStatus(st, T('✅ 対話に差し込みました（{0} 文字・DeepSeek 用量は消費していません）', t.length), 'ok');
+                setStatus(st, T('✅ 対話に差し込みました（{0} 文字）', t.length), 'ok');
                 toast(T('✅ 認識結果を対話に差し込みました'), 'success');
                 setTimeout(function () { closeModal('dscDbAsrOverlay'); }, 900);
                 return;
@@ -1051,7 +1057,7 @@
     function fillImageModels() {
         var sel = $('dscDbImgModel');
         if (!sel) return;
-        var items = modelsByCat('image').map(function (m) { return { value: m.value, label: m.label }; });
+        var items = modelsByCat('image');
         fillSelect(sel, items, S.cfg ? S.cfg.imageModel : '');
     }
 
@@ -1227,7 +1233,7 @@
         var all = modelsByCat('imageedit').concat(modelsByCat('image'));
         var head = all.filter(function (m) { return m.value === EDIT_DEFAULT; });
         var rest = all.filter(function (m) { return m.value !== EDIT_DEFAULT; });
-        var items = head.concat(rest).map(function (m) { return { value: m.value, label: m.label }; });
+        var items = head.concat(rest);
         if (!items.length) items = [{ value: '', label: T('既定（Seedream 5.0 pro）') }];
         var pick = items.some(function (m) { return m.value === EDIT_DEFAULT; }) ? EDIT_DEFAULT : items[0].value;
         fillSelect(sel, items, pick);
@@ -1382,7 +1388,7 @@
     function fillVideoModels() {
         var sel = $('dscDbVidModel');
         if (!sel) return;
-        fillSelect(sel, modelsByCat('video').map(function (m) { return { value: m.value, label: m.label }; }),
+        fillSelect(sel, modelsByCat('video'),
             S.cfg ? S.cfg.videoModel : '');
     }
 
@@ -1549,7 +1555,7 @@
         // 台本の生成は対話モデルで行う。ポッドキャストモデルを model として
         // 送ると方舟 /chat/completions が 404（model does not exist）を返すため、
         // ここでは対話モデルを列挙し、既定値も対話モデルにする。
-        fillSelect(sel, modelsByCat('chat').map(function (m) { return { value: m.value, label: m.label }; }),
+        fillSelect(sel, modelsByCat('chat'),
             S.cfg ? S.cfg.chatModel : '');
     }
 

@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'deepseek_api.dart';
+import 'doubao.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -735,11 +736,27 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
     return;
   }
   final cfg = getDsConfig();
-  if (cfg.apiKey.isEmpty) {
+  final model = trimOr(mStr(body, 'model'), cfg.model.isEmpty ? DS_DEFAULT_MODEL : cfg.model);
+
+  // 豆包模型の継続生成は方舟へ送る（DeepSeek の Key と用量には一切触れない）
+  final useDoubao = dbIsChatModel(model);
+  final dbCfg = getDbConfig();
+  if (useDoubao) {
+    if (dbCfg.apiKey.trim().isEmpty) {
+      await dsJSONErr(
+          res,
+          400,
+          dbLocalized(dsRequestLang(req, body), 'keyMissingForModel'));
+      return;
+    }
+  } else if (cfg.apiKey.isEmpty) {
     await dsJSONErr(res, 400, '先に DeepSeek API Key を設定してください');
     return;
   }
-  final model = trimOr(mStr(body, 'model'), cfg.model.isEmpty ? DS_DEFAULT_MODEL : cfg.model);
+  final callKey = useDoubao ? dbCfg.apiKey : cfg.apiKey;
+  final callUrl = useDoubao ? dbChatEndpoint() : DS_API_URL;
+  // 豆包モデルの継続生成でも「考えてから書く」を維持する
+  final extraBody = useDoubao ? dbThinkingEnableParam(model) : null;
 
   final history = getDsMessages(sessionID);
   var oldReasoning = '';
@@ -791,7 +808,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   final usageAcc = DsUsageAcc();
   try {
     await callDsMultiRoundStream(
-      cfg.apiKey,
+      callKey,
       model,
       apiMessages,
       params.maxTokens,
@@ -807,6 +824,8 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
         sse.send('content', {'delta': s});
       },
       usageAcc,
+      apiUrl: callUrl,
+      extraBody: extraBody,
     );
   } catch (e) {
     logp('⚠️ 継続生成が中断されました: $e');
@@ -828,8 +847,8 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
 
   DsMessage? aiMsg;
   if (messageID.isNotEmpty) {
-    final upd = updateDsMessageContent(
-        sessionID, messageID, merged, finalReasoning, usageAcc.snapshot());
+    final upd = updateDsMessageContent(sessionID, messageID, merged,
+        finalReasoning, useDoubao ? null : usageAcc.snapshot());
     if (upd != null) {
       aiMsg = upd;
       final sess = getDsSession(sessionID);
@@ -845,7 +864,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
       content: merged,
       createdAt: rfc3339(DateTime.now()),
       reasoning: finalReasoning,
-      usage: usageAcc.snapshot(),
+      usage: useDoubao ? null : usageAcc.snapshot(),
     );
     appendDsMessage(a);
     aiMsg = a;

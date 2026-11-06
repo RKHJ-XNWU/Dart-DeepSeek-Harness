@@ -331,6 +331,7 @@ Future<({String content, String reasoning})> callDsChatAPI(
   DsUsageAcc? usageAcc, {
   bool raw = false,
   String apiUrl = DS_API_URL,
+  Map<String, dynamic>? extraBody,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
@@ -346,7 +347,10 @@ Future<({String content, String reasoning})> callDsChatAPI(
     'stream': false,
     'max_tokens': mt,
     'temperature': temp,
-    if (thinkParam != null) 'thinking': thinkParam,
+    if (extraBody != null && extraBody.isNotEmpty)
+      ...extraBody
+    else if (thinkParam != null)
+      'thinking': thinkParam,
   };
   final client = globalHTTPClientWithTimeout;
 
@@ -467,6 +471,7 @@ Future<void> callDsChatAPIStream(
   void Function(String)? onContent,
   DsUsageAcc? usageAcc, {
   String apiUrl = DS_API_URL,
+  Map<String, dynamic>? extraBody,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
@@ -481,6 +486,8 @@ Future<void> callDsChatAPIStream(
     'max_tokens': mt,
     'temperature': temp,
     if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
+    // 方舟专用附加字段（如 thinking）。DeepSeek 通道不传，避免 400。
+    if (extraBody != null && extraBody.isNotEmpty) ...extraBody,
   };
   final client = globalHTTPClient;
   final req = await client.postUrl(Uri.parse(apiUrl));
@@ -729,11 +736,12 @@ Future<({String content, String reasoning})> callDsMultiRound(
   void Function(int round, int total, String stage)? progressFn,
   DsUsageAcc? usageAcc, {
   String apiUrl = DS_API_URL,
+  Map<String, dynamic>? extraBody,
 }) async {
   if (rounds < 1) rounds = 1;
   progressFn?.call(1, rounds, '正在生成初稿...');
-  final first = await callDsChatAPI(
-      apiKey, model, messages, maxTokens, temperature, usageAcc, apiUrl: apiUrl);
+  final first = await callDsChatAPI(apiKey, model, messages, maxTokens, temperature,
+      usageAcc, apiUrl: apiUrl, extraBody: extraBody);
   if (rounds == 1) return (content: first.content, reasoning: first.reasoning);
 
   final reasoningParts = <String>[];
@@ -749,8 +757,8 @@ Future<({String content, String reasoning})> callDsMultiRound(
       {'role': 'user', 'content': _reflectPrompt(i)},
     ];
     try {
-      final r = await callDsChatAPI(
-          apiKey, model, reflectMsgs, maxTokens, temperature, usageAcc, apiUrl: apiUrl);
+      final r = await callDsChatAPI(apiKey, model, reflectMsgs, maxTokens, temperature,
+          usageAcc, apiUrl: apiUrl, extraBody: extraBody);
       if (r.content.trim().isEmpty) break;
       currentReply = r.content;
       if (r.reasoning.trim().isNotEmpty) {
@@ -779,6 +787,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   void Function(String)? onContent,
   DsUsageAcc? usageAcc, {
   String apiUrl = DS_API_URL,
+  Map<String, dynamic>? extraBody,
 }) async {
   if (rounds < 1) rounds = 1;
   onRound?.call(1, rounds, '正在生成初稿...');
@@ -792,7 +801,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   }, (s) {
     firstContent.write(s);
     onContent?.call(s);
-  }, usageAcc, apiUrl: apiUrl);
+  }, usageAcc, apiUrl: apiUrl, extraBody: extraBody);
 
   if (rounds == 1) {
     return (
@@ -824,7 +833,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
       }, (s) {
         newContent.write(s);
         onContent?.call(s);
-      }, usageAcc, apiUrl: apiUrl);
+      }, usageAcc, apiUrl: apiUrl, extraBody: extraBody);
     } catch (e) {
       logp('⚠️ 第 $i ラウンドの内省に失敗しました: $e。前回の結果を使用します');
       break;
@@ -1092,13 +1101,70 @@ class FileContext {
   final String text;
   final List<String> imageFileIds;
   final List<String> otherFiles;
-  const FileContext(this.text, this.imageFileIds, this.otherFiles);
+
+  /// 音频附件：豆包音频理解模型可直接读取原始音频；
+  /// DeepSeek 通道不具备音频理解能力。
+  final List<String> audioFileIds;
+
+  /// 视频附件：豆包视频理解模型可直接读取原始视频；
+  /// DeepSeek 通道不具备视频理解能力。
+  final List<String> videoFileIds;
+
+  const FileContext(
+    this.text,
+    this.imageFileIds,
+    this.otherFiles, {
+    this.audioFileIds = const <String>[],
+    this.videoFileIds = const <String>[],
+  });
+
+  /// 是否携带任何媒体附件（图片 / 音频 / 视频）
+  bool get hasMedia =>
+      imageFileIds.isNotEmpty ||
+      audioFileIds.isNotEmpty ||
+      videoFileIds.isNotEmpty;
+}
+
+const Set<String> _audioExts = {
+  '.mp3', '.wav', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac',
+  '.amr', '.webm', '.mp4a', '.wma', '.aiff', '.aif', '.caf', '.mka',
+};
+
+const Set<String> _videoExts = {
+  '.mp4', '.mov', '.m4v', '.mkv', '.avi', '.webm', '.flv', '.wmv',
+  '.mpeg', '.mpg', '.ts', '.mts', '.m2ts', '.3gp', '.ogv', '.rmvb',
+};
+
+bool _extInSet(String name, Set<String> exts) {
+  final i = name.lastIndexOf('.');
+  if (i < 0) return false;
+  return exts.contains(name.substring(i).toLowerCase());
+}
+
+/// 该文件是否为音频（按 MIME 优先，其次按扩展名）
+bool isAudioFile(String mimeType, String fileName) {
+  if (mimeType.toLowerCase().startsWith('audio/')) return true;
+  // video/webm 常见于浏览器录音，按音频对待
+  if (mimeType.toLowerCase() == 'video/webm' && _extInSet(fileName, _audioExts)) {
+    return true;
+  }
+  return !mimeType.toLowerCase().startsWith('video/') &&
+      _extInSet(fileName, _audioExts);
+}
+
+/// 该文件是否为视频（按 MIME 优先，其次按扩展名）
+bool isVideoFile(String mimeType, String fileName) {
+  if (mimeType.toLowerCase().startsWith('video/')) return true;
+  if (mimeType.toLowerCase().startsWith('audio/')) return false;
+  return _extInSet(fileName, _videoExts);
 }
 
 FileContext buildFileContext(List<String> fileIDs) {
   final textChunks = <String>[];
   final otherFiles = <String>[];
   final imageFileIDs = <String>[];
+  final audioFileIDs = <String>[];
+  final videoFileIDs = <String>[];
 
   for (var fid in fileIDs) {
     fid = fid.trim();
@@ -1110,6 +1176,16 @@ FileContext buildFileContext(List<String> fileIDs) {
     }
     if (meta.mimeType.startsWith('image/')) {
       imageFileIDs.add(fid);
+      continue;
+    }
+    // 音频 / 视频单独分流：豆包对应能力模型可直接理解原始媒体，
+    // 不再降级成「只给文件名」而让用户误以为无法识别。
+    if (isVideoFile(meta.mimeType, meta.name)) {
+      videoFileIDs.add(fid);
+      continue;
+    }
+    if (isAudioFile(meta.mimeType, meta.name)) {
+      audioFileIDs.add(fid);
       continue;
     }
     if (isTextFile(meta.mimeType, meta.name)) {
@@ -1133,10 +1209,17 @@ FileContext buildFileContext(List<String> fileIDs) {
   }
   if (otherFiles.isNotEmpty) {
     if (sb.isNotEmpty) sb.write('\n\n');
-    sb.write('【ユーザーは以下のファイルもアップロードしました（内容を直接読み取れません）】:');
+    sb.write('【ユーザーがアップロードした以下のファイルは、内容を自動抽出できない形式です'
+        '（ファイル名のみ参照）】:');
     sb.write(otherFiles.join('、'));
   }
-  return FileContext(sb.toString(), imageFileIDs, otherFiles);
+  return FileContext(
+    sb.toString(),
+    imageFileIDs,
+    otherFiles,
+    audioFileIds: audioFileIDs,
+    videoFileIds: videoFileIDs,
+  );
 }
 
 // ------------------------------------------------------------
