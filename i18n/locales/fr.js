@@ -243,7 +243,7 @@ Server酱|Server酱
 翻訳欄が見つかりません|Zone de traduction introuvable
 この返信を中国語に翻訳|Traduire cette réponse en chinois
 ⏳ 翻訳中…|⏳ Traduction…
-簡体字中国語（简体中文）|Chinois simplifié (简体中文)
+簡体字中国語（简体中文）|Chinois simplifié
 翻訳結果が空でした|Le résultat de la traduction est vide
 翻訳に失敗：|Échec de la traduction : 
 読み上げる内容がありません|Rien à lire à voix haute
@@ -1252,7 +1252,7 @@ TTS リソース ID（任意）|ID de ressource TTS (facultatif)
 音色 A（話者 1）|Voix A (locuteur 1)
 音色 B（話者 2）|Voix B (locuteur 2)
 高速モード（深い思考をオフ）|Mode rapide (réflexion approfondie désactivée)
-豆包の言語モデルで深い思考を無効化し、最初の一文字が届くまでの待ち時間を大幅に短縮します（実測 16.8 秒 → 0.9 秒）|Désactive la réflexion approfondie des modèles 豆包 et réduit fortement l'attente du premier caractère (mesuré 16,8 s → 0,9 s)
+豆包の言語モデルで深い思考を無効化し、最初の一文字が届くまでの待ち時間を大幅に短縮します（実測 16.8 秒 → 0.9 秒）|Désactive la réflexion approfondie des modèles Doubao et réduit fortement l'attente du premier caractère (mesuré 16,8 s → 0,9 s)
 録音ファイルを豆包へ自動ルーティング|Routage automatique des enregistrements vers Doubao
 豆包以外のモデルを選んでいても、録音を送ると豆包で認識・分析します|Même avec un autre modèle, l'enregistrement est transcrit et analysé par Doubao
 生成物に透かしを入れる|Ajouter un filigrane
@@ -1386,12 +1386,12 @@ I18N.add('fr', `
 
 /* 豆包モード（左上の＋の左のトグル） */
 I18N.add('fr', `
-豆包モード：オン（送信は豆包モデル）|Mode 豆包 : activé (envoi via un modèle 豆包)
+豆包モード：オン（送信は豆包モデル）|Mode Doubao : activé (envoi via un modèle Doubao)
 豆包モード：オフ（送信は DeepSeek）|Mode 豆包 : désactivé (envoi via DeepSeek)
 ⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください|⚠️ La clé API 豆包 n'est pas définie. Saisissez-la dans Réglages → 豆包
-豆包モードをオンにしました（モデル：{0}）|Mode 豆包 activé (modèle : {0})
+豆包モードをオンにしました（モデル：{0}）|Mode Doubao activé (modèle : {0})
 豆包モードをオフにしました（DeepSeek に戻ります）|Mode 豆包 désactivé (retour à DeepSeek)
-豆包|豆包
+豆包|Doubao
 豆包モデルが未開通です：{0}|Modèle Doubao non activé : {0}
 火山方舟コンソールの「開通管理」でこのモデルを開通してください。|Activez ce modèle dans la console Ark, rubrique « Gestion des activations ».
 豆包モデルが見つかりません：{0}|Modèle Doubao introuvable ou accès refusé : {0}

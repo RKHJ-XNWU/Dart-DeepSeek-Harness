@@ -243,7 +243,7 @@ Server酱|ServerChan
 翻訳欄が見つかりません|Translation box not found
 この返信を中国語に翻訳|Translate this reply into Chinese
 ⏳ 翻訳中…|⏳ Translating…
-簡体字中国語（简体中文）|Simplified Chinese (简体中文)
+簡体字中国語（简体中文）|Simplified Chinese
 翻訳結果が空でした|Translation result was empty
 翻訳に失敗：|Translation failed: 
 読み上げる内容がありません|Nothing to read aloud

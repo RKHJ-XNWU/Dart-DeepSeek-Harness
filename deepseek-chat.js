@@ -2924,7 +2924,7 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: false,
                         targetChars: state.longTextTargetChars,
-                        enableTools: state.enableTools,
+                        enableTools: state.enableTools || window.__dscDeviceIntent(content),
                         stream: true,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents()
@@ -2984,7 +2984,7 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: state.longTextMode,
                         targetChars: state.longTextTargetChars,
-                        enableTools: state.enableTools,
+                        enableTools: state.enableTools || window.__dscDeviceIntent(content),
                         stream: false,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents() : [])
@@ -6039,3 +6039,42 @@ function highlightInElement(root, keyword) {
     start();
   }
 })();
+
+// ============================================================
+//  设备操作意图检测：命中则强制开启工具模式（拒绝修复）
+//  工具模式关闭时不发送 tools 定义，模型无手段可用，
+//  只能回复「我无法打开应用，请手动操作」。此处请求层兜底。
+// ============================================================
+window.__dscDeviceIntent = window.__dscDeviceIntent || function (text) {
+    try {
+        var s = String(text == null ? '' : text).trim();
+        if (!s) return false;
+        var low = s.toLowerCase();
+        var strong = [
+            '\u6253\u5f00\u5e94\u7528', '\u6253\u5f00\u8f6f\u4ef6',
+            '\u542f\u52a8\u5e94\u7528', '\u542f\u52a8\u8f6f\u4ef6',
+            '\u5378\u8f7d\u5e94\u7528', '\u5378\u8f7d\u8f6f\u4ef6',
+            '\u5b89\u88c5\u5e94\u7528', '\u5b89\u88c5apk',
+            '\u70b9\u51fb', '\u6ed1\u52a8', '\u957f\u6309',
+            '\u8f93\u5165\u6587\u5b57', '\u622a\u56fe', '\u622a\u5c4f', '\u5f55\u5c4f',
+            '\u81ea\u52a8\u5316', '\u5305\u540d', '\u8fdb\u7a0b',
+            '\u526a\u8d34\u677f', '\u901a\u77e5\u680f', '\u98de\u884c\u6a21\u5f0f',
+            '\u5f00\u53d1\u8005\u9009\u9879', '\u65e0\u969c\u788d',
+            '\u6388\u4e88\u6743\u9650', '\u7533\u8bf7\u6743\u9650',
+            '\u6253\u5f00\u6743\u9650', '\u8c03\u7528\u6743\u9650',
+            '\u6743\u9650\u8bbe\u7f6e', '\u5f3a\u5236\u505c\u6b62',
+            'adb', 'termux', 'rish', 'auto.py', 'adb_up', 'shell',
+            '\u6267\u884c\u547d\u4ee4'
+        ];
+        for (var i = 0; i < strong.length; i++) {
+            if (low.indexOf(strong[i].toLowerCase()) >= 0) return true;
+        }
+        if (/(\u6388\u4e88|\u7533\u8bf7|\u6253\u5f00|\u8c03\u7528|\u83b7\u53d6|\u7ed9\u4e88|\u5141\u8bb8|\u67e5\u8be2)[\u4e00-\u9fa5]{0,6}\u6743\u9650/.test(s)) return true;
+        if (s.length <= 40 &&
+            /(\u6253\u5f00|\u542f\u52a8|\u5524\u8d77|\u8c03\u8d77|\u5173\u95ed|\u9000\u51fa|\u5378\u8f7d|\u5b89\u88c5)/.test(s) &&
+            /(\u54d4\u54e9|B\u7ad9|b\u7ad9|\u5fae\u4fe1|\u6296\u97f3|\u6dd8\u5b9d|\u4eac\u4e1c|\u652f\u4ed8\u5b9d|QQ|qq|\u7f51\u6613|\u7f8e\u56e2|\u9ad8\u5fb7|\u5730\u56fe|\u76f8\u673a|\u8bbe\u7f6e|\u6d4f\u89c8\u5668|\u97f3\u4e50|\u89c6\u9891|\u6e38\u620f|\u5e94\u7528|\u8f6f\u4ef6|app|APP|apk)/.test(s)) {
+            return true;
+        }
+        return false;
+    } catch (e) { return false; }
+};

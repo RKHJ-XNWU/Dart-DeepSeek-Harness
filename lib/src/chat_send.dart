@@ -37,6 +37,8 @@ Future<void> handleDsChatSendStream(
   bool enableTools, {
   ModelRouteDecision? route,
   String apiUrl = DS_API_URL,
+  /// UI 言語（拒否禁令の選択に使用）
+  String lang = '',
   /// 方舟专用附加字段（如 thinking）。DeepSeek 通道保持为 null。
   Map<String, dynamic>? extraBody,
 }) async {
@@ -54,7 +56,7 @@ Future<void> handleDsChatSendStream(
     await sse.send('tool_mode_start', {'start': true});
 
     final agentMsgs = <Map<String, dynamic>>[
-      {'role': 'system', 'content': DS_TOOL_AGENT_SYSTEM_PROMPT},
+      {'role': 'system', 'content': dsToolAgentPrompt(lang, DS_TOOL_AGENT_SYSTEM_PROMPT)},
       ...apiMessages,
     ];
     var maxIter = DS_TOOL_MAX_ITERATIONS;
@@ -710,6 +712,13 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   // 图片 → image_url、音频 → input_audio、视频 → video_url，
   // 全部原样交给豆包本人理解；同时开启深度思考（thinking）。
   var useTools = enableTools;
+  // 設備操作・自動化の意図を検出したらツールモードを自動有効化する。
+  // ツールモード OFF のままでは tools 定義が送られず、モデルは「手動で操作してください」
+  // と拒否するしかない（方舟 API で再現確認済み）。
+  if (!useTools && dsIsDeviceIntent(content)) {
+    useTools = true;
+    logp('🔧 設備操作意図を検出：ツールモードを自動有効化し、ツール定義を送信します');
+  }
   Map<String, dynamic>? dbExtraBody;
   final dbMediaParts = <Map<String, dynamic>>[];
   if (useDoubao && fileCtx.hasMedia) {
@@ -831,7 +840,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
         maxTokens, temperature, rounds, sessionID, content, fileIDs, useTools,
         route: route,
         apiUrl: callUrl,
-        extraBody: dbExtraBody);
+        extraBody: dbExtraBody,
+        lang: uiLang);
     return;
   }
 
@@ -840,7 +850,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     logp('🔧 ツールモードを有効化し、マルチターンの function calling を開始します（最大 $DS_TOOL_MAX_ITERATIONS ラウンド）');
     final usageAcc = DsUsageAcc();
     final agentMsgs = <Map<String, dynamic>>[
-      {'role': 'system', 'content': DS_TOOL_AGENT_SYSTEM_PROMPT},
+      {'role': 'system', 'content': dsToolAgentPrompt(uiLang, DS_TOOL_AGENT_SYSTEM_PROMPT)},
       ...apiMessages,
     ];
     ToolStreamOutcome outcome;

@@ -7,7 +7,7 @@
  *      不改动 AI 生成的中文正文，也不触碰 <pre>/<code>。
  *
  * 生效范围：除日语（源语言）以外的所有界面语言。
- * 优先级：I18N 字典精确匹配（全部语言）→ 内置中文短语表兜底。
+ * 优先级：I18N 字典精确匹配（全部6种语言），自动适配当前界面语言。
  */
 ;(function () {
   if (window.__dscJaFix) return;
@@ -97,25 +97,8 @@
       }
     } catch (e) {}
 
-    // ② 内置短语表兜底：表内译文为简体中文，仅中文模式使用
-    if (curLang() !== 'zh') return s;
-
-    var out = s;
-    for (var i = 0; i < PHRASES.length; i++) {
-      var src = PHRASES[i][0], dst = PHRASES[i][1];
-      if (src.indexOf('#') >= 0) {
-        var rxSrc = src.split('#').map(function (p) {
-          return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        }).join('([0-9][0-9,.]*)');
-        out = out.replace(new RegExp(rxSrc, 'g'), function () {
-          var args = arguments, d = dst, n = 1;
-          return d.replace(/#/g, function () { return args[n++] || ''; });
-        });
-      } else if (out.indexOf(src) >= 0) {
-        out = out.split(src).join(dst);
-      }
-    }
-    return out;
+    // ② 所有非日语语言都通过I18N字典精确匹配兜底，无需单独维护短语表
+    return s;
   }
 
   function fixNode(node) {
