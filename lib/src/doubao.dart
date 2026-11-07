@@ -240,6 +240,7 @@ String dbLocalized(String lang, String key, [List<String> args = const <String>[
 const Set<String> dbAudioUnderstandModels = <String>{
   'doubao-seed-2-0-mini-260428',
   'doubao-seed-2-0-lite-260428',
+  'doubao-seed-2-1-lite-260915',
 };
 
 /// 支持「视频理解」的模型：可直接把视频字节作为 video_url 送入对话。
