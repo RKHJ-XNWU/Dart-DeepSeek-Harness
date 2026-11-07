@@ -2182,6 +2182,15 @@
         return TOOL_ICONS[name] || '🔧';
     }
 
+    // 動画アップロード進捗用のバイト整形（2GB 級は GB 表示）
+    function dscFmtBytes(v) {
+        v = Number(v) || 0;
+        if (v >= 1073741824) return (v / 1073741824).toFixed(2) + ' GB';
+        if (v >= 1048576) return (v / 1048576).toFixed(1) + ' MB';
+        if (v >= 1024) return (v / 1024).toFixed(0) + ' KB';
+        return v + ' B';
+    }
+
     // ============================================================
     // 汎用 SSE ストリーミングリクエスト
     // ============================================================
@@ -2291,6 +2300,37 @@
                         t.reasoningBuf += obj.delta || '';
                         if (thinkPanel && thinkPanel.style.display === 'none') {
                             thinkPanel.style.display = '';
+                        }
+
+                    } else if (currentEvent === 'media_progress') {
+                        // 豆包大视频通道（Files API）の進捗：2GB のアップロードでも
+                        // 画面に段階と割合を出し、固まったように見せない。
+                        if (thinkPanel && thinkPanel.style.display === 'none') thinkPanel.style.display = '';
+                        if (thinkLabel) {
+                            var mpStage = obj.stage || '';
+                            var mpLine = '🎬 動画を準備中…';
+                            if (mpStage === 'begin') {
+                                mpLine = '🎬 動画 ' + (obj.count || 1) + ' 件を準備します';
+                            } else if (mpStage === 'cache_hit') {
+                                mpLine = '♻️ アップロード済みの動画を再利用します';
+                            } else if (mpStage === 'compact_start') {
+                                mpLine = '🎞️ 512MB 超のためローカルで圧縮中（元 ' + dscFmtBytes(obj.size) + '）…時間がかかります';
+                            } else if (mpStage === 'compact_done') {
+                                mpLine = '🎞️ 圧縮完了。アップロードを準備中…';
+                            } else if (mpStage === 'upload_start') {
+                                mpLine = '☁️ 方舟へアップロード開始（' + dscFmtBytes(obj.size) + '）';
+                            } else if (mpStage === 'upload') {
+                                mpLine = '☁️ 方舟へアップロード中 ' + (obj.percent || 0) + '%（' + dscFmtBytes(obj.sent) + ' / ' + dscFmtBytes(obj.total) + '）';
+                            } else if (mpStage === 'upload_retry') {
+                                mpLine = '🔁 前処理モデルを切り替えて再試行中…';
+                            } else if (mpStage === 'tos_reference') {
+                                mpLine = '☁️ TOS 上の動画を参照登録中（' + dscFmtBytes(obj.size) + '）';
+                            } else if (mpStage === 'preprocess_wait' || mpStage === 'preprocess') {
+                                mpLine = '⏳ 方舟が動画を前処理中（抽帧）… ' + (obj.waited || 0) + ' 秒';
+                            } else if (mpStage === 'ready') {
+                                mpLine = '✅ 動画の準備完了。回答を生成します…';
+                            }
+                            thinkLabel.textContent = mpLine;
                         }
 
                     } else if (currentEvent === 'content') {

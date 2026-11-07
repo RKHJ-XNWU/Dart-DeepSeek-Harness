@@ -358,6 +358,50 @@ http://127.0.0.1:9999/
 **实时语音（Seeduplex）：**
 浏览器无法给 WebSocket 附加自定义请求头，因此本项目用本地 Dart 服务做代理，由服务端注入 `X-Api-Key` 后转发到火山引擎。端到端语音必须使用豆包语音控制台的 Key，方舟的 Key 会返回 401。
 
+#### 5.1 大视频理解（上限 2GB）
+
+附件里挂一个视频，切到豆包模式并选择支持视频理解的模型（`doubao-seed-2.x` 系列均可），
+豆包就能直接看视频内容回答问题。
+
+**体积上限从 40MB 提升到 2GB**，实现方式分两条路（全程不把整段视频读进内存）：
+
+| 视频体积 | 处理方式 | 说明 |
+| :--- | :--- | :--- |
+| ≤ 45MB | 直接以 `data:video/mp4;base64,...` 作为 `video_url` 随主请求发送 | 模型自己看整段视频作答，体验最好 |
+| > 45MB（含 2GB） | `ffmpeg` 无损切片（`-c copy`，不重编码）成若干 ≤45MB 的段 → 逐段理解 → 汇总 | 每段得到带时间轴的客观描述，最后并入用户提示词由主模型综合回答 |
+
+**依赖**：超过 45MB 的视频需要本机有 `ffmpeg`：
+
+```bash
+pkg install -y ffmpeg
+```
+
+**配置文件**：`data/deepseek_chat/doubao_video_ark.json`（首次使用时自动生成）
+
+| 字段 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `maxBytes` | `2147483648` | 视频上限（2GB），超过直接报错，不做静默截断 |
+| `fps` | `1.0` | 方舟抽帧密度（0.2~5），长视频调小可省 token |
+| `segmentMaxBytes` | `47185920` | 单片上限（45MB），必须小于 50MB 的 base64 硬限制 |
+| `useFilesApi` | `false` | 是否优先走 Files API（`file_id`）。见下方说明 |
+| `tosBucket` / `tosPrefix` | 空 | 仅 Files API 通道使用，填了才启用 TOS 的 2GB 直传 |
+| `autoCompact` | `true` | Files API 通道下 >512MB 时用 ffmpeg 压缩再上传 |
+| `preprocessModel` | 空 | Files API 通道的 `preprocess_configs[video][model]` |
+
+**关于 Files API**：方舟官方的大文件通道是 Files API + `file_id`（托管 512MB / TOS 2GB）。
+本机实测该 Key 的 `file_id` 在 `/chat/completions` 与 `/responses` 中引用会返回
+`404 The specified resource file is not found`，上传时带 `preprocess_configs[video][model]`
+还会返回 `400 Project is invalid`（说明该 Key 未绑定 project / TOS 授权）。
+因此默认走「本地切片 + base64」这条路——它在任何 Key 上都能用。
+若你在控制台开通了 project 级 Key 与 TOS 授权，可把 `useFilesApi` 设为 `true`。
+
+**进度提示**：上传/切片/逐段理解期间，前端思考面板会实时显示
+`☁️ 方舟へアップロード中 42%`、`✂️ 分割完了`、`🎬 第 3/46 段` 等阶段，
+不会出现「点了发送却像卡住」的表现。
+
+**注意**：分段理解会发起多次模型调用，2GB 视频通常是几十段，耗时可能几十分钟；
+若账号欠费，方舟会返回 `403 AccountOverdueError`，此时任何豆包请求都会失败，充值后恢复。
+
 ### 6. 智能体工具模式
 
 当模型判断需要操作手机时，会进入工具循环：**规划 → 调用工具 → 读取结果 → 自我修正**，直到任务达成。
@@ -502,6 +546,7 @@ ddsh/
 │   ├── tools.dart             #   90+ 工具的 Schema 与执行器
 │   ├── model_router.dart      #   模型能力判定与自动路由
 │   ├── doubao.dart            #   火山方舟：生图 / P图 / 视频 / TTS / 播客 / ASR
+│   ├── doubao_video_ark.dart  #   大视频（≤2GB）理解：切片 / 分段 / Files API
 │   ├── doubao_realtime.dart   #   Seeduplex 全双工 + RTC 编排
 │   ├── cosplay.dart           #   角色扮演
 │   ├── files.dart             #   分片上传 / 下载 / 元数据

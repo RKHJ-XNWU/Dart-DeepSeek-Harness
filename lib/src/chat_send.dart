@@ -11,6 +11,7 @@ import 'dart:io';
 import 'cosplay.dart';
 import 'deepseek_api.dart';
 import 'doubao.dart';
+import 'doubao_video_ark.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -41,8 +42,60 @@ Future<void> handleDsChatSendStream(
   String lang = '',
   /// 方舟专用附加字段（如 thinking）。DeepSeek 通道保持为 null。
   Map<String, dynamic>? extraBody,
+
+  /// 待与媒体片段一起提交的 user 文本（含视频时才使用）
+  String userPrompt = '',
+
+  /// 已就绪的媒体片段（图片 / 音频）
+  List<Map<String, dynamic>> mediaParts = const <Map<String, dynamic>>[],
+
+  /// 尚未准备的大视频 id（在 SSE 建连后走 Files API 上传）
+  List<String> pendingVideoIds = const <String>[],
 }) async {
   final sse = Sse(req.response);
+
+  // ---------- 大视频：SSE 已建连，后续上传期间由心跳保活 ----------
+  if (pendingVideoIds.isNotEmpty) {
+    try {
+      await sse.send('media_progress', {
+        'stage': 'begin',
+        'count': pendingVideoIds.length,
+      });
+      final vid = await dbVideoContentForChat(
+        videoFileIds: pendingVideoIds,
+        model: model,
+        apiKey: apiKey,
+        onProgress: (info) {
+          sse.send('media_progress', info);
+        },
+      );
+      final promptOut =
+          vid.text.isEmpty ? userPrompt : '$userPrompt\n\n${vid.text}';
+      apiMessages.add({
+        'role': 'user',
+        'content': <Map<String, dynamic>>[
+          {'type': 'text', 'text': promptOut},
+          ...mediaParts,
+          ...vid.parts,
+        ],
+      });
+      await sse.send('media_progress', {
+        'stage': 'ready',
+        'parts': vid.parts.length,
+        'segments': vid.text.isEmpty ? 0 : 1,
+      });
+    } on DbVideoArkException catch (e) {
+      logp('❌ 動画の準備に失敗（ストリーミング）: ${e.message}');
+      await sse.send('error', {'message': e.message});
+      await sse.done();
+      return;
+    } catch (e) {
+      logp('❌ 動画の準備に失敗（ストリーミング・想定外）: $e');
+      await sse.send('error', {'message': '视频准备失败：$e'});
+      await sse.done();
+      return;
+    }
+  }
 
   final contentBuf = StringBuffer();
   final reasoningBuf = StringBuffer();
@@ -721,6 +774,16 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   }
   Map<String, dynamic>? dbExtraBody;
   final dbMediaParts = <Map<String, dynamic>>[];
+  // 视频统一由 doubao_video_ark 处理：≤45MB 直接作为 video_url 片段，
+  // >45MB 用 ffmpeg 无损切片后逐段理解（2GB 也能看完）。
+  // 切片 + 逐段理解可能持续几分钟到几十分钟，而本机 HttpServer 的
+  // idleTimeout 是 120 秒：流式模式下若等到主函数末尾才建立 SSE，
+  // 等待期间连接会被掐断。因此「流式 + 含视频」时把媒体准备挪到 SSE 建连之后
+  // （SSE 自带 15 秒心跳负责保活）。
+  final deferVideoPrepare = useDoubao &&
+      stream &&
+      !longTextMode &&
+      fileCtx.videoFileIds.isNotEmpty;
   if (useDoubao && fileCtx.hasMedia) {
     for (final id in fileCtx.imageFileIds) {
       final b64 = dsFileToBase64(id);
@@ -745,22 +808,30 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       dbMediaParts.add(dbAudioPart(prepared.format, base64Encode(prepared.bytes)));
       logp('🎧 音声を豆包の音声理解へ直接送信: ${meta.name} (${prepared.format})');
     }
-    for (final id in fileCtx.videoFileIds) {
-      final meta = getDsFileMeta(id);
-      if (meta == null) continue;
-      final f = File('$DSFilesBlobDir/${meta.relPath}');
-      if (!f.existsSync()) continue;
-      final raw = f.readAsBytesSync();
-      if (raw.length > 40 * 1024 * 1024) {
-        await dsJSONErr(
-            res, 400, dbLocalized(mediaLang, 'videoTooLarge', [meta.name]));
+    // 视频：不再 readAsBytesSync + base64（2GB 走那条路必然 OOM）。
+    // 现在交给 doubao_video_ark：≤45MB 直接作为 video_url 片段，
+    // >45MB 用 ffmpeg 无损切片后逐段理解，结论并入 userPrompt。
+    if (!deferVideoPrepare) {
+      try {
+        final vid = await dbVideoContentForChat(
+          videoFileIds: fileCtx.videoFileIds,
+          model: model,
+          apiKey: callKey,
+        );
+        dbMediaParts.addAll(vid.parts);
+        if (vid.text.isNotEmpty) {
+          // 大视频：分段理解结果以文本形式并入用户提示词
+          userPrompt = '$userPrompt\n\n${vid.text}';
+          logp('🧾 動画の分段理解結果をプロンプトへ結合（${runeLen(vid.text)} 文字）');
+        }
+      } on DbVideoArkException catch (e) {
+        logp('❌ 動画の準備に失敗: ${e.message}');
+        await dsJSONErr(res, 400, e.message);
         return;
       }
-      final mime = meta.mimeType.toLowerCase().startsWith('video/')
-          ? meta.mimeType
-          : 'video/mp4';
-      dbMediaParts.add(dbVideoPart(mime, base64Encode(raw)));
-      logp('🎬 動画を豆包の動画理解へ直接送信: ${meta.name} ($mime)');
+    } else {
+      logp('🎬 動画 ${fileCtx.videoFileIds.length} 件は SSE 接続後に '
+          '分割・準備します');
     }
     // 画像 / 音声 / 動画を見たうえで、まず考えてから答える
     dbExtraBody = dbThinkingEnableParam(model);
@@ -822,7 +893,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       apiMessages.add({'role': 'user', 'content': snap});
     }
   }
-  if (dbMediaParts.isNotEmpty) {
+  if (deferVideoPrepare) {
+    // 含视频的流式请求：本条 user message 由 handleDsChatSendStream 在
+    // SSE 建连、且视频 file_id 准备好之后追加（避免 120 秒空闲断连）。
+    logp('⏸️ 動画付きリクエスト: user メッセージの追加を SSE 側へ委譲');
+  } else if (dbMediaParts.isNotEmpty) {
     apiMessages.add({
       'role': 'user',
       'content': <Map<String, dynamic>>[
@@ -841,7 +916,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
         route: route,
         apiUrl: callUrl,
         extraBody: dbExtraBody,
-        lang: uiLang);
+        lang: uiLang,
+        userPrompt: deferVideoPrepare ? userPrompt : '',
+        mediaParts: dbMediaParts,
+        pendingVideoIds:
+            deferVideoPrepare ? fileCtx.videoFileIds : const <String>[]);
     return;
   }
 

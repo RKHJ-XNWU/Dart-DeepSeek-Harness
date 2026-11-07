@@ -140,12 +140,14 @@ const Map<String, Map<String, String>> _dbMsgTable = <String, Map<String, String
     'fr': 'Fichier audio trop volumineux (limite 40 Mo) : {0}',
   },
   'videoTooLarge': <String, String>{
-    'ja': '動画ファイルが大きすぎます（上限 40MB）：{0}',
-    'zh': '视频文件过大（上限 40MB）：{0}',
-    'en': 'Video file is too large (limit 40MB): {0}',
-    'ko': '동영상 파일이 너무 큽니다(최대 40MB): {0}',
-    'ru': 'Видеофайл слишком большой (лимит 40MB): {0}',
-    'fr': 'Fichier vidéo trop volumineux (limite 40 Mo) : {0}',
+    // 视频上限从 40MB 提升到 2GB：45MB 以内直传 video_url，
+    // 超过则用 ffmpeg 无损切片后逐段理解再汇总（见 doubao_video_ark.dart）。
+    'ja': '動画ファイルが大きすぎます（上限 2GB）：{0}',
+    'zh': '视频文件过大（上限 2GB）：{0}',
+    'en': 'Video file is too large (limit 2GB): {0}',
+    'ko': '동영상 파일이 너무 큽니다(최대 2GB): {0}',
+    'ru': 'Видеофайл слишком большой (лимит 2GB): {0}',
+    'fr': 'Fichier vidéo trop volumineux (limite 2 Go) : {0}',
   },
   'keyMissingForModel': <String, String>{
     'ja': '豆包モデルを選択中ですが、豆包 API Key が未設定です',
@@ -245,6 +247,7 @@ const Set<String> dbAudioUnderstandModels = <String>{
 const Set<String> dbVideoUnderstandModels = <String>{
   'doubao-seed-2-0-mini-260428',
   'doubao-seed-2-0-lite-260428',
+  'doubao-seed-2-1-lite-260915',
   'doubao-seed-2-1-turbo-260628',
   'doubao-seed-2-1-pro-260628',
   'doubao-seed-evolving-latest-version',
@@ -255,8 +258,18 @@ bool dbSupportsAudioInput(String model) =>
     dbAudioUnderstandModels.contains(model.trim().toLowerCase());
 
 /// 该模型能否直接理解原始视频
-bool dbSupportsVideoInput(String model) =>
-    dbVideoUnderstandModels.contains(model.trim().toLowerCase());
+///
+/// 判定分两层：
+///   1) 白名单（上面 dbVideoUnderstandModels，含前端展示用的清单）；
+///   2) doubao-seed-2.x 系列前缀兜底 —— 实测 doubao-seed-2-1-lite-260915
+///      等未列入白名单的版本同样能理解视频，硬白名单会误拦真实可用的模型。
+bool dbSupportsVideoInput(String model) {
+  final m = model.trim().toLowerCase();
+  if (m.isEmpty) return false;
+  if (dbVideoUnderstandModels.contains(m)) return true;
+  if (m.startsWith('doubao-seed-evolving')) return true;
+  return RegExp(r'^doubao-seed-2-[0-9a-z]').hasMatch(m);
+}
 
 /// 具备音频理解能力的模型清单（用于前端提示与错误话术）
 List<String> get dbAudioCapableModels =>
