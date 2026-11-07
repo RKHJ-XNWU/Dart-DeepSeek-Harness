@@ -597,7 +597,7 @@ Future<String> dbChatText(
   String systemPrompt,
   List<Map<String, dynamic>> messages, {
   String? model,
-  int maxTokens = 4096,
+  int maxTokens = 8192,
   double temperature = 0.8,
   Duration timeout = const Duration(seconds: 120),
 }) async {
@@ -641,7 +641,7 @@ Future<String> _dbChatRawOnce(
   DbConfig cfg,
   String model,
   List<Map<String, dynamic>> messages, {
-  int maxTokens = 4096,
+  int maxTokens = 8192,
   double temperature = 0.8,
   bool thinking = false,
   String systemPrompt = '',
@@ -1880,7 +1880,7 @@ Future<Map<String, dynamic>> dbGeneratePodcast({
   final scriptModel = _dbPickChatModel(model, cfg);
   final raw = await dbChatText(sys, [
     {'role': 'user', 'content': user.toString()}
-  ], model: scriptModel, maxTokens: 6000, temperature: 0.9);
+  ], model: scriptModel, maxTokens: 8192, temperature: 0.9);
   final script = dbParsePodcastScript(raw);
   if (script.isEmpty) throw Exception('台本生成失败（空响应）');
 
@@ -2538,7 +2538,7 @@ Future<void> handleDbChat(HttpRequest req) async {
     }
     final text = await dbChatText(system, msgs,
         model: mStr(body, 'model'),
-        maxTokens: intArgDefault(body, 'maxTokens', 4096),
+        maxTokens: intArgDefault(body, 'maxTokens', 8192),
         temperature: double.tryParse(mStr(body, 'temperature')) ?? 0.8);
     await dsJSONOk(res, 200, {'success': true, 'text': text});
   } catch (e) {
@@ -2592,7 +2592,7 @@ Future<void> handleDbAudioAnalyze(HttpRequest req) async {
         <Map<String, dynamic>>[
           {'role': 'user', 'content': content}
         ],
-        maxTokens: intArgDefault(body, 'maxTokens', 4096),
+        maxTokens: intArgDefault(body, 'maxTokens', 8192),
         temperature: 0.6,
         thinking: true,
       );
@@ -2617,7 +2617,7 @@ Future<void> handleDbAudioAnalyze(HttpRequest req) async {
         <Map<String, dynamic>>[
           {'role': 'user', 'content': '音声の書き起こし:\n$text\n\n依頼: $prompt'}
         ],
-        maxTokens: 4096,
+        maxTokens: 8192,
         temperature: 0.7,
         thinking: false,
         systemPrompt: '你是音频内容分析专家。请依据给定的转写文本作答，'

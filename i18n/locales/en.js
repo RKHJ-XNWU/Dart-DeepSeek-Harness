@@ -1377,7 +1377,7 @@ I18N.add('en', `
 二次元|Anime 2D
 日本アニメ風|Japanese anime
 特撮風|Tokusatsu
-田野風|Countryside
+田園風|Countryside
 ファイル名|File name
 例：seed-tts-2.0|e.g. seed-tts-2.0
 動画生成に失敗：{0}|Video generation failed: {0}
@@ -1556,4 +1556,11 @@ I18N.add('en', `
 話速|Speed
 音色|Voice
 設定の読み込みに失敗：{0}|Failed to load settings: {0}
+`);
+
+/* —— 豆包菜单项补充（本次修复） —— */
+I18N.add('en', `
+豆包音声生成|Doubao voice generation
+豆包画像生成|Doubao image generation
+豆包動画生成|Doubao video generation
 `);

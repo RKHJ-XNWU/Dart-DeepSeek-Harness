@@ -99,6 +99,33 @@
         return res;
     }
 
+    /**
+     * tExact(src) —— 只做「整句精确匹配」的翻译
+     * 与 t() 的区别：不做部分一致替换，也不做破坏性片段替换。
+     * 用途：AI 正文 / 思考区等 SKIP 区域内的**固定 UI 短语**兜底，
+     *       确保不会因为某个短片段命中而破坏 AI 生成的正文。
+     */
+    function tExact(s) {
+        if (s == null) return '';
+        var str = String(s);
+        if (current === 'ja') return str;
+        var d = dicts[current];
+        if (!d) return str;
+        if (Object.prototype.hasOwnProperty.call(d, str)) return d[str];
+        var tr = str.replace(/^\s+|\s+$/g, '');
+        if (tr !== str && Object.prototype.hasOwnProperty.call(d, tr)) {
+            var w = /^(\s*)([\s\S]*?)(\s*)$/.exec(str);
+            return (w ? w[1] : '') + d[tr] + (w ? w[3] : '');
+        }
+        // 数字归一化后的精确匹配（如「件の〜:」+ 运行时数字）
+        if (/[0-9]/.test(str)) {
+            var key = tr.replace(/[0-9][0-9,.\u3000]*/g, '#');
+            var cache = dictCache[current] || buildCache(current);
+            if (Object.prototype.hasOwnProperty.call(cache, key)) return cache[key];
+        }
+        return str;
+    }
+
     function tCore(s) {
         if (current === 'ja') return s;
         var d = dicts[current];
@@ -647,6 +674,7 @@
         DEFAULT_LANG: DEFAULT_LANG,
         add: add,
         t: t,
+        tExact: tExact,
         getLang: getLang,
         setLang: setLang,
         translateTree: translateTree,

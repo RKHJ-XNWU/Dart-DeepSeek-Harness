@@ -1377,7 +1377,7 @@ I18N.add('fr', `
 二次元|Style 2D
 日本アニメ風|Animé japonais
 特撮風|Tokusatsu
-田野風|Campagnard
+田園風|Campagnard
 ファイル名|Nom du fichier
 例：seed-tts-2.0|Ex. : seed-tts-2.0
 動画生成に失敗：{0}|Échec de la génération de vidéo : {0}
@@ -1556,4 +1556,11 @@ I18N.add('fr', `
 話速|Vitesse
 音色|Timbre
 設定の読み込みに失敗：{0}|Échec du chargement des paramètres : {0}
+`);
+
+/* —— 豆包菜单项补充（本次修复） —— */
+I18N.add('fr', `
+豆包音声生成|génération vocale Doubao
+豆包画像生成|image Doubao
+豆包動画生成|vidéo Doubao
 `);

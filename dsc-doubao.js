@@ -29,7 +29,7 @@
     };
 
     var RATIOS = ['16:9', '3:4', '4:3', '19:6', '21:9', '1:1', '9:16'];
-    var IMG_STYLES_JA = ['アニメ', '二次元', '日本アニメ風', 'ピクセル', 'シネマティック', '特撮風', '中国アニメ風', '田野風'];
+    var IMG_STYLES_JA = ['アニメ', '二次元', '日本アニメ風', 'ピクセル', 'シネマティック', '特撮風', '中国アニメ風', '田園風'];
 
     function $(id) { return document.getElementById(id); }
 
@@ -43,6 +43,58 @@
 
     function lang() {
         try { return (window.I18N && window.I18N.getLang()) || 'ja'; } catch (e) { return 'ja'; }
+    }
+
+    // ------------------------------------------------------------
+    // 音色解析：豆包音色 ID / 任意输入 → 合法的 Edge Neural 音色名
+    //   后端 /tts 直接把 voice 交给 Edge 合成（不做任何映射），
+    //   播客则走 edgeVoiceFor()（仅按 male / 非 male 二分）。
+    //   两条链路都只有在收到「xx-XX-XxxxNeural」这种合法 Neural 名时，
+    //   才会真正按用户选择发音；否则统一落回同一个默认音色，
+    //   表现就是「填什么值听起来都一样」。
+    // ------------------------------------------------------------
+    var EDGE_VOICE_POOL = {
+        zh: ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-YunjianNeural',
+             'zh-CN-YunxiNeural', 'zh-CN-YunyangNeural', 'zh-CN-YunxiaNeural'],
+        ja: ['ja-JP-NanamiNeural', 'ja-JP-KeitaNeural'],
+        en: ['en-US-AriaNeural', 'en-US-GuyNeural', 'en-US-JennyNeural'],
+        fr: ['fr-FR-DeniseNeural', 'fr-FR-HenriNeural'],
+        ru: ['ru-RU-SvetlanaNeural', 'ru-RU-DmitryNeural'],
+        ko: ['ko-KR-SunHiNeural', 'ko-KR-InJoonNeural']
+    };
+
+    // 已收录的豆包音色 → 各自对应的 Edge 音色（互不相同）
+    var DB_TO_EDGE = {
+        'zh_female_xiaohe_uranus_bigtts': 'zh-CN-XiaoxiaoNeural',
+        'zh_female_shuangkuaisisi_moon_bigtts': 'zh-CN-XiaoyiNeural',
+        'zh_female_wanwanxiaohe_moon_bigtts': 'zh-CN-XiaoxiaoNeural',
+        'zh_female_gaolengyujie_moon_bigtts': 'zh-CN-XiaoyiNeural',
+        'zh_female_qingxinnvsheng_mars_bigtts': 'zh-CN-XiaoxiaoNeural',
+        'zh_female_mizai_conversation_wvae_bigtts': 'zh-CN-XiaoyiNeural',
+        'zh_male_qingshuangnanda_mars_bigtts': 'zh-CN-YunxiNeural',
+        'zh_male_yangguangqingnian_moon_bigtts': 'zh-CN-YunjianNeural',
+        'zh_male_ahu_conversation_wvae_bigtts': 'zh-CN-YunyangNeural',
+        'zh_male_shaonianzixin_moon_bigtts': 'zh-CN-YunxiaNeural',
+        'zh_male_zhubajie_conversation_wvae_bigtts': 'zh-CN-YunjianNeural'
+    };
+
+    function voiceHash(str) {
+        var h = 5381;
+        for (var i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+        return h;
+    }
+
+    function dscEdgeVoiceOf(raw, lg) {
+        var v = String(raw == null ? '' : raw).trim();
+        if (!v) return '';
+        // 已经是合法 Neural 名：原样使用（后端 isNeuralVoice 会直接采纳）
+        if (/^[a-z]{2}-[A-Z]{2}-\w+Neural$/.test(v)) return v;
+        if (DB_TO_EDGE[v]) return DB_TO_EDGE[v];
+        var l = String(lg || 'zh').toLowerCase().slice(0, 2);
+        var pool = EDGE_VOICE_POOL[l] || EDGE_VOICE_POOL.zh;
+        // 未收录的自定义值：按字符串散列稳定分配，
+        // 保证「填不同的值」→「不同的音色」，而不是永远同一个声音。
+        return pool[voiceHash(v) % pool.length];
     }
 
     function el(tag, cls, text) {
@@ -199,13 +251,13 @@
     // メニュー項目は「日本語キー＋実行関数」で保持し、言語切替時はラベルだけ貼り替える。
     // 再読込なしで言語を変えても、以前の言語の文言が残らないようにするため。
     var MENU_ITEMS = [
-        { id: 'dscDbTtsBtn', ic: '🔊', label: '豆包で音声生成', tip: '豆包音声生成', open: function () { openTtsModal(); } },
-        { id: 'dscDbImageBtn', ic: '🎨', label: '豆包で画像生成', tip: '豆包画像生成', open: function () { openImageModal(); } },
-        { id: 'dscDbVideoBtn', ic: '🎬', label: '豆包で動画生成', tip: '豆包動画生成', open: function () { openVideoModal(); } },
-        { id: 'dscDbPodcastBtn', ic: '🎧', label: '豆包ポッドキャスト', tip: '豆包ポッドキャスト', open: function () { openPodcastModal(); } },
-        { id: 'dscDbCallBtn', ic: '📞', label: '豆包音声通話', tip: '豆包音声通話', open: function () { openCallModal(); } },
-        { id: 'dscDbAsrBtn', ic: '🎤', label: '録音ファイルを豆包で認識', tip: '豆包録音ファイル認識', open: function () { openAsrModal(); } },
-        { id: 'dscDbEditBtn', ic: '🖌️', label: '豆包P图', tip: '豆包P图', open: function () { openEditModal(); } }
+        { id: 'dscDbTtsBtn', ic: '🔊', label: T('豆包で音声生成'), tip: T('豆包音声生成'), open: function () { openTtsModal(); } },
+        { id: 'dscDbImageBtn', ic: '🎨', label: T('豆包で画像生成'), tip: T('豆包画像生成'), open: function () { openImageModal(); } },
+        { id: 'dscDbVideoBtn', ic: '🎬', label: T('豆包で動画生成'), tip: T('豆包動画生成'), open: function () { openVideoModal(); } },
+        { id: 'dscDbPodcastBtn', ic: '🎧', label: T('豆包ポッドキャスト'), tip: T('豆包ポッドキャスト'), open: function () { openPodcastModal(); } },
+        { id: 'dscDbCallBtn', ic: '📞', label: T('豆包音声通話'), tip: T('豆包音声通話'), open: function () { openCallModal(); } },
+        { id: 'dscDbAsrBtn', ic: '🎤', label: T('録音ファイルを豆包で認識'), tip: T('豆包録音ファイル認識'), open: function () { openAsrModal(); } },
+        { id: 'dscDbEditBtn', ic: '🖌️', label: T('豆包P图'), tip: T('豆包P图'), open: function () { openEditModal(); } }
     ];
 
     function applyMenuLabels() {
@@ -727,7 +779,7 @@
         var items = modelsByCat('tts');
         // カタログが空でも選択肢をゼロにしない（必ず 1 件は選べる状態にする）
         if (!items.length) {
-            items = [{ value: 'SeedAudio1.0', label: 'Doubao-音声生成-1.0（音声生成）' }];
+            items = [{ value: 'SeedAudio1.0', label: T('Doubao-音声生成-1.0（音声生成）') }];
         }
         var want = (S.cfg && S.cfg.ttsModel) || '';
         if (want && !items.some(function (m) { return m.value === want; })) {
@@ -755,7 +807,7 @@
         if (!text.trim()) { setStatus(st, '⚠️ ' + T('テキストを入力してください'), 'err'); return; }
         var body = {
             text: text,
-            voice: (($('dscDbTtsVoice') || {}).value || '').trim(),
+            voice: dscEdgeVoiceOf(($('dscDbTtsVoice') || {}).value || '', lang()),
             model: (ttsModelSel() || {}).value || '',
             speed: (($('dscDbTtsSpeed') || {}).value || '1.0'),
             format: 'mp3',
@@ -1570,8 +1622,8 @@
             style: (($('dscDbPodStyle') || {}).value || '').trim(),
             minutes: parseInt((($('dscDbPodMin') || {}).value || '3'), 10),
             name: (($('dscDbPodName') || {}).value || '').trim(),
-            voiceA: (($('dscDbPodVoiceA') || {}).value || '').trim(),
-            voiceB: (($('dscDbPodVoiceB') || {}).value || '').trim(),
+            voiceA: dscEdgeVoiceOf(($('dscDbPodVoiceA') || {}).value || '', lang()),
+            voiceB: dscEdgeVoiceOf(($('dscDbPodVoiceB') || {}).value || '', lang()),
             model: ($('dscDbPodModel') || {}).value || '',
             lang: lang()
         };
