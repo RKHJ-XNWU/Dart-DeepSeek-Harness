@@ -12,6 +12,7 @@ import 'cosplay.dart';
 import 'deepseek_api.dart';
 import 'doubao.dart';
 import 'doubao_video_ark.dart';
+import 'doubao_wiki.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -105,6 +106,21 @@ Future<void> handleDsChatSendStream(
 
   // ---------- 工具模式 ----------
   if (enableTools) {
+    // 工具模式 × 联网内容插件：方舟客服确认 Responses API 的 tools
+    // 数组可同时放置 web_search 与 function，由模型自动选择调用，故不再互斥。
+    // 仅在豆包通道 + 已开信源 + 无音视频时混用，其余退回原有工具链。
+    final toolWikiSources = apiUrl != DS_API_URL
+        ? dbWikiNormalizeSources(getDbConfig().webSources)
+        : const <String>[];
+    final useWikiTools = toolWikiSources.isNotEmpty &&
+        pendingVideoIds.isEmpty &&
+        dbWikiMediaSupported(mediaParts);
+    if (!useWikiTools && apiUrl != DS_API_URL && toolWikiSources.isNotEmpty) {
+      logp('ℹ️ 音声・動画入力を含むため、ツールモードでは联网内容插件を併用しません');
+      await sse.send('notice', {
+        'message': '当前输入含音频/视频，联网内容插件通道不支持，本次未启用百科检索',
+      });
+    }
     await sse.send('rounds', {'total': 0});
     await sse.send('tool_mode_start', {'start': true});
 
@@ -120,33 +136,64 @@ Future<void> handleDsChatSendStream(
 
     ToolStreamOutcome outcome;
     try {
-      outcome = await callDsWithToolsStream(
-        apiKey,
-        model,
-        agentMsgs,
-        maxTokens,
-        temperature,
-        maxIter,
-        (s) {
-          firstContentAt ??= DateTime.now();
-          contentBuf.write(s);
-          sse.send('content', {'delta': s});
-        },
-        (phase, name, args, result) async {
-          await sse.send('tool_call', {
-            'phase': phase,
-            'name': name,
-            'args': args,
-            'result': result,
-          });
-        },
-        (s) {
-          toolReasoningBuf.write(s);
-          sse.send('reasoning', {'delta': s});
-        },
-        usageAcc,
-        apiUrl: apiUrl,
-      );
+      if (useWikiTools) {
+        final w = await callDbWikiWithToolsStream(
+          apiKey,
+          model,
+          agentMsgs,
+          maxTokens,
+          toolWikiSources,
+          maxIter,
+          (s) {
+            firstContentAt ??= DateTime.now();
+            contentBuf.write(s);
+            sse.send('content', {'delta': s});
+          },
+          (phase, name, args, result) async {
+            await sse.send('tool_call', {
+              'phase': phase,
+              'name': name,
+              'args': args,
+              'result': result,
+            });
+          },
+          (s) {
+            toolReasoningBuf.write(s);
+            sse.send('reasoning', {'delta': s});
+          },
+          usageAcc,
+          mediaParts: mediaParts,
+        );
+        outcome = ToolStreamOutcome(w.content, w.reasoning, w.toolLogs);
+      } else {
+        outcome = await callDsWithToolsStream(
+          apiKey,
+          model,
+          agentMsgs,
+          maxTokens,
+          temperature,
+          maxIter,
+          (s) {
+            firstContentAt ??= DateTime.now();
+            contentBuf.write(s);
+            sse.send('content', {'delta': s});
+          },
+          (phase, name, args, result) async {
+            await sse.send('tool_call', {
+              'phase': phase,
+              'name': name,
+              'args': args,
+              'result': result,
+            });
+          },
+          (s) {
+            toolReasoningBuf.write(s);
+            sse.send('reasoning', {'delta': s});
+          },
+          usageAcc,
+          apiUrl: apiUrl,
+        );
+      }
     } catch (e) {
       await sse.send('error', {'message': '$e'});
       await sse.done();
@@ -255,6 +302,54 @@ Future<void> handleDsChatSendStream(
   DateTime? reasoningStart;
   var reasoningTotalMs = 0;
 
+  // ---------- 豆包联网内容插件（抖音百科等）----------
+  // 方舟文档硬约束：sources=[douyin] 等属于「联网内容插件」，
+  // 仅 Responses API 支持，Chat Completions 无法指定；因此这里分流。
+  // 仅豆包通道 + 用户显式开启信源 + 纯文本输入时启用。
+  final wikiSources = apiUrl != DS_API_URL
+      ? dbWikiNormalizeSources(getDbConfig().webSources)
+      : const <String>[];
+  // 图片（image_url）可随 input_image 一起提交，与 web_search 并存；
+  // 音频 / 视频在插件通道不保证可用，出现时回退原生多模态。
+  final canUseWiki = wikiSources.isNotEmpty &&
+      pendingVideoIds.isEmpty &&
+      dbWikiMediaSupported(mediaParts);
+
+  if (canUseWiki) {
+    logp('豆包联网内容插件モード: 信源=${wikiSources.join(",")}');
+    try {
+      await callDbWikiResponsesStream(
+        apiKey,
+        model,
+        apiMessages,
+        maxTokens,
+        wikiSources,
+        (s) {
+          reasoningBuf.write(s);
+          reasoningStart ??= DateTime.now();
+          sse.send('reasoning', {'delta': s});
+        },
+        (s) {
+          if (reasoningStart != null) {
+            reasoningTotalMs +=
+                DateTime.now().difference(reasoningStart!).inMilliseconds;
+            reasoningStart = null;
+          }
+          firstContentAt ??= DateTime.now();
+          contentBuf.write(s);
+          sse.send('content', {'delta': s});
+        },
+        usageAcc: usageAcc,
+        baseUrl: dbBaseUrl(null),
+        mediaParts: mediaParts,
+      );
+    } catch (e) {
+      logp('豆包联网内容插件の呼び出しに失敗: $e');
+      await sse.send('error', {'message': '$e'});
+      await sse.done();
+      return;
+    }
+  } else {
   try {
     await callDsMultiRoundStream(
       apiKey,
@@ -293,6 +388,7 @@ Future<void> handleDsChatSendStream(
     await sse.send('error', {'message': '$e'});
     await sse.done();
     return;
+  }
   }
 
   if (reasoningStart != null) {
@@ -1019,15 +1115,42 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   }
 
   // ============ 非流式兜底 ============
+  // 豆包联网内容插件（抖音百科等）在非流式路径同样生效：
+  // Responses API 本身仍是流式，这里把增量累积成完整文本后返回。
   final usageAcc = DsUsageAcc();
   String reply;
   String reasoning;
+  final wikiSrcFallback = useDoubao
+      ? dbWikiNormalizeSources(getDbConfig().webSources)
+      : const <String>[];
+  final wikiOkFallback = wikiSrcFallback.isNotEmpty &&
+      fileCtx.videoFileIds.isEmpty &&
+      dbWikiMediaSupported(dbMediaParts);
   try {
-    final r = await callDsMultiRound(callKey, model, apiMessages, maxTokens,
-        temperature, rounds, null, usageAcc,
-        apiUrl: callUrl, extraBody: dbExtraBody);
-    reply = r.content;
-    reasoning = r.reasoning;
+    if (wikiOkFallback) {
+      final rb = StringBuffer();
+      final cb = StringBuffer();
+      await callDbWikiResponsesStream(
+        callKey,
+        model,
+        apiMessages,
+        maxTokens,
+        wikiSrcFallback,
+        (s) => rb.write(s),
+        (s) => cb.write(s),
+        usageAcc: usageAcc,
+        baseUrl: dbBaseUrl(null),
+        mediaParts: dbMediaParts,
+      );
+      reply = cb.toString();
+      reasoning = rb.toString();
+    } else {
+      final r = await callDsMultiRound(callKey, model, apiMessages, maxTokens,
+          temperature, rounds, null, usageAcc,
+          apiUrl: callUrl, extraBody: dbExtraBody);
+      reply = r.content;
+      reasoning = r.reasoning;
+    }
   } catch (e) {
     await dsJSONErr(res, 500, 'API 呼び出しに失敗しました: $e');
     return;

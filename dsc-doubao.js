@@ -28,6 +28,9 @@
         editBusy: false
     };
 
+    // 豆包联网内容插件信源（仅 douyin 由 UI 控制，其余保留后端值）
+    var DB_WEB_SOURCES = [];
+
     var RATIOS = ['16:9', '3:4', '4:3', '19:6', '21:9', '1:1', '9:16'];
     var IMG_STYLES_JA = ['アニメ', '二次元', '日本アニメ風', 'ピクセル', 'シネマティック', '特撮風', '中国アニメ風', '田園風'];
 
@@ -497,6 +500,8 @@
 
         card.appendChild(switchRow('dscDbFastMode', '高速モード（深い思考をオフ）',
             '豆包の言語モデルで深い思考を無効化し、最初の一文字が届くまでの待ち時間を大幅に短縮します（実測 16.8 秒 → 0.9 秒）', true));
+        card.appendChild(switchRow('dscDbWikiDouyin', '抖音百科を情報源にする（豆包モード限定）',
+            '火山方舟の「联网内容插件」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません', false));
         card.appendChild(switchRow('dscDbAutoRoute', '録音ファイルを豆包へ自動ルーティング',
             '豆包以外のモデルを選んでいても、録音を送ると豆包で認識・分析します', true));
         card.appendChild(switchRow('dscDbWatermark', '生成物に透かしを入れる',
@@ -612,6 +617,9 @@
             k.value = '';
             k.placeholder = c.hasKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedKey) : T('ARK API Key を入力');
         }
+        DB_WEB_SOURCES = Array.isArray(c.webSources) ? c.webSources.slice() : [];
+        var wd = $('dscDbWikiDouyin');
+        if (wd) wd.checked = DB_WEB_SOURCES.indexOf('douyin') >= 0;
         var fm = $('dscDbFastMode');
         if (fm) fm.checked = (c.fastMode !== false);
         var ar = $('dscDbAutoRoute');
@@ -644,6 +652,12 @@
             voice: ($('dscDbVoiceA') || {}).value || '',
             voiceB: ($('dscDbVoiceB') || {}).value || '',
             fastMode: !!(($('dscDbFastMode') || {}).checked),
+            webSources: (function () {
+                var ws = (DB_WEB_SOURCES || []).filter(function (x) { return x !== 'douyin'; });
+                var d = $('dscDbWikiDouyin');
+                if (d && d.checked) ws.push('douyin');
+                return ws;
+            })(),
             autoRouteAudio: !!(($('dscDbAutoRoute') || {}).checked),
             watermark: !!(($('dscDbWatermark') || {}).checked),
             duplexVoice: ($('dscDbDuplexVoice') || {}).value || '',

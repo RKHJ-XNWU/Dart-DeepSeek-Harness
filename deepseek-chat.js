@@ -2349,6 +2349,12 @@
                             thinkPanel.style.display = '';
                         }
 
+                    } else if (currentEvent === 'notice') {
+                        // 后端提示（例：当前输入含音频/视频，未启用百科检索）。
+                        // 走思考面板而不是弹窗，避免打断正在进行的工具轮次。
+                        if (thinkPanel && thinkPanel.style.display === 'none') thinkPanel.style.display = '';
+                        if (thinkLabel) thinkLabel.textContent = '\u2139\ufe0f ' + (obj.message || '');
+
                     } else if (currentEvent === 'media_progress') {
                         // 豆包大视频通道（Files API）の進捗：2GB のアップロードでも
                         // 画面に段階と割合を出し、固まったように見せない。

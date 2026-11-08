@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'doubao_wiki.dart';
 import 'ds_crypto.dart';
 import 'files.dart';
 import 'globals.dart';
@@ -356,6 +357,11 @@ class DbConfig {
   bool fastMode;
   List<String> customModels;
 
+  /// 联网内容插件信源（抖音百科 / 头条图文 / 墨迹天气 / 全网检索）。
+  /// 仅豆包模式生效，且仅走 Responses API（插件不支持 Chat Completions）。
+  /// 留空 = 不启用联网内容插件，保持原有 Chat API 行为。
+  List<String> webSources;
+
   // ---- 端到端实时语音（Seeduplex）----
   /// 全双工通话音色；留空则沿用 [voice]
   String duplexVoice;
@@ -405,7 +411,9 @@ class DbConfig {
     this.s2sAppId = '',
     this.s2sToken = '',
     List<String>? customModels,
-  }) : customModels = customModels ?? <String>[];
+    List<String>? webSources,
+  })  : customModels = customModels ?? <String>[],
+        webSources = webSources ?? <String>[];
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'apiKey': apiKey,
@@ -434,6 +442,7 @@ class DbConfig {
         's2sAppId': s2sAppId,
         's2sToken': s2sToken,
         'customModels': customModels,
+        'webSources': webSources,
       };
 
   factory DbConfig.fromJson(Map<String, dynamic> j) => DbConfig(
@@ -464,6 +473,8 @@ class DbConfig {
         s2sAppId: mStr(j, 's2sAppId'),
         s2sToken: mStr(j, 's2sToken'),
         customModels: asList(j['customModels']).map((e) => '$e').toList(),
+        webSources: dbWikiNormalizeSources(
+            asList(j['webSources']).map((e) => '$e')),
       );
 }
 
@@ -2072,6 +2083,8 @@ Map<String, dynamic> _configJson() {
     'hasS2s': cfg.s2sAppId.trim().isNotEmpty && cfg.s2sToken.trim().isNotEmpty,
     's2sAppId': cfg.s2sAppId,
     'customModels': cfg.customModels,
+    'webSources': cfg.webSources,
+    'webSourcesAllowed': dbWikiAllowedSources,
     'catalog': _modelListJson(),
   };
 }
@@ -2156,6 +2169,9 @@ Future<void> handleDbConfig(HttpRequest req) async {
             .where((e) => e.isNotEmpty)
             .toList()
         : old.customModels,
+    webSources: body.containsKey('webSources')
+        ? dbWikiNormalizeSources(asList(body['webSources']).map((e) => '${e}'))
+        : old.webSources,
   );
   // 允许显式清空 Key（clearKey=1）
   if (mBool(body, 'clearKey')) cfg.apiKey = '';
