@@ -2,7 +2,7 @@
 
 # 🐋 Dart · DeepSeek Harness
 
-**把整台安卓手机变成你的 AI 工作站**
+**把整台安卓手机变成你的Harness工作站**
 
 100% 纯 Dart 重写 · 零第三方依赖 · 单文件可执行 · 原生 Web UI
 
