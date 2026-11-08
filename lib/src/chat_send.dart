@@ -708,14 +708,14 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   }
 
   if (webSearch && content.isNotEmpty) {
+    // 豆包通道同样允许调用 DeepSeek 官方 /v1/tools/search 联网搜索。
+    // 搜索结果只是以纯文本注入 userPrompt，最终仍由豆包模型作答；
+    // 请求走的是 getDsConfig().apiKey（DeepSeek 官方 Key），与豆包 Key 无关。
     if (useDoubao) {
-      // 豆包通道禁止调用 DeepSeek 的 /v1/tools/search，避免消耗 DeepSeek 用量
-      logp('⛔ 豆包モード：DeepSeek の联网検索は呼び出しません（用量保護）');
-      userPrompt += '\n\n' + dbLocalized(mediaLang, 'searchBlockedNote');
-    } else {
-      final ctx = await buildWebSearchContext(content);
-      if (ctx.isNotEmpty) userPrompt += ctx;
+      logp('🔍 豆包モード：DeepSeek 公式联网検索を呼び出します（結果はプロンプトに注入）');
     }
+    final ctx = await buildWebSearchContext(content);
+    if (ctx.isNotEmpty) userPrompt += ctx;
   }
   if (userPrompt.trim().isEmpty) userPrompt = 'アップロードしたファイルを確認してください。';
 
