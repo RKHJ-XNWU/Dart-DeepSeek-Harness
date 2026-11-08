@@ -211,7 +211,7 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
   var mt = maxTokens;
   if (mt <= 0) mt = 4096;
   if (clampMax && mt > 120000) mt = 120000;
-  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
+  if (apiUrl != DS_API_URL && mt > 120000) mt = 120000;
   if (temperature < 0) temperature = 0;
 
   // 方舟（豆包）は stream_options 非対応の可能性があるため DeepSeek のみ付与
@@ -336,7 +336,7 @@ Future<({String content, String reasoning})> callDsChatAPI(
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
   if (mt > 300000) mt = 300000;
-  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
+  if (apiUrl != DS_API_URL && mt > 120000) mt = 120000;
   var temp = temperature;
   if (temp <= 0) temp = 1.0;
 
@@ -415,7 +415,7 @@ Future<DsRawResponse> callDsChatAPIRaw(
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
   if (mt > 300000) mt = 300000;
-  if (apiUrl != DS_API_URL && mt > 32768) mt = 32768;
+  if (apiUrl != DS_API_URL && mt > 120000) mt = 120000;
   if (temperature < 0) temperature = 0;
 
   final body = <String, dynamic>{
