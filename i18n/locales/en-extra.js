@@ -458,4 +458,6 @@ DeepSeek ディメンションへ帰還中…|Returning to DeepSeek dimensions..
 チャンクを読み込んでいます…|Loading blocks...
 豆包ディメンション|Doubao dimension
 DeepSeek ディメンション|DeepSeek dimension
+抖音百科を情報源にする（豆包モード限定）|Set Douyin Baike as Information Source (Doubao Mode Only)
+火山方舟の「联网内容插件」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません|Uses the Volcano Ark "Web Content Plugin" to add Douyin Baike (douyin) to the search sources. Takes effect only in Doubao mode and has no impact on the DeepSeek channel
 `);
