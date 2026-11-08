@@ -2248,8 +2248,9 @@
     }
 
     // 他モジュール（deepseek-chat.js）から参照する公開 API
-    //   ・豆包モード中か ・この値が豆包系モデルか
+    //   ・豆包モード中か ・この値が豆包系モデルか ・豆包の対話モデル値
     window.dscDoubaoModeOn = function () { return isDbMode(); };
+    window.dscDoubaoChatModel = function () { return dbChatModel(); };
     window.dscIsDoubaoModelId = function (v) {
         v = String(v || '').trim();
         if (!v) return false;
@@ -2285,19 +2286,203 @@
         }, 280);
     }
 
-    function setDbMode(on, silent) {
+
+    // ------------------------------------------------------------
+    // 次元転送（ディメンション・ワープ）演出 v1 ─《ディメンション・ポータル》
+    //   同じチャット窓のまま「別ディメンション」へ移動したことを、
+    //   マイクラのポータル通過のようなフルスクリーン演出で伝える。
+    //   構成：虚空背景 + 放射漩涡 + 翻滚线框立方体 + 上飘光粒子
+    //         + 霓虹标题 + 进度条
+    //   演出は DOM だけで完結し、本体のメッセージ再読込とは並行して走る。
+    //
+    //   ★ 两处技术修复（与视觉风格无关，回退后必须保留）：
+    //     1) 遮罩 z-index 100080，高于聊天容器 100000 与豆包模态框 100050。
+    //        低一层就会被整个盖住 —— 动画在播，但肉眼完全看不见。
+    //     2) 消息重载推迟到 210ms（遮罩已实心后）再触发，并用双重 rAF
+    //        等首帧样式落地。太早会在半透明遮罩下直播「清空→重填」，闪一下。
+    // ------------------------------------------------------------
+    var DB_WARP_MS = 1500;   // 演出总时长（含淡出）
+    var DB_WARP_FADE = 260;  // 末尾淡出时长
+    var DB_WARP_PARTICLES = 18;  // 上飘光粒子数量
+
+    function dbWarpDim(toDb, load) {
+        // ★ 動画の終了は固定タイマーではなく、「メッセージの読み込み完了」を待って決める。
+        //   固定時間だと fetch が遅いとき、フェードアウト時に下層が空のまま表示され「一瞬光る」。
+        return new Promise(function (resolve) {
+            // 連打・重複対策：前回の演出が残っていれば取り除く
+            var old = $('dscDimWarp');
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+
+            var reduce = false;
+            try {
+                reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            } catch (e) {}
+
+            var mk = function (tag, cls) {
+                var el = document.createElement(tag);
+                if (cls) el.className = cls;
+                return el;
+            };
+
+            var w = mk('div');
+            w.id = 'dscDimWarp';
+            w.className = toDb ? 'dsc-warp-db' : 'dsc-warp-ds';
+            w.setAttribute('role', 'status');
+            w.setAttribute('aria-live', 'polite');
+
+            // 1. 虚空背景（最初の一フレームから CSS で実体表示）
+            w.appendChild(mk('div', 'dsc-warp-bg'));
+
+            // 2. 放射渦巻
+            w.appendChild(mk('div', 'dsc-warp-vortex'));
+
+            // 3. ワイヤーキューブ（六面）
+            var cube = mk('div', 'dsc-warp-cube');
+            for (var ci = 0; ci < 6; ci++) cube.appendChild(mk('s'));
+            w.appendChild(cube);
+
+            // 4. 上漂光粒子（動的を減らす設定のときは生成しない）
+            if (!reduce) {
+                var parts = mk('div', 'dsc-warp-p');
+                for (var pi = 0; pi < DB_WARP_PARTICLES; pi++) {
+                    var dot = mk('i');
+                    dot.style.left = (Math.random() * 100).toFixed(2) + '%';
+                    dot.style.bottom = (Math.random() * 28).toFixed(2) + '%';
+                    dot.style.animationDelay = (Math.random() * 1.9).toFixed(2) + 's';
+                    var sz = 2 + Math.random() * 3;
+                    dot.style.width = sz.toFixed(1) + 'px';
+                    dot.style.height = sz.toFixed(1) + 'px';
+                    parts.appendChild(dot);
+                }
+                w.appendChild(parts);
+            }
+
+            // 5. 文字と進行バー
+            var title = mk('div', 'dsc-warp-title');
+            title.textContent = toDb ? T('豆包ディメンション') : T('DeepSeek ディメンション');
+
+            var sub = mk('div', 'dsc-warp-sub');
+            sub.textContent = toDb ? T('ポータルを開いています') : T('主世界へ戻っています');
+
+            var bar = mk('div', 'dsc-warp-bar');
+            var barIn = mk('b');
+            bar.appendChild(barIn);
+
+            var core = mk('div', 'dsc-warp-core');
+            core.appendChild(title);
+            core.appendChild(sub);
+            core.appendChild(bar);
+            w.appendChild(core);
+
+            document.body.appendChild(w);
+            void w.offsetWidth;   // レイアウト確定
+
+            var startedAt = Date.now();
+            var MIN_SHOW = reduce ? 420 : 900;   // 演出の最短表示時間
+            var MAX_WAIT = 4000;                 // 読み込みが固まっても必ず抜ける
+
+            // 二重 rAF：遮蔽が実際に描画されてから読み込みを開始する
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    w.classList.add('dsc-warp-in');
+                    w.classList.add('dsc-warp-go');
+                    barIn.style.width = '100%';
+
+                    // 中盤で文言を差し替えて「読み込み中」感を出す
+                    setTimeout(function () {
+                        try {
+                            sub.textContent = toDb
+                                ? T('新しいディメンションを生成しています…')
+                                : T('チャンクを読み込んでいます…');
+                        } catch (e) {}
+                    }, Math.round(MIN_SHOW * 0.62));
+
+                    // メッセージ読み込み（Promise）を待ってからフェードアウト
+                    var p = null;
+                    try { p = (typeof load === 'function') ? load() : null; } catch (e) { p = null; }
+
+                    var settled = Promise.resolve(p).catch(function () {});
+                    var guard = new Promise(function (r) { setTimeout(r, MAX_WAIT); });
+
+                    Promise.race([settled, guard]).then(function () {
+                        var rest = Math.max(0, MIN_SHOW - (Date.now() - startedAt));
+                        setTimeout(function () {
+                            // ★ クロスフェード：下層のチャット領域を一旦 0 にし、
+                            //   遮罩のフェードアウトと同時に 0→1 で浮かび上がらせる。
+                            //   これにより下層がどのタイミングで描画されていても
+                            //   白飛び／明滅が物理的に起こらない。
+                            var appEl = document.getElementById('deepseekChatApp');
+                            if (appEl) {
+                                appEl.style.transition = 'none';
+                                appEl.style.opacity = '0';
+                            }
+                            requestAnimationFrame(function () {
+                                requestAnimationFrame(function () {
+                                    if (appEl) {
+                                        appEl.style.transition = 'opacity .4s linear';
+                                        appEl.style.opacity = '1';
+                                    }
+                                    w.classList.add('dsc-warp-out');
+                                    // チャット領域の opacity を元に戻す（インラインstyle を消す）
+                                    setTimeout(function () {
+                                        if (appEl) {
+                                            appEl.style.transition = '';
+                                            appEl.style.opacity = '';
+                                        }
+                                    }, 520);
+                                    // 遮罩はクロスフェード完了後に取り除く
+                                    setTimeout(function () {
+                                        if (w.parentNode) w.parentNode.removeChild(w);
+                                        resolve();
+                                    }, Math.max(DB_WARP_FADE, 420) + 120);
+                                });
+                            });
+                        }, rest);
+                    });
+                });
+            });
+        });
+    }
+
+    function setDbMode(on, silent, noWarp) {
         try { localStorage.setItem(DB_MODE_KEY, on ? '1' : '0'); } catch (e) {}
         syncDbModeUI();
+        // ★ 维度切换：同一个聊天窗口，豆包 / DeepSeek 的消息流互不可见
+        //   ポータル演出を出しつつ、新ディメンションのメッセージを並行読込
+        var reloadDim = function () {
+            try {
+                if (window.dscReloadMessagesForDim) return window.dscReloadMessagesForDim();
+            } catch (e) { return null; }
+            return null;
+        };
+        // ★ 演出の終了（＝メッセージ読み込み完了＋遮罩削除）を Promise で受け取る
+        var warpDone;
+        if (noWarp) {
+            reloadDim();
+            warpDone = Promise.resolve();
+        } else {
+            warpDone = dbWarpDim(on, reloadDim);
+        }
+        // 遮罩（100080）が完全に消えてからトーストを出す
+        var sayLater = function (fn) {
+            warpDone.then(function () { try { fn(); } catch (e) {} });
+        };
         if (silent) return;
         if (on) {
             if (S.cfg && S.cfg.hasKey === false) {
-                toast(T('⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください'), 'error');
-                openDbSettings();
+                sayLater(function () {
+                    toast(T('⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください'), 'error');
+                    openDbSettings();
+                });
             } else {
-                toast(T('豆包モードをオンにしました（モデル：{0}）', dbChatModel()), 'success');
+                sayLater(function () {
+                    toast(T('豆包モードをオンにしました（モデル：{0}）', dbChatModel()), 'success');
+                });
             }
         } else {
-            toast(T('豆包モードをオフにしました（DeepSeek に戻ります）'), 'info');
+            sayLater(function () {
+                toast(T('豆包モードをオフにしました（DeepSeek に戻ります）'), 'info');
+            });
         }
     }
 
@@ -2342,7 +2527,7 @@
             try {
                 var url = (typeof input === 'string') ? input : ((input && input.url) || '');
                 if (init && typeof init.body === 'string' &&
-                    /\/api\/ds-chat\/(send|continue)(\?|$)/.test(url)) {
+                    /\/api\/ds-chat\/(send|continue|abort-save)(\?|$)/.test(url)) {
                     var body = JSON.parse(init.body);
                     if (body && typeof body === 'object') {
                         var cur = String(body.model || '');
@@ -2386,7 +2571,7 @@
             var sel = $('dscModelSelect');
             if (sel) sel.value = 'deepseek-flash';
             purgeLegacyChatModels();
-            if (!isDbMode()) setDbMode(true, true);
+            if (!isDbMode()) setDbMode(true, true, true);
             console.log('[DB] 旧設定の豆包モデル「' + m + '」を豆包モードへ移行しました');
         } catch (e) {}
     }

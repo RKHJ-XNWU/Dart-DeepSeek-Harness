@@ -197,6 +197,7 @@ Future<void> handleDsChatSendStream(
       createdAt: rfc3339(now),
       attachments: fileIDs.join(','),
     );
+    userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(userMsg);
 
     final aiMsg = DsMessage(
@@ -209,6 +210,7 @@ Future<void> handleDsChatSendStream(
       // 豆包経由では usage を保存しない（方舟の消費量を正確に取得できないため）
       usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
     );
+    aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(aiMsg);
 
     final sess = getDsSession(sessionID);
@@ -308,6 +310,7 @@ Future<void> handleDsChatSendStream(
     createdAt: rfc3339(now),
     attachments: fileIDs.join(','),
   );
+  userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(userMsg);
 
   final aiMsg = DsMessage(
@@ -319,6 +322,7 @@ Future<void> handleDsChatSendStream(
     reasoning: reasoningBuf.toString(),
     usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
   );
+  aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);
 
   final sess = getDsSession(sessionID);
@@ -396,6 +400,7 @@ Future<void> handleDsNovelGeneration(
     content: userContent,
     createdAt: rfc3339(DateTime.now()),
   );
+  userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(userMsg);
 
   final basePrompt = buildNovelBasePrompt(th, tg, g, st, target);
@@ -414,6 +419,7 @@ Future<void> handleDsNovelGeneration(
     createdAt: rfc3339(DateTime.now()),
     usage: usageAcc.snapshot(),
   );
+  aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);
 
   var title = '小説創作';
@@ -480,6 +486,7 @@ Future<void> handleDsNovelGenerationStream(
     content: userContent,
     createdAt: rfc3339(DateTime.now()),
   );
+  userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(userMsg);
   await sse.send('user_message', userMsg.toJson());
 
@@ -512,6 +519,7 @@ Future<void> handleDsNovelGenerationStream(
     createdAt: rfc3339(DateTime.now()),
     usage: usageAcc.snapshot(),
   );
+  aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);
 
   var title = '小説創作';
@@ -863,7 +871,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   final refs = resolveCrossSessionRefs(userPrompt, sessionID);
   if (refs.injected) userPrompt = refs.rewritten;
 
-  var history = getDsMessages(sessionID);
+  // ★ 维度隔離：只把「同一维度」の履歴をモデルへ渡す。
+  //   豆包(dim=db) と DeepSeek(dim=ds) は互いのメッセージを一切見ない。
+  final chatDim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
+  logp('🧭 送信维度=$chatDim (model=$model)');
+  var history = getDsMessages(sessionID, dim: chatDim);
   history = pickHistoryWindow(history);
 
   final apiMessages = <Map<String, dynamic>>[];
@@ -951,6 +963,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       createdAt: rfc3339(now),
       attachments: fileIDs.join(','),
     );
+    userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(userMsg);
 
     var fullReasoning = outcome.reasoning;
@@ -972,6 +985,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       // 豆包额度无法从方舟精确取得，故不落库 usage，避免误导
       usage: useDoubao ? null : usageAcc.snapshot(),
     );
+    aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(aiMsg);
 
     final sess = getDsSession(sessionID);
@@ -1029,6 +1043,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     createdAt: rfc3339(now),
     attachments: fileIDs.join(','),
   );
+  userMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(userMsg);
 
   final aiMsg = DsMessage(
@@ -1040,6 +1055,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     reasoning: reasoning,
     usage: useDoubao ? null : usageAcc.snapshot(),
   );
+  aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);
 
   final sess = getDsSession(sessionID);

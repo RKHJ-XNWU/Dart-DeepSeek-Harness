@@ -188,6 +188,9 @@
         ttsCancelled: false,
         longTextMode: false,
         longTextTargetChars: LONG_TEXT_DEFAULT_CHARS,
+        // ★ 本次发送/续生成所属的维度。在请求发出的那一刻冻结，
+        //   避免用户中途切模式后，abort-save 把消息存到错的维度。
+        sendDim: 'ds',
         currentModel: 'deepseek-flash', // 安全な既定値。起動後は syncModelFromConfig() バックエンド設定で上書き
         enableTools: false,
         renderedStart: 0,
@@ -560,6 +563,30 @@
             if (typeof window.dscIsDoubaoModelId === 'function') return !!window.dscIsDoubaoModelId(v);
         } catch (e) {}
         return /^(doubao|glm|seed|volc)/i.test(v);
+    }
+
+    // ★ 当前「维度」对应的模型标识：
+    //   豆包模式开启 -> 豆包会话模型（后端判为 db 维度）
+    //   否则 -> 当前 DeepSeek 模型（后端判为 ds 维度）
+    //   同一个会话窗口内，两个维度的消息流互相隔离。
+    function dscDimKey() {
+        try {
+            if (window.dscDoubaoModeOn && window.dscDoubaoModeOn()) return 'db';
+        } catch (e) {}
+        return 'ds';
+    }
+
+    function dscDimModel() {
+        try {
+            if (window.dscDoubaoModeOn && window.dscDoubaoModeOn()) {
+                if (typeof window.dscDoubaoChatModel === 'function') {
+                    var m = String(window.dscDoubaoChatModel() || '').trim();
+                    if (m) return m;
+                }
+                return 'doubao-seed';
+            }
+        } catch (e) {}
+        return state.currentModel || 'deepseek-flash';
     }
 
     function dscHideUsage(model) {
@@ -1344,7 +1371,9 @@
                 }
                 return c;
             }),
-            hasMore: !!state.hasMore
+            hasMore: !!state.hasMore,
+            // ★ 维度：避免切换豆包/DeepSeek 后误用另一维度的本地快照
+            dim: dscDimKey()
         });
     }
     function dscScheduleMsgsSnap() {
@@ -1367,7 +1396,10 @@
         try { renderSessions(); } catch (e) {}
         try { updateTitle(); } catch (e) {}
         var ms = dscReadSnap(DSC_SNAP_MSGS);
-        if (ms && ms.sid === state.currentSessionId && ms.messages && ms.messages.length) {
+        // ★ 只有「同一会话 + 同一维度」的快照才能直接上屏，否则等后端按维度拉取
+        if (ms && ms.sid === state.currentSessionId &&
+            (ms.dim || 'ds') === dscDimKey() &&
+            ms.messages && ms.messages.length) {
             state.messages = ms.messages;
             state.hasMore = !!ms.hasMore;
             try { renderMessages(); } catch (e) {}
@@ -1740,16 +1772,16 @@
         // ★ 上部は常に「未踏の境地を探る」を固定表示し、セッション情報はサブタイトル行へ移動
         if (titleEl) titleEl.textContent = dscT('未踏の境地を探る');
         if (sess) {
-            if (subEl) subEl.textContent = (sess.title || dscT('無題')) + dscT(' · 全 {0} 件のセッション · {1}', state.sessions.length, state.currentModel);
+            if (subEl) subEl.textContent = (sess.title || dscT('無題')) + dscT(' · 全 {0} 件のセッション · {1}', state.sessions.length, dscDimModel());
         } else {
-            if (subEl) subEl.textContent = dscT('DeepSeek チャット · モデル: ') + state.currentModel;
+            if (subEl) subEl.textContent = dscT('DeepSeek チャット · モデル: ') + dscDimModel();
         }
     }
 
     async function loadMessages() {
         if (!state.currentSessionId) { state.messages = []; state.hasMore = false; renderMessages(); return; }
         try {
-            var res = await fetch('/api/ds-chat/messages?sessionId=' + encodeURIComponent(state.currentSessionId) + '&limit=' + MSG_PAGE_SIZE);
+            var res = await fetch('/api/ds-chat/messages?sessionId=' + encodeURIComponent(state.currentSessionId) + '&limit=' + MSG_PAGE_SIZE + '&model=' + encodeURIComponent(dscDimModel()));
             var data = await res.json();
             state.messages = data.messages || [];
             state.hasMore = !!data.hasMore;
@@ -1757,6 +1789,17 @@
             dscSaveMsgsSnap();
         } catch (e) { toast('メッセージの読み込みに失敗', 'error'); }
     }
+
+    // ★ 维度切换后重新拉取当前会话的消息（豆包 <-> DeepSeek）
+    window.dscReloadMessagesForDim = function () {
+        try {
+            state.messages = [];
+            state.hasMore = false;
+            state.renderedStart = 0;
+            state.loadingOlder = false;
+        } catch (e) {}
+        return loadMessages();
+    };
 
     function renderMessages() {
         var wrap = $('dscMessages');
@@ -1885,7 +1928,8 @@
         try {
             var first = state.messages[0];
             var res = await fetch('/api/ds-chat/messages?sessionId=' + encodeURIComponent(state.currentSessionId) +
-                '&beforeId=' + encodeURIComponent(first.id) + '&limit=' + MSG_PAGE_SIZE);
+                '&beforeId=' + encodeURIComponent(first.id) + '&limit=' + MSG_PAGE_SIZE +
+                '&model=' + encodeURIComponent(dscDimModel()));
             var data = await res.json();
             var older = data.messages || [];
             state.hasMore = !!data.hasMore;
@@ -1915,7 +1959,8 @@
         btn.textContent = dscT('読み込み中…');
         btn.disabled = true;
         try {
-            var res = await fetch('/api/ds-chat/reasoning?sessionId=' + encodeURIComponent(sid) + '&id=' + encodeURIComponent(msgId));
+            // ★ 只读当前维度的 reasoning，避免跨维度读到另一边的思考内容
+            var res = await fetch('/api/ds-chat/reasoning?sessionId=' + encodeURIComponent(sid) + '&id=' + encodeURIComponent(msgId) + '&dim=' + encodeURIComponent(dscDimKey()));
             var data = await res.json();
             var full = (data && data.reasoning) || '';
             if (full) {
@@ -2197,6 +2242,8 @@
     async function sendMessageStream(payload, aiMsgEl, opts) {
         opts = opts || {};
         var onEvent = opts.onEvent || null;
+        // ★ 冻结维度：消息属于哪个维度，在请求发出的这一刻就定下来
+        state.sendDim = dscDimKey();
 
         var t = state.typer;
         t.contentBuf = '';
@@ -2567,7 +2614,9 @@
                     fileIds: ctx.fileIds || [],
                     aiContent: ctx.aiContent || '',
                     reasoning: ctx.reasoning || '',
-                    messageId: ctx.messageId || ''
+                    messageId: ctx.messageId || '',
+                    // ★ 用发送时冻结的维度，而不是请求时才取当前模式
+                    dim: ctx.dim || state.sendDim || dscDimKey()
                 }),
                 signal: ctrl.signal
             });
@@ -2672,6 +2721,8 @@
         var m = state.messages[idx];
         if (!m || m.role !== 'assistant') return;
 
+        // ★ 冻结维度：续生成属于当前维度
+        state.sendDim = dscDimKey();
         state.isSending = true;
         state.stopRequested = false;
         setSendBtnMode('sending');

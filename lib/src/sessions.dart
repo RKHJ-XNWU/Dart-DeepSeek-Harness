@@ -15,6 +15,13 @@ import 'files.dart';
 import 'globals.dart';
 
 const int DS_MAX_OUTPUT_TOKENS = 120000;
+
+/// ★ 维度：同一个会话（同一个聊天窗口）内，豆包与 DeepSeek 的消息流互相隔离。
+///   DS_DIM_DS = DeepSeek 维度（默认）    DS_DIM_DB = 豆包维度
+///   存储格式扩展为 #M|id|role|content|createdAt|attachments|reasoning|usage|dim
+///   旧数据没有第 9 字段 -> 解析为 DS_DIM_DS，与历史 100% 兼容。
+const String DS_DIM_DS = 'ds';
+const String DS_DIM_DB = 'db';
 const int DS_NORMAL_OUTPUT_TOKENS = 8192;
 const int DS_TARGET_CHARS_5M = 5000000;
 const int DS_TTS_MAX_RUNES = 1000000;
@@ -62,6 +69,8 @@ class DsMessage {
   String reasoning;
   bool reasoningTruncated;
   DsTokenUsage? usage;
+  /// ★ 维度：'ds'（DeepSeek，默认）或 'db'（豆包）
+  String dim;
 
   DsMessage({
     required this.id,
@@ -73,6 +82,7 @@ class DsMessage {
     this.reasoning = '',
     this.reasoningTruncated = false,
     this.usage,
+    this.dim = DS_DIM_DS,
   });
 
   Map<String, dynamic> toJson() {
@@ -87,6 +97,7 @@ class DsMessage {
     if (reasoning.isNotEmpty) m['reasoning'] = reasoning;
     if (reasoningTruncated) m['reasoningTruncated'] = true;
     if (usage != null) m['usage'] = usage!.toJson();
+    m['dim'] = dim;
     return m;
   }
 }
@@ -115,7 +126,7 @@ class SessionFile {
   const SessionFile(this.session, this.messages);
 }
 
-SessionFile readDsSessionFile(String path) {
+SessionFile readDsSessionFile(String path, {String? dim}) {
   String data;
   try {
     data = File(path).readAsStringSync();
@@ -141,7 +152,8 @@ SessionFile readDsSessionFile(String path) {
       if (parts.length < 4) continue;
       final att = parts.length >= 5 ? parts[4] : '';
       final rea = parts.length >= 6 ? unescDs(parts[5]) : '';
-      msgs.add(DsMessage(
+      final dm = parts.length >= 8 ? parts[7].trim() : DS_DIM_DS;
+      final md = DsMessage(
         id: parts[0],
         role: parts[1],
         content: unescDs(parts[2]),
@@ -149,7 +161,9 @@ SessionFile readDsSessionFile(String path) {
         attachments: att,
         reasoning: rea,
         usage: dsParseUsageField(parts),
-      ));
+        dim: dm.isEmpty ? DS_DIM_DS : dm,
+      );
+      if (dim == null || md.dim == dim) msgs.add(md);
     }
   }
   return SessionFile(sess, msgs);
@@ -160,6 +174,7 @@ DsMessage? parseDsMessageLine(String line) {
   if (!t.startsWith('#M|')) return null;
   final parts = t.substring(3).split('|');
   if (parts.length < 4) return null;
+  final d = parts.length >= 8 ? parts[7].trim() : DS_DIM_DS;
   return DsMessage(
     id: parts[0],
     role: parts[1],
@@ -168,6 +183,7 @@ DsMessage? parseDsMessageLine(String line) {
     attachments: parts.length >= 5 ? parts[4] : '',
     reasoning: parts.length >= 6 ? unescDs(parts[5]) : '',
     usage: dsParseUsageField(parts),
+    dim: d.isEmpty ? DS_DIM_DS : d,
   );
 }
 
@@ -178,7 +194,7 @@ class TailResult {
   const TailResult(this.messages, this.hasMore);
 }
 
-TailResult readDsSessionTailMsgs(String path, int limit) {
+TailResult readDsSessionTailMsgs(String path, int limit, {String? dim}) {
   RandomAccessFile raf;
   try {
     raf = File(path).openSync();
@@ -201,31 +217,43 @@ TailResult readDsSessionTailMsgs(String path, int limit) {
       return n;
     }
 
-    final needLines = limit + 2;
-    while (offset > 0 && countNewlines(tail) < needLines) {
-      var readSize = blockSize;
-      if (offset < readSize) readSize = offset.toInt();
-      offset -= readSize;
-      raf.setPositionSync(offset);
-      final chunk = raf.readSync(readSize);
-      tail = [...chunk, ...tail];
+    // ★ 维度过滤后条数可能不足 limit，需按倍数扩大读取窗口，
+    //   直到够用或已读到文件头。
+    var needLines = limit + 2;
+    var msgs = <DsMessage>[];
+    var headTruncated = false;
+    while (true) {
+      while (offset > 0 && countNewlines(tail) < needLines) {
+        var readSize = blockSize;
+        if (offset < readSize) readSize = offset.toInt();
+        offset -= readSize;
+        raf.setPositionSync(offset);
+        final chunk = raf.readSync(readSize);
+        tail = [...chunk, ...tail];
+      }
+
+      var lines = utf8.decode(tail, allowMalformed: true).split('\n');
+      headTruncated = offset > 0;
+      if (headTruncated && lines.isNotEmpty) {
+        lines = lines.sublist(1); // 首行可能被截断
+      }
+      msgs = <DsMessage>[];
+      for (final ln in lines) {
+        final m = parseDsMessageLine(ln);
+        if (m == null) continue;
+        if (dim != null && m.dim != dim) continue;
+        msgs.add(m);
+      }
+      if (msgs.length >= limit + 1 || offset <= 0) break;
+      needLines *= 2;
     }
 
-    var lines = utf8.decode(tail, allowMalformed: true).split('\n');
-    if (offset > 0 && lines.isNotEmpty) {
-      lines = lines.sublist(1); // 首行可能被截断
-    }
-    final msgs = <DsMessage>[];
-    for (final ln in lines) {
-      final m = parseDsMessageLine(ln);
-      if (m != null) msgs.add(m);
-    }
-    var hasMore = false;
     if (msgs.length > limit) {
       final sliced = msgs.sublist(msgs.length - limit);
       return TailResult(sliced, true);
     }
-    return TailResult(msgs, hasMore);
+    // 按维度过滤时，若读取窗口已做过头部截断，说明更早处仍有内容
+    return TailResult(msgs, dim != null ? headTruncated : false);
   } finally {
     try {
       raf.closeSync();
@@ -285,8 +313,10 @@ bool appendDsMessage(DsMessage m) {
     logp('⚠️ セッションファイルが存在しません: ${m.sessionId}');
     return false;
   }
+  final d = m.dim.isEmpty ? DS_DIM_DS : m.dim;
   final line = '#M|${m.id}|${m.role}|${escDs(m.content)}|${m.createdAt}|'
-      '${m.attachments}|${escDs(m.reasoning)}|${dsEncodeUsageField(m.usage)}\n';
+      '${m.attachments}|${escDs(m.reasoning)}|${dsEncodeUsageField(m.usage)}'
+      '|$d\n';
   try {
     File(path).writeAsStringSync(line, mode: FileMode.append);
     invalidateDsSessionCaches(path);
@@ -298,7 +328,8 @@ bool appendDsMessage(DsMessage m) {
 }
 
 DsMessage? updateDsMessageContent(String sessionID, String msgID,
-    String newContent, String newReasoning, DsTokenUsage? addUsage) {
+    String newContent, String newReasoning, DsTokenUsage? addUsage,
+    {String? dim}) {
   if (sessionID.trim().isEmpty || msgID.trim().isEmpty) return null;
   final path = dsSessionPath(sessionID);
   String data;
@@ -314,11 +345,19 @@ DsMessage? updateDsMessageContent(String sessionID, String msgID,
     if (!trimmed.startsWith('#M|')) continue;
     final parts = trimmed.substring(3).split('|');
     if (parts.length < 4 || parts[0] != msgID) continue;
+    // ★ 维度校验：指定 dim 时只允许更新该维度的消息，防止跨维度写越界
+    if (dim != null) {
+      final rawLineDim = parts.length >= 8 ? parts[7].trim() : DS_DIM_DS;
+      final lineDim = rawLineDim.isEmpty ? DS_DIM_DS : rawLineDim;
+      if (lineDim != dim) continue;
+    }
     final att = parts.length >= 5 ? parts[4] : '';
     final created = parts[3];
     final mergedUsage = dsMergeUsage(dsParseUsageField(parts), addUsage);
+    final keepDim = parts.length >= 8 ? parts[7].trim() : DS_DIM_DS;
     lines[i] = '#M|${parts[0]}|${parts[1]}|${escDs(newContent)}|$created|$att|'
-        '${escDs(newReasoning)}|${dsEncodeUsageField(mergedUsage)}';
+        '${escDs(newReasoning)}|${dsEncodeUsageField(mergedUsage)}|'
+        '${keepDim.isEmpty ? DS_DIM_DS : keepDim}';
     out = DsMessage(
       id: parts[0],
       sessionId: sessionID,
@@ -328,6 +367,7 @@ DsMessage? updateDsMessageContent(String sessionID, String msgID,
       attachments: att,
       reasoning: newReasoning,
       usage: mergedUsage,
+      dim: keepDim.isEmpty ? DS_DIM_DS : keepDim,
     );
     break;
   }
@@ -516,7 +556,7 @@ List<DsSession> getAllDsSessions() {
 DsSession? getDsSession(String id) => readDsSessionHeaderFast(dsSessionPath(id));
 
 /// 返回的消息列表可能是缓存对象，调用方只读、不得就地修改字段
-List<DsMessage> getDsMessages(String sessionID) {
+List<DsMessage> getDsMessages(String sessionID, {String? dim}) {
   final path = dsSessionPath(sessionID);
   int? size;
   int? mtimeMs;
@@ -528,18 +568,25 @@ List<DsMessage> getDsMessages(String sessionID) {
     size = null;
     mtimeMs = null;
   }
-  if (size != null && mtimeMs != null) {
-    final c = _dsMsgsCache[path];
-    if (c != null && c.size == size && c.mtimeMs == mtimeMs) return c.msgs;
+  // ★ 缓存始终保存「全部维度」的消息，维度过滤在返回时进行，
+  //   这样同一会话在 ds / db 两个维度之间切换都不会破坏缓存。
+  List<DsMessage> all;
+  final c = _dsMsgsCache[path];
+  if (size != null && mtimeMs != null && c != null &&
+      c.size == size && c.mtimeMs == mtimeMs) {
+    all = c.msgs;
+  } else {
+    final sf = readDsSessionFile(path);
+    for (final m in sf.messages) {
+      m.sessionId = sessionID;
+    }
+    if (size != null && mtimeMs != null) {
+      _putDsMsgsCache(path, size, mtimeMs, sf.messages);
+    }
+    all = sf.messages;
   }
-  final sf = readDsSessionFile(path);
-  for (final m in sf.messages) {
-    m.sessionId = sessionID;
-  }
-  if (size != null && mtimeMs != null) {
-    _putDsMsgsCache(path, size, mtimeMs, sf.messages);
-  }
-  return sf.messages;
+  if (dim == null) return all;
+  return all.where((m) => m.dim == dim).toList();
 }
 
 List<DsMessage> pickHistoryWindow(List<DsMessage> history) {

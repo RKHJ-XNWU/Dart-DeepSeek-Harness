@@ -211,6 +211,18 @@ Future<void> handleDsChatSessionsBatchDelete(HttpRequest req) async {
   await dsJSONOk(res, 200, {'success': true, 'deleted': count});
 }
 
+/// ★ 从请求中解析「维度」。
+///   优先 dim 参数；否则用 model 参数判断（豆包目录 -> db，其余 -> ds）。
+///   都不传时回退 DS_DIM_DS，与历史数据的语义保持一致。
+String dsDimFromReq(HttpRequest req, [String bodyModel = '']) {
+  final d = qp(req, 'dim').trim();
+  if (d == DS_DIM_DB || d == DS_DIM_DS) return d;
+  var m = bodyModel.trim();
+  if (m.isEmpty) m = qp(req, 'model').trim();
+  if (m.isEmpty) return DS_DIM_DS;
+  return dbIsChatModel(m) ? DS_DIM_DB : DS_DIM_DS;
+}
+
 /// 生成「推理已截断」的消息副本：绝不修改缓存中的原始消息对象，
 /// 否则后续把历史发给模型时会拿到被截断的 reasoning。
 DsMessage _msgWithReasoningPreview(DsMessage m, String sessionID) {
@@ -225,6 +237,7 @@ DsMessage _msgWithReasoningPreview(DsMessage m, String sessionID) {
     reasoning: r.$1,
     reasoningTruncated: r.$2,
     usage: m.usage,
+    dim: m.dim,
   );
 }
 
@@ -246,9 +259,11 @@ Future<void> handleDsChatMessages(HttpRequest req) async {
   }
   final beforeID = qp(req, 'beforeId');
   final path = dsSessionPath(sessionID);
+  // ★ 维度：同一个会话窗口内，豆包与 DeepSeek 的消息流互相隔离
+  final dim = dsDimFromReq(req);
 
   if (beforeID.isEmpty) {
-    final tail = readDsSessionTailMsgs(path, limit);
+    final tail = readDsSessionTailMsgs(path, limit, dim: dim);
     final msgs = tail.messages
         .map((m) => _msgWithReasoningPreview(m, sessionID))
         .toList();
@@ -260,7 +275,7 @@ Future<void> handleDsChatMessages(HttpRequest req) async {
     return;
   }
 
-  final all = getDsMessages(sessionID);
+  final all = getDsMessages(sessionID, dim: dim);
   var idx = -1;
   for (var i = 0; i < all.length; i++) {
     if (all[i].id == beforeID) {
@@ -296,7 +311,9 @@ Future<void> handleDsChatReasoning(HttpRequest req) async {
     await dsJSONErr(res, 400, '缺少 sessionId 或 id');
     return;
   }
-  for (final m in getDsMessages(sessionID)) {
+  // ★ 维度：只读当前维度的消息，防止读到另一维度的思考内容
+  final dim = dsDimFromReq(req);
+  for (final m in getDsMessages(sessionID, dim: dim)) {
     if (m.id == id) {
       await dsJSONOk(res, 200, {'reasoning': m.reasoning});
       return;
@@ -622,6 +639,14 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
   final aiContent = mStr(body, 'aiContent');
   final reasoning = mStr(body, 'reasoning');
   final messageID = mStr(body, 'messageId');
+  // ★ 维度：由前端随请求带上当前模型，决定这条消息归属哪个维度
+  final abortModel = mStr(body, 'model');
+  // ★ 优先采用前端在「发送时」冻结的维度：
+  //   用户中途切换模式后才触发 abort-save 时，model 已不代表原维度。
+  final abortDimReq = mStr(body, 'dim').trim();
+  final abortDim = (abortDimReq == DS_DIM_DB || abortDimReq == DS_DIM_DS)
+      ? abortDimReq
+      : (dbIsChatModel(abortModel) ? DS_DIM_DB : DS_DIM_DS);
 
   if (sessionID.trim().isEmpty) {
     await dsJSONErr(res, 400, 'セッション ID がありません');
@@ -641,7 +666,8 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
       return;
     }
     final upd = updateDsMessageContent(
-        sessionID, messageID, aiContent, reasoning, null);
+        sessionID, messageID, aiContent, reasoning, null,
+        dim: abortDim);
     if (upd == null) {
       await dsJSONErr(res, 500, '未找到要更新的消息');
       return;
@@ -661,6 +687,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
       content: savedContent,
       createdAt: rfc3339(now),
       attachments: fileIDs.join(','),
+      dim: abortDim,
     );
     if (!appendDsMessage(u)) {
       await dsJSONErr(res, 500, 'ユーザーメッセージの保存に失敗しました');
@@ -676,6 +703,7 @@ Future<void> handleDsChatAbortSave(HttpRequest req) async {
         content: aiContent,
         createdAt: rfc3339(DateTime.now()),
         reasoning: reasoning,
+        dim: abortDim,
       );
       if (!appendDsMessage(a)) {
         await dsJSONErr(res, 500, '回答の保存に失敗しました');
@@ -758,7 +786,9 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   // 豆包モデルの継続生成でも「考えてから書く」を維持する
   final extraBody = useDoubao ? dbThinkingEnableParam(model) : null;
 
-  final history = getDsMessages(sessionID);
+  // ★ 只把「同一维度」的历史发给模型，豆包与 DeepSeek 互不可见
+  final history = getDsMessages(sessionID,
+      dim: useDoubao ? DS_DIM_DB : DS_DIM_DS);
   var oldReasoning = '';
   if (messageID.isNotEmpty) {
     for (final m in history) {
@@ -848,7 +878,8 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   DsMessage? aiMsg;
   if (messageID.isNotEmpty) {
     final upd = updateDsMessageContent(sessionID, messageID, merged,
-        finalReasoning, useDoubao ? null : usageAcc.snapshot());
+        finalReasoning, useDoubao ? null : usageAcc.snapshot(),
+        dim: useDoubao ? DS_DIM_DB : DS_DIM_DS);
     if (upd != null) {
       aiMsg = upd;
       final sess = getDsSession(sessionID);
@@ -865,6 +896,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
       createdAt: rfc3339(DateTime.now()),
       reasoning: finalReasoning,
       usage: useDoubao ? null : usageAcc.snapshot(),
+      dim: useDoubao ? DS_DIM_DB : DS_DIM_DS,
     );
     appendDsMessage(a);
     aiMsg = a;

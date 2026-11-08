@@ -484,3 +484,271 @@
     border-radius: 10px;
     border: 1px solid #e5e7eb;
 }
+
+/* ============================================================
+   ★ 次元転送演出 v1 ——《ディメンション・ポータル》
+   ─ 豆包 / DeepSeek 维度切换时的过场动画（第一版，已回退）
+   ─ 画面构成：虚空背景 + 旋转放射漩涡 + 翻滚线框立方体
+     + 上飘光粒子 + 霓虹标题 + 进度条
+   ─ 保留的两处技术修复（与视觉风格无关，必须保留）：
+     1) z-index 100080 —— 高于聊天容器(100000)与豆包模态框(100050)，
+        否则整层被盖住，动画在播但看不见。
+     2) .dsc-warp-bg 第一帧即实心，不做自身淡入 —— 否则淡入期间
+        底层消息区的「清空→重填」会透过半透明遮罩露出来，闪一下。
+   ============================================================ */
+#dscDimWarp {
+    position: fixed;
+    inset: 0;
+    z-index: 100080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* 第一帧即实心：遮罩容器不做自身淡入，避免淡入期间底层消息区透出造成闪烁 */
+    opacity: 1;
+    pointer-events: none;
+    /* 强制独立合成层：避免遮罩与底层消息区一起重绘时出现单帧闪烁 */
+    will-change: opacity;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    /* 揭开采用交叉淡入淡出，时长与底层聊天区的渐显保持同步 */
+    transition: opacity .4s linear;
+    /* 维度主题色：单个变量驱动整套画面，.dsc-warp-db / -ds 只需覆盖它 */
+    --wp: #a855f7;
+    --wp-rgb: 168, 85, 247;
+    --wp-dim: #1a0b33;
+}
+#dscDimWarp.dsc-warp-db {
+    --wp: #a855f7;
+    --wp-rgb: 168, 85, 247;
+    --wp-dim: #1a0b33;
+}
+#dscDimWarp.dsc-warp-ds {
+    --wp: #38bdf8;
+    --wp-rgb: 56, 189, 248;
+    --wp-dim: #08203a;
+}
+#dscDimWarp.dsc-warp-in  { opacity: 1; }
+#dscDimWarp.dsc-warp-out { opacity: 0; }
+
+/* 1. 虚空背景 ─ 第一帧就完全遮住底层 */
+#dscDimWarp .dsc-warp-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 1;
+    background:
+        radial-gradient(circle at 50% 50%,
+            var(--wp-dim) 0%,
+            #0a0a12 60%,
+            #000 100%);
+}
+
+/* 2. 放射漩涡 ─ 190vmax 巨型放射条纹，缓慢旋转并整层放大 */
+#dscDimWarp .dsc-warp-vortex {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 190vmax;
+    height: 190vmax;
+    margin-left: -95vmax;
+    margin-top: -95vmax;
+    opacity: 0;
+    transform: scale(.25);
+    transform-origin: 50% 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(var(--wp-rgb), 0) 0deg,
+        rgba(var(--wp-rgb), .16) 2.5deg,
+        rgba(var(--wp-rgb), 0) 5deg
+    );
+    animation: dscWarpSpin 2.6s linear infinite;
+    animation-play-state: paused;
+    transition: opacity .3s ease, transform .5s cubic-bezier(.16, .9, .3, 1);
+}
+#dscDimWarp.dsc-warp-go .dsc-warp-vortex {
+    opacity: 1;
+    transform: scale(1);
+    animation-play-state: running;
+}
+
+/* 3. 线框立方体 ─ 六面 3D 翻滚 */
+#dscDimWarp .dsc-warp-cube {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 62px;
+    height: 62px;
+    margin: -31px 0 0 -31px;
+    opacity: 0;
+    transform-style: preserve-3d;
+    perspective: 620px;
+    animation: dscWarpCube 3.4s linear infinite;
+    animation-play-state: paused;
+    transition: opacity .3s ease;
+}
+#dscDimWarp.dsc-warp-go .dsc-warp-cube {
+    opacity: 1;
+    animation-play-state: running;
+}
+#dscDimWarp .dsc-warp-cube s {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 62px;
+    height: 62px;
+    background: rgba(var(--wp-rgb), .05);
+    border: 2px solid var(--wp);
+    box-shadow:
+        0 0 12px rgba(var(--wp-rgb), .55),
+        inset 0 0 12px rgba(var(--wp-rgb), .35);
+}
+#dscDimWarp .dsc-warp-cube s:nth-child(1) { transform: translateZ(31px); }
+#dscDimWarp .dsc-warp-cube s:nth-child(2) { transform: rotateY(180deg) translateZ(31px); }
+#dscDimWarp .dsc-warp-cube s:nth-child(3) { transform: rotateY(90deg) translateZ(31px); }
+#dscDimWarp .dsc-warp-cube s:nth-child(4) { transform: rotateY(-90deg) translateZ(31px); }
+#dscDimWarp .dsc-warp-cube s:nth-child(5) { transform: rotateX(90deg) translateZ(31px); }
+#dscDimWarp .dsc-warp-cube s:nth-child(6) { transform: rotateX(-90deg) translateZ(31px); }
+
+/* 4. 上飘光粒子 ─ 18 颗，位置与延迟由 JS 内联指定 */
+#dscDimWarp .dsc-warp-p {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 72%;
+    opacity: 0;
+    transition: opacity .3s ease;
+}
+#dscDimWarp.dsc-warp-go .dsc-warp-p { opacity: 1; }
+#dscDimWarp .dsc-warp-p i {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--wp);
+    box-shadow: 0 0 8px rgba(var(--wp-rgb), .9);
+    opacity: 0;
+    animation: dscWarpP 2.2s ease-out infinite;
+}
+
+/* 5. 文字与进度 */
+#dscDimWarp .dsc-warp-core {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    opacity: 0;
+    transition: opacity .3s ease;
+}
+#dscDimWarp.dsc-warp-go .dsc-warp-core { opacity: 1; }
+
+#dscDimWarp .dsc-warp-title {
+    font-size: clamp(1.05rem, 4.4vmin, 1.7rem);
+    font-weight: 800;
+    letter-spacing: .1em;
+    color: #fff;
+    text-shadow:
+        0 0 14px var(--wp),
+        0 0 28px rgba(var(--wp-rgb), .6);
+}
+
+#dscDimWarp .dsc-warp-sub {
+    margin-top: 10px;
+    font-size: clamp(.7rem, 2.6vmin, .88rem);
+    letter-spacing: .06em;
+    color: rgba(255, 255, 255, .72);
+    text-shadow: 0 0 10px rgba(var(--wp-rgb), .5);
+}
+
+#dscDimWarp .dsc-warp-bar {
+    width: clamp(150px, 42vmin, 260px);
+    height: 3px;
+    margin: 18px auto 0;
+    border-radius: 2px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, .14);
+    box-shadow: 0 0 10px rgba(var(--wp-rgb), .35);
+}
+#dscDimWarp .dsc-warp-bar > b {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg,
+        rgba(var(--wp-rgb), .45),
+        var(--wp));
+    box-shadow: 0 0 10px rgba(var(--wp-rgb), .8);
+    transition: width 1.02s cubic-bezier(.22, .8, .28, 1);
+}
+
+/* ── 关键帧 ─────────────────────────────────────────── */
+@keyframes dscWarpSpin {
+    from { transform: rotate(0deg) scale(1); }
+    to   { transform: rotate(360deg) scale(1); }
+}
+@keyframes dscWarpCube {
+    0%   { transform: rotateX(0deg) rotateY(0deg); }
+    100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+@keyframes dscWarpP {
+    0%   { opacity: 0; transform: translateY(0) scale(.6); }
+    22%  { opacity: .95; }
+    100% { opacity: 0; transform: translateY(-62vh) scale(1.15); }
+}
+
+/* ── 响应式 ─────────────────────────────────────────── */
+@media (max-width: 480px) {
+    #dscDimWarp .dsc-warp-cube {
+        width: 50px;
+        height: 50px;
+        margin: -25px 0 0 -25px;
+    }
+    #dscDimWarp .dsc-warp-cube s {
+        width: 50px;
+        height: 50px;
+    }
+    #dscDimWarp .dsc-warp-cube s:nth-child(1) { transform: translateZ(25px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(2) { transform: rotateY(180deg) translateZ(25px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(3) { transform: rotateY(90deg) translateZ(25px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(4) { transform: rotateY(-90deg) translateZ(25px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(5) { transform: rotateX(90deg) translateZ(25px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(6) { transform: rotateX(-90deg) translateZ(25px); }
+    #dscDimWarp .dsc-warp-title { letter-spacing: .06em; }
+}
+
+@media (min-width: 1200px) {
+    #dscDimWarp .dsc-warp-cube {
+        width: 74px;
+        height: 74px;
+        margin: -37px 0 0 -37px;
+    }
+    #dscDimWarp .dsc-warp-cube s {
+        width: 74px;
+        height: 74px;
+    }
+    #dscDimWarp .dsc-warp-cube s:nth-child(1) { transform: translateZ(37px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(2) { transform: rotateY(180deg) translateZ(37px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(3) { transform: rotateY(90deg) translateZ(37px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(4) { transform: rotateY(-90deg) translateZ(37px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(5) { transform: rotateX(90deg) translateZ(37px); }
+    #dscDimWarp .dsc-warp-cube s:nth-child(6) { transform: rotateX(-90deg) translateZ(37px); }
+}
+
+/* 无障碍：降低动态偏好时只留静态构图 */
+@media (prefers-reduced-motion: reduce) {
+    #dscDimWarp,
+    #dscDimWarp .dsc-warp-vortex,
+    #dscDimWarp .dsc-warp-cube,
+    #dscDimWarp .dsc-warp-core,
+    #dscDimWarp .dsc-warp-p {
+        transition-duration: .12s;
+    }
+    #dscDimWarp .dsc-warp-vortex,
+    #dscDimWarp .dsc-warp-cube,
+    #dscDimWarp .dsc-warp-p i {
+        animation: none !important;
+    }
+    #dscDimWarp.dsc-warp-go .dsc-warp-vortex { opacity: .45; transform: scale(1); }
+    #dscDimWarp.dsc-warp-go .dsc-warp-p { opacity: 0; }
+    #dscDimWarp .dsc-warp-bar > b { transition: width .3s linear; }
+}
