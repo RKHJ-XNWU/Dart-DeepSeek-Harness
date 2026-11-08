@@ -15,7 +15,7 @@
     var STORAGE_KEY = 'dsc_ui_lang';
     // 言語切替が成立したらページを再読込する（辞書適用漏れを確実に消す）
     var RELOAD_ON_LANG_CHANGE = true;
-    var DEFAULT_LANG = 'zh';
+    var DEFAULT_LANG = 'ja';
     var LANGS = ['ja', 'zh', 'en', 'ko', 'ru', 'fr'];
     var LANG_LABEL = {
         ja: '日本語', zh: '中文', en: 'English',
