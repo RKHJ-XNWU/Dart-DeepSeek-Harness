@@ -2192,7 +2192,7 @@
         var openAll = !!state.srcOpenAll;
         var html = '<div class="dsc-src-head" role="button" tabindex="0">' +
             '<span class="dsc-src-ic">🔗</span>' +
-            '<span class="dsc-src-tt">' + dscT('联网来源') + ' · ' + items.length + '</span>' +
+            '<span class="dsc-src-tt">' + dscT('ネット検索ソース') + ' · ' + items.length + '</span>' +
             '<span class="dsc-src-arrow">' + (openAll ? '▾' : '▸') + '</span>' +
             '</div><div class="dsc-src-list">';
         for (var i = 0; i < items.length; i++) {

@@ -371,6 +371,7 @@ DeepSeek ディメンション|Dimension DeepSeek
 ⏳ 方舟が動画を前処理中（抽帧）… # 秒|⏳ Ark prétraite la vidéo (extraction d'images)… # s
 ✅ 動画の準備完了。回答を生成します…|✅ Vidéo prête. Génération de la réponse…
 件を準備します|élément(s), préparation
+ネット検索ソース|Source réseau
 
 ☁️ 方舟へアップロード中 |☁️ Téléversement vers Ark 
 ☁️ 方舟へアップロード開始（|☁️ Début du téléversement vers Ark (

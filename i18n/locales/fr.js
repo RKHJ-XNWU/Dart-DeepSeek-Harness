@@ -1563,4 +1563,5 @@ I18N.add('fr', `
 豆包音声生成|génération vocale Doubao
 豆包画像生成|image Doubao
 豆包動画生成|vidéo Doubao
+ネット検索ソース|Source réseau
 `);
