@@ -17,6 +17,7 @@ import 'ds_crypto.dart';
 import 'net.dart';
 import 'deepseek_api.dart';
 import 'globals.dart';
+import 'virtual_display.dart';
 
 // ------------------------------------------------------------
 // 工作区 & 常量
@@ -40,6 +41,202 @@ const int fastPollIntervalMs = 40;
 const int fastPollMaxMs = 900;
 const Duration fgCacheTTL = Duration(milliseconds: 800);
 const Duration uiCacheTTL = Duration(milliseconds: 300);
+
+// ------------------------------------------------------------
+// adb shell 通道（本机无线调试，uid=2000 shell）
+//   旧 Shizuku 権限は取り消し済み。input / am / pm / dumpsys /
+//   uiautomator / settings / appops / wm / screencap 等の
+//   システム級コマンドは Termux 応用 uid では実行できないため、
+//   adb shell（uid=2000、Shizuku 相当の権限）へ振り分ける。
+// ------------------------------------------------------------
+const String dsAdbSerial = '127.0.0.1:5555';
+const Duration adbReadyTTL = Duration(seconds: 15);
+
+String _adbBin = '';
+bool _adbReady = false;
+DateTime _adbReadyAt = DateTime.fromMillisecondsSinceEpoch(0);
+Future<bool>? _adbEnsureTask;
+String _adbLastError = '';
+
+/// 需要 shell(uid=2000) 身份才能执行的命令头。
+const Set<String> _shellUidCmds = <String>{
+  'input', 'am', 'pm', 'cmd', 'dumpsys', 'uiautomator', 'settings',
+  'content', 'wm', 'svc', 'media', 'monkey', 'appops', 'screencap',
+  'screenrecord', 'ime', 'getprop', 'setprop', 'pidof', 'ps',
+  'kill', 'pkill', 'top', 'logcat', 'dpm',
+};
+
+String _resolveAdbBin() {
+  if (_adbBin.isNotEmpty && _adbBin != 'adb') return _adbBin;
+  for (final p in const <String>[
+    '/data/data/com.termux/files/usr/bin/adb',
+    '/usr/bin/adb',
+    '/system/bin/adb',
+  ]) {
+    try {
+      if (File(p).existsSync()) {
+        _adbBin = p;
+        return _adbBin;
+      }
+    } catch (_) {}
+  }
+  _adbBin = 'adb';
+  return _adbBin;
+}
+
+String adbBinPath() => _resolveAdbBin();
+
+bool adbChannelReady() =>
+    _adbReady && DateTime.now().difference(_adbReadyAt) < adbReadyTTL;
+
+String adbLastError() => _adbLastError;
+
+/// 确保 adb 通道在线：start-server → connect → 校验 uid=2000/0。
+Future<bool> ensureAdbChannel({bool force = false}) async {
+  if (!force && adbChannelReady()) return true;
+  final running = _adbEnsureTask;
+  if (running != null) return running;
+  final task = _ensureAdbChannelImpl();
+  _adbEnsureTask = task;
+  try {
+    return await task;
+  } finally {
+    _adbEnsureTask = null;
+  }
+}
+
+Future<bool> _ensureAdbChannelImpl() async {
+  final bin = _resolveAdbBin();
+  try {
+    await runProcess(bin, const ['start-server'],
+        timeout: const Duration(seconds: 8));
+  } catch (_) {}
+  try {
+    await runProcess(bin, const ['connect', dsAdbSerial],
+        timeout: const Duration(seconds: 8));
+  } catch (_) {}
+  var out = '';
+  try {
+    final r = await runProcess(bin, const ['-s', dsAdbSerial, 'shell', 'id'],
+        timeout: const Duration(seconds: 8));
+    out = r.out;
+  } catch (e) {
+    out = '$e';
+  }
+  var ok = out.contains('uid=2000') || out.contains('uid=0');
+  if (!ok) {
+    // 兜底：直接跑项目自带的 adb_up.sh（起 daemon + connect + 校验）
+    try {
+      final script = '${Directory.current.path}/adb_up.sh';
+      if (File(script).existsSync()) {
+        await runProcess('sh', [script], timeout: const Duration(seconds: 25));
+        final r2 = await runProcess(bin, const ['-s', dsAdbSerial, 'shell', 'id'],
+            timeout: const Duration(seconds: 8));
+        out = r2.out;
+        ok = out.contains('uid=2000') || out.contains('uid=0');
+      }
+    } catch (_) {}
+  }
+  _adbReady = ok;
+  if (ok) {
+    _adbReadyAt = DateTime.now();
+    _adbLastError = '';
+  } else {
+    _adbLastError = out.trim().isEmpty ? 'adb 応答なし' : out.trim();
+    if (_adbLastError.length > 200) {
+      _adbLastError = _adbLastError.substring(0, 200);
+    }
+  }
+  return ok;
+}
+
+bool _adbLinkLost(String s) {
+  final low = s.toLowerCase();
+  if (low.contains('unauthorized') ||
+      low.contains('failed to connect') ||
+      low.contains('cannot connect') ||
+      low.contains('no devices/emulators')) {
+    return true;
+  }
+  return low.contains('device ') &&
+      (low.contains('not found') || low.contains('offline'));
+}
+
+/// 直接执行 adb shell 命令（掉线自动重连重试一次）。
+Future<ProcResult> runViaAdb(String cmdStr, {Duration? timeout}) async {
+  final bin = _resolveAdbBin();
+  final t = timeout ?? const Duration(seconds: 30);
+  var r = await runProcess(bin, ['-s', dsAdbSerial, 'shell', cmdStr], timeout: t);
+  if (_adbLinkLost(r.out)) {
+    final ok = await ensureAdbChannel(force: true);
+    if (ok) {
+      r = await runProcess(bin, ['-s', dsAdbSerial, 'shell', cmdStr], timeout: t);
+    }
+  }
+  final out = r.out.replaceAll('\r\n', '\n').replaceAll('\r', '');
+  return ProcResult(out, r.code, r.timedOut);
+}
+
+/// 引号感知的 `;` 分段：`input text 'a;b'` 不会被切开。
+List<String> splitShellSegments(String cmd) {
+  final out = <String>[];
+  final buf = StringBuffer();
+  String? quote;
+  var esc = false;
+  for (var i = 0; i < cmd.length; i++) {
+    final ch = cmd[i];
+    if (esc) {
+      buf.write(ch);
+      esc = false;
+      continue;
+    }
+    if (ch == '\\') {
+      buf.write(ch);
+      esc = true;
+      continue;
+    }
+    if (quote != null) {
+      if (ch == quote) quote = null;
+      buf.write(ch);
+      continue;
+    }
+    if (ch == "'" || ch == '"') {
+      quote = ch;
+      buf.write(ch);
+      continue;
+    }
+    if (ch == ';') {
+      out.add(buf.toString());
+      buf.clear();
+      continue;
+    }
+    buf.write(ch);
+  }
+  if (buf.isNotEmpty) out.add(buf.toString());
+  return out
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList(growable: false);
+}
+
+/// 该段命令是否必须以 shell(uid=2000) 身份执行。
+bool segNeedsShellUid(String seg) {
+  var s = seg.trim();
+  if (s.isEmpty) return false;
+  var guard = 0;
+  while (guard++ < 8) {
+    final first = s.split(RegExp(r'\s+')).first;
+    if (!RegExp(r'^[A-Za-z_][A-Za-z0-9_]*=').hasMatch(first)) break;
+    s = s.substring(first.length).trim();
+    if (s.isEmpty) return false;
+  }
+  if (s.isEmpty) return false;
+  var head = s.split(RegExp(r'\s+')).first;
+  final slash = head.lastIndexOf('/');
+  if (slash >= 0) head = head.substring(slash + 1);
+  head = head.replaceAll(RegExp(r'^[()]+'), '');
+  return _shellUidCmds.contains(head);
+}
 
 // ------------------------------------------------------------
 // 进程执行辅助（带超时）
@@ -145,10 +342,46 @@ class SmartShellResult {
 Future<SmartShellResult> runSmartShell(String workdir, String cmdStr,
     {Duration? timeout}) async {
   if (shizukuDisabled && containsShizukuInvocation(cmdStr)) {
-    return const SmartShellResult('🚫 Shizuku 権限は取り消し済みのため、関連コマンドの実行を拒否しました', false, 1);
+    return const SmartShellResult(
+        '🚫 旧権限チャンネルの呼び出しは無効化されています。システム操作は adb shell 通道（adb_shell）を使用してください',
+        false, 1);
   }
-  final r = await runRawShell(workdir, cmdStr, timeout: timeout);
-  return SmartShellResult(r.out, false, r.code);
+  final segs = splitShellSegments(cmdStr);
+  if (segs.isEmpty) return const SmartShellResult('', false, 0);
+  final needsAdb = segs.any(segNeedsShellUid);
+  if (!needsAdb) {
+    final r = await runRawShell(workdir, cmdStr, timeout: timeout);
+    return SmartShellResult(r.out, false, r.code);
+  }
+  final per = timeout ?? const Duration(seconds: 30);
+  final online = await ensureAdbChannel();
+  if (!online) {
+    final r = await runRawShell(workdir, cmdStr, timeout: timeout);
+    final hint = '\n⚠️ adb shell 通道がオフラインです（$_adbLastError）。'
+        'Termux で ddsh/adb_up.sh を実行してください';
+    return SmartShellResult('${r.out}$hint', false, r.code);
+  }
+  final sb = StringBuffer();
+  var code = 0;
+  var yielder = 0;
+  for (final seg in segs) {
+    final ProcResult r;
+    if (segNeedsShellUid(seg)) {
+      r = await runViaAdb(seg, timeout: per);
+    } else {
+      final rr = await runRawShell(workdir, seg, timeout: per);
+      r = ProcResult(rr.out, rr.code, rr.timedOut);
+    }
+    if (r.out.isNotEmpty) {
+      if (sb.isNotEmpty) sb.write('\n');
+      sb.write(r.out);
+      if (++yielder % 24 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    code = r.code;
+  }
+  return SmartShellResult(sb.toString(), true, code);
 }
 
 Future<String> runShellCtx(String workdir, String cmdStr,
@@ -509,6 +742,15 @@ List<Map<String, dynamic>> buildDsTools() {
             ['command'])),
     fnTool('shizuku_install_rish', 'rish を自動デプロイします。',
         objSchema({'target_dir': str('対象ディレクトリ')})),
+    fnTool('adb_status', 'adb shell 通道の状態を検出します（uid=2000）。',
+        objSchema({})),
+    fnTool('adb_connect', 'adb 無線デバッグへ再接続します（127.0.0.1:5555）。',
+        objSchema({})),
+    fnTool(
+        'adb_shell',
+        'adb shell（uid=2000）でコマンドを実行します。input / am / pm / dumpsys / settings など。',
+        objSchema({'command': str('命令'), 'timeout': integer('タイムアウト秒数')},
+            ['command'])),
     fnTool(
         'batch_tap',
         '複数のクリックをまとめて実行します。',
@@ -833,13 +1075,66 @@ List<Map<String, dynamic>> buildDsTools() {
         ])),
     fnTool('cosplay_remove', 'キャラクターライブラリから 1 件削除します（ライブラリ管理用。スイッチがオフでも使用可能）。',
         objSchema({'id': str('削除するキャラクターの id。')}, ['id'])),
+    // ---- 虚拟屏幕（专属：所有 UI 操作在副屏执行，不抢主屏焦点） ----
+    fnTool('vd_status', '虚拟屏幕状态（displayId / 规格 / 是否就绪）。', objSchema({})),
+    fnTool(
+        'vd_create',
+        '创建虚拟屏幕（副屏）。之后可用 vd_* 工具在该屏操作，主屏可继续刷视频/打游戏不被抢焦点。',
+        objSchema({
+          'width': integer('宽，默认 720'),
+          'height': integer('高，默认 1280'),
+          'dpi': integer('密度，默认 320'),
+        })),
+    fnTool('vd_destroy', '关闭并移除虚拟屏幕。', objSchema({})),
+    fnTool(
+        'vd_launch',
+        '在虚拟屏幕上启动应用：包名 / 包名+Activity / https URL。',
+        objSchema({
+          'target': str('包名，如 com.android.settings；或 pkg/.Act；或 https URL')
+        }, [
+          'target'
+        ])),
+    fnTool('vd_tap', '在虚拟屏幕上点击。',
+        objSchema({'x': integer('X'), 'y': integer('Y')}, ['x', 'y'])),
+    fnTool(
+        'vd_swipe',
+        '在虚拟屏幕上滑动。',
+        objSchema({
+          'x1': integer('起点X'),
+          'y1': integer('起点Y'),
+          'x2': integer('终点X'),
+          'y2': integer('终点Y'),
+          'duration_ms': integer('时长毫秒，默认 300'),
+        }, [
+          'x1',
+          'y1',
+          'x2',
+          'y2'
+        ])),
+    fnTool('vd_key', '在虚拟屏幕上发送按键（keycode，如 4=返回）。',
+        objSchema({'keycode': integer('keycode')}, ['keycode'])),
+    fnTool('vd_text', '在虚拟屏幕上输入文本（含中文时走剪贴板粘贴）。',
+        objSchema({'text': str('文本')}, ['text'])),
+    fnTool('vd_screenshot', '抓取虚拟屏幕截图。',
+        objSchema({'save_path': str('保存路径，默认 /sdcard/.ds_vd_shot_<ts>.png')})),
+    fnTool(
+        'vd_ocr',
+        '对虚拟屏幕画面做 OCR（uiautomator 不支持副屏，只能走截图 OCR）。',
+        objSchema({'lang': str('语言，默认 chi_sim+eng')})),
+    fnTool(
+        'vd_observe',
+        '汇总虚拟屏幕感知：状态 + 截图 + OCR。',
+        objSchema({
+          'ocr': boolean('是否同时 OCR，默认 true'),
+          'lang': str('OCR 语言'),
+        })),
   ];
 }
 
 // ------------------------------------------------------------
 // 工具执行实现
 // ------------------------------------------------------------
-Future<String> execToolShizukuDisabled() async {
+Future<String> execToolshizukuDisabled() async {
   return '🚫 Shizuku 権限は取り消し済みのため、AI にシステム権限がありません';
 }
 
@@ -1045,7 +1340,7 @@ Future<String> execToolOCRScreen(Map<String, dynamic> args) async {
   if (tessPath.isEmpty) return 'tesseract がインストールされていません。実行してください: pkg install tesseract';
 
   final tmpImg =
-      '/data/local/tmp/ds_ocr_${DateTime.now().microsecondsSinceEpoch}.png';
+      '/sdcard/.ds_ocr_${DateTime.now().microsecondsSinceEpoch}.png';
   await runSmartShell('', 'screencap -p $tmpImg',
       timeout: const Duration(seconds: 15));
   if (!File(tmpImg).existsSync()) return 'スクリーンショットファイルが存在しません: $tmpImg';
@@ -1263,18 +1558,28 @@ Future<String> execToolKeyEvent(Map<String, dynamic> args) async {
 }
 
 Future<String> execToolStartApp(Map<String, dynamic> args) async {
-  if (shizukuDisabled) {
-    // 与 Go 版一致：无特权时仍尝试 am start（本地 sh 通常无権限）
-    final pkg = mStr(args, 'package').trim();
-    if (pkg.isEmpty) return 'package は必須です';
-    await runSmartShell('', 'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $pkg',
-        timeout: const Duration(seconds: 3));
-    invalidateFgCache();
-    final fg = await getForegroundPackage();
-    if (fg == pkg) return '✅ $pkg を起動しました';
-    return '🚫 システム権限がありません（Shizuku 取り消し済み）。アプリを起動できないため、ユーザーが手動で開いてください';
+  final pkg = mStr(args, 'package').trim();
+  if (pkg.isEmpty) return 'package は必須です';
+  final r = await runSmartShell(
+      '',
+      'am start -a android.intent.action.MAIN '
+      '-c android.intent.category.LAUNCHER -p $pkg',
+      timeout: const Duration(seconds: 6));
+  invalidateFgCache();
+  final fg = await getForegroundPackage();
+  if (fg == pkg) return '✅ $pkg を起動しました（adb shell / uid=2000）';
+  final low = r.out.toLowerCase();
+  if (low.contains('error') ||
+      low.contains('does not exist') ||
+      low.contains('unable to resolve') ||
+      low.contains('exception')) {
+    return '❌ $pkg の起動に失敗しました: ${r.out.trim()}';
   }
-  return '🚫 システム権限がありません';
+  if (!adbChannelReady()) {
+    return '⚠️ adb shell 通道がオフラインです。Termux で ddsh/adb_up.sh を実行してください（${adbLastError()}）';
+  }
+  return '⚠️ am start は送信しましたが、前面が $pkg になっていません'
+      '（現在: ${fg.isEmpty ? '不明' : fg}）\n${r.out.trim()}';
 }
 
 Future<String> execToolCurrentApp() async {
@@ -1386,17 +1691,39 @@ Future<String> execToolFindElement(Map<String, dynamic> args) async {
 Future<String> execToolScreenshot(Map<String, dynamic> args) async {
   var savePath = mStr(args, 'save_path');
   if (savePath.isEmpty) {
-    savePath = 'screenshot_${DateTime.now().millisecondsSinceEpoch ~/ 1000}.png';
+    savePath =
+        'screenshot_${DateTime.now().millisecondsSinceEpoch ~/ 1000}.png';
   }
   final absPath = resolveToolPath(savePath);
   final dir = absPath.substring(0, absPath.lastIndexOf('/'));
   ensureDir(dir);
-  await runSmartShell('', 'screencap -p ${shellQuote(absPath)}',
-      timeout: const Duration(seconds: 8));
+  // adb shell（uid=2000）は Termux 私有ディレクトリへ書き込めないため、
+  // /sdcard へ一時出力してから Termux 側でコピーする。
+  final tmp = '/sdcard/.ds_shot_${DateTime.now().microsecondsSinceEpoch}.png';
+  await runSmartShell('', 'screencap -p $tmp',
+      timeout: const Duration(seconds: 10));
+  var copied = false;
+  try {
+    if (File(tmp).existsSync()) {
+      File(tmp).copySync(absPath);
+      copied = true;
+    }
+  } catch (_) {}
+  try {
+    if (File(tmp).existsSync()) File(tmp).deleteSync();
+  } catch (_) {}
+  if (!copied) {
+    await runSmartShell('', 'screencap -p ${shellQuote(absPath)}',
+        timeout: const Duration(seconds: 8));
+  }
   var size = 0;
   try {
     size = File(absPath).lengthSync();
   } catch (_) {}
+  if (size == 0) {
+    return '⚠️ スクリーンショットを取得できませんでした'
+        '（adb 状態: ${adbChannelReady() ? 'ONLINE' : 'OFFLINE ${adbLastError()}'}）';
+  }
   return '✅ スクリーンショット: $absPath ($size バイト)';
 }
 
@@ -1527,11 +1854,14 @@ Future<String> execToolExecuteCommand(Map<String, dynamic> args) async {
       timeout: Duration(seconds: timeout));
   var out = r.out;
   var prefix = '';
-  if (shizukuDisabled && containsPermissionError(out)) {
-    prefix = '⚠️ [システム権限なし] ';
-    out += '\n\n💡 ヒント: 現在システム権限がありません（Shizuku 取り消し済み）のため、特権が必要なシステムコマンドは実行できません。';
+  if (containsPermissionError(out)) {
+    prefix = '⚠️ [adbd 権限不足] ';
+    out += '\n\n💡 ヒント: このコマンドは adb shell（uid=2000）でも拒否されました。'
+        'adb 通道の状態は adb_status で確認できます。';
   }
-  if (r.code != 0 && out.isEmpty) return '${prefix}実行に失敗しました（終了コード ${r.code}）';
+  if (r.code != 0 && out.isEmpty) {
+    return '${prefix}実行に失敗しました（終了コード ${r.code}）';
+  }
   if (out.isEmpty) out = '(成功、出力なし)';
   if (out.length > 64 * 1024) out = '${out.substring(0, 64 * 1024)}\n...[截断]';
   return '$prefix$out';
@@ -2030,10 +2360,301 @@ Future<String> execToolFetch(Map<String, dynamic> args) async {
   }
 }
 
+Future<String> execToolAdbStatus() async {
+  final bin = _resolveAdbBin();
+  final ok = await ensureAdbChannel(force: true);
+  final dev = await runProcess(bin, const ['devices'],
+      timeout: const Duration(seconds: 6));
+  final id = await runProcess(bin, const ['-s', dsAdbSerial, 'shell', 'id'],
+      timeout: const Duration(seconds: 6));
+  final sb = StringBuffer();
+  sb.write(ok ? '✅ adb shell 通道 ONLINE\n' : '❌ adb shell 通道 OFFLINE\n');
+  sb.write('bin: $bin\nserial: $dsAdbSerial\n');
+  sb.write('devices: ${dev.out.trim()}\n');
+  sb.write('shell id: ${id.out.trim()}\n');
+  if (!ok) sb.write('hint: Termux で ddsh/adb_up.sh を実行してください\n');
+  return sb.toString();
+}
+
+Future<String> execToolAdbConnect() async {
+  final ok = await ensureAdbChannel(force: true);
+  if (!ok) {
+    return '❌ 接続できませんでした: ${adbLastError()}\n'
+        '設定 → 開発者向けオプション → ワイヤレス デバッグ を確認してください';
+  }
+  final id = await runViaAdb('id', timeout: const Duration(seconds: 6));
+  return '✅ $dsAdbSerial に接続しました\n${id.out.trim()}';
+}
+
+Future<String> execToolAdbShell(Map<String, dynamic> args) async {
+  final cmdStr = mStr(args, 'command');
+  if (cmdStr.trim().isEmpty) return 'command は必須です';
+  var timeout = intArgDefault(args, 'timeout', 30);
+  if (timeout <= 0) timeout = 30;
+  if (timeout > maxCmdTimeout) timeout = maxCmdTimeout;
+  final ok = await ensureAdbChannel();
+  if (!ok) {
+    return '🚫 adb shell 通道がオフラインです（${adbLastError()}）。'
+        'Termux で ddsh/adb_up.sh を実行してください';
+  }
+  final r = await runViaAdb(cmdStr, timeout: Duration(seconds: timeout));
+  var out = r.out;
+  if (out.isEmpty) out = '(成功、出力なし)';
+  if (out.length > 64 * 1024) out = '${out.substring(0, 64 * 1024)}\n...[截断]';
+  return '✅ adb shell (uid=2000): $cmdStr\n$out';
+}
+
 // ------------------------------------------------------------
 // 工具路由
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// 豆包专属工具模式 —— 虚拟屏幕强制网关
+//
+// 需求：豆包模式下所有 UI 自动化必须跑在虚拟屏幕（副屏）上，
+//       主屏焦点不被抢占、主屏上正在运行的应用不被打断。
+// 做法：deepseek_api 在豆包模型的工具执行批次前后置位 dsVdForce，
+//       本网关把「主屏操作 / 主屏感知」类工具整体重定向到 vd_* 实现，
+//       副屏未就绪时由 vdTap / vdSwipe / ... 内部的 vdEnsure() 自动创建。
+// 实测限制：副屏的 uiautomator dump 会被系统静默忽略（仍 dump 主屏），
+//       因此按 text / resource_id 定位的调用无法在副屏完成，
+//       这类请求返回明确说明，引导模型改用 vd_observe / vd_ocr + 坐标操作。
+// ------------------------------------------------------------
+
+String _vdPfx(String s) => '【虚拟屏】$s';
+
+/// 返回非 null 表示已接管（返回值即最终结果）。
+Future<String?> dsVdIntercept(String name, Map<String, dynamic> args) async {
+  switch (name) {
+    case 'tap':
+      return _vdTapRoute(args);
+    case 'long_press':
+      return _vdLongPressRoute(args);
+    case 'swipe':
+      return _vdSwipeRoute(args);
+    case 'input_text':
+      return _vdTextRoute(args);
+    case 'key_event':
+      return _vdKeyRoute(args);
+    case 'start_app':
+      return _vdLaunchRoute(args);
+    case 'screenshot':
+      return _vdShotRoute(args);
+    case 'ocr_screen':
+    case 'get_screen_text':
+      return _vdOcrRoute(args);
+    case 'screen_size':
+      return _vdSizeRoute();
+    case 'batch_tap':
+      return _vdBatchTapRoute(args);
+    case 'batch_swipe':
+      return _vdBatchSwipeRoute(args);
+    case 'ui_dump':
+    case 'find_element':
+    case 'wait_for_element':
+      return _vdPfx('副屏不支持 uiautomator dump（--display 被系统静默忽略），'
+          'UI 树定位不可用。请改用 vd_observe / vd_ocr 取得文字与坐标，'
+          '再用 vd_tap / vd_swipe 按坐标操作。');
+  }
+  return null;
+}
+
+Future<String> _vdTapRoute(Map<String, dynamic> args) async {
+  final x = intArg(args, 'x');
+  final y = intArg(args, 'y');
+  if (x == null || y == null) {
+    final t = mStr(args, 'text');
+    final rid = mStr(args, 'resource_id');
+    if (t.isNotEmpty || rid.isNotEmpty) {
+      return _vdPfx('副屏没有 UI 树，无法按「$t$rid」定位元素。'
+          '请先 vd_ocr / vd_observe 取得坐标，再用 vd_tap 按坐标点击。');
+    }
+    return _vdPfx('x / y 座標がありません');
+  }
+  final r = await vdTap(x, y);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdLongPressRoute(Map<String, dynamic> args) async {
+  final x = intArg(args, 'x');
+  final y = intArg(args, 'y');
+  var dur = intArgDefault(args, 'duration_ms', defaultLongPressDur);
+  if (dur < 50) dur = 50;
+  if (x == null || y == null) {
+    return _vdPfx('長押しには x / y 座標が必要です（副屏は UI 樹で検索できません）');
+  }
+  final r = await vdSwipe(x, y, x, y, durMs: dur);
+  return _vdPfx('${r.output}（長押し $dur ms）');
+}
+
+Future<String> _vdSwipeRoute(Map<String, dynamic> args) async {
+  var dur = intArgDefault(args, 'duration_ms', defaultSwipeDur);
+  if (dur < 50) dur = 50;
+  final dir = mStr(args, 'direction').trim().toLowerCase();
+  int x1;
+  int y1;
+  int x2;
+  int y2;
+  if (dir.isNotEmpty) {
+    const w = vdDefaultWidth;
+    const h = vdDefaultHeight;
+    final cx = w ~/ 2;
+    final cy = h ~/ 2;
+    if (dir == 'up') {
+      x1 = cx;
+      y1 = (h * 0.75).toInt();
+      x2 = cx;
+      y2 = (h * 0.25).toInt();
+    } else if (dir == 'down') {
+      x1 = cx;
+      y1 = (h * 0.25).toInt();
+      x2 = cx;
+      y2 = (h * 0.75).toInt();
+    } else if (dir == 'left') {
+      x1 = (w * 0.85).toInt();
+      y1 = cy;
+      x2 = (w * 0.15).toInt();
+      y2 = cy;
+    } else if (dir == 'right') {
+      x1 = (w * 0.15).toInt();
+      y1 = cy;
+      x2 = (w * 0.85).toInt();
+      y2 = cy;
+    } else {
+      return _vdPfx('不明な方向: $dir（up / down / left / right のいずれか）');
+    }
+  } else {
+    final sx = intArg(args, 'start_x');
+    final sy = intArg(args, 'start_y');
+    final ex = intArg(args, 'end_x');
+    final ey = intArg(args, 'end_y');
+    if (sx == null || sy == null || ex == null || ey == null) {
+      return _vdPfx('direction か座標ペア（start_x/start_y/end_x/end_y）が必要です');
+    }
+    x1 = sx;
+    y1 = sy;
+    x2 = ex;
+    y2 = ey;
+  }
+  final r = await vdSwipe(x1, y1, x2, y2, durMs: dur);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdTextRoute(Map<String, dynamic> args) async {
+  final text = mStr(args, 'text');
+  if (text.isEmpty) return _vdPfx('text は必須です');
+  final r = await vdText(text);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdKeyRoute(Map<String, dynamic> args) async {
+  final kc = intArg(args, 'keycode');
+  if (kc != null) {
+    final r = await vdKey(kc);
+    return _vdPfx(r.output);
+  }
+  final k = mStr(args, 'key').trim().toLowerCase();
+  const map = <String, int>{
+    'back': 4,
+    'home': 3,
+    'recent': 187,
+    'recents': 187,
+    'enter': 66,
+    'menu': 82,
+    'delete': 67,
+    'del': 67,
+    'power': 26,
+    'volume_up': 24,
+    'volume_down': 25,
+    'tab': 61,
+    'search': 84,
+    'escape': 111,
+    'esc': 111,
+  };
+  final code = map[k];
+  if (code == null) {
+    return _vdPfx('未知のキー: $k（keycode を指定してください）');
+  }
+  final r = await vdKey(code);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdLaunchRoute(Map<String, dynamic> args) async {
+  final pkg = mStr(args, 'package').trim();
+  final act = mStr(args, 'activity').trim();
+  if (pkg.isEmpty) return _vdPfx('package は必須です');
+  final target = act.isEmpty
+      ? pkg
+      : (act.startsWith('.') ? '$pkg$act' : '$pkg/$act');
+  final r = await vdLaunch(target);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdShotRoute(Map<String, dynamic> args) async {
+  final p = mStr(args, 'save_path');
+  final r = await vdScreenshot(savePath: p);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdOcrRoute(Map<String, dynamic> args) async {
+  final lang = mStr(args, 'lang').trim();
+  final r = await vdOcr(lang: lang.isEmpty ? 'chi_sim+eng' : lang);
+  return _vdPfx(r.output);
+}
+
+Future<String> _vdSizeRoute() async {
+  final st = await vdEnsure();
+  if (!st.ready) {
+    return _vdPfx('副屏が未準備です（spec="${st.spec}"）。vd_create を先に実行してください。');
+  }
+  return _vdPfx('虚拟屏幕 ${vdDefaultWidth}x${vdDefaultHeight}'
+      '（displayId=${st.displayId}, spec="${st.spec}"）');
+}
+
+Future<String> _vdBatchTapRoute(Map<String, dynamic> args) async {
+  final pts = asList(args['points']);
+  if (pts.isEmpty) return _vdPfx('points は必須です');
+  final intervalMs = intArgDefault(args, 'interval_ms', 100);
+  final sb = StringBuffer();
+  var n = 0;
+  for (final raw in pts) {
+    final m = asMap(raw);
+    final x = intArg(m, 'x');
+    final y = intArg(m, 'y');
+    if (x == null || y == null) {
+      sb.write('  ⏭ 座標なしの項目をスキップ（副屏は UI 樹で検索できません）\n');
+      continue;
+    }
+    if (n > 0 && intervalMs > 0) {
+      await Future<void>.delayed(Duration(milliseconds: intervalMs));
+    }
+    final r = await vdTap(x, y);
+    sb.write('  ($x,$y) → ${r.ok ? 'OK' : r.output}\n');
+    n++;
+  }
+  if (n == 0) return _vdPfx('有効な座標がありません');
+  return _vdPfx('$n 点を副屏でクリック:\n$sb');
+}
+
+Future<String> _vdBatchSwipeRoute(Map<String, dynamic> args) async {
+  final acts = asList(args['actions']);
+  if (acts.isEmpty) return _vdPfx('actions は必須です');
+  final sb = StringBuffer();
+  var n = 0;
+  for (final raw in acts) {
+    final m = asMap(raw);
+    final out = await _vdSwipeRoute(m);
+    sb.write('  ${out.replaceFirst('【虚拟屏】', '')}\n');
+    n++;
+  }
+  return _vdPfx('$n 回のスワイプを副屏で実行:\n$sb');
+}
+
 Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
+  // 豆包专属工具模式：UI 操作与感知一律重定向到虚拟屏幕，主屏不受影响。
+  if (dsVdForce) {
+    final intercepted = await dsVdIntercept(name, args);
+    if (intercepted != null) return intercepted;
+  }
   switch (name) {
     // Shizuku 全部禁用（与 Go 版 shizukuDisabled=true 行为一致）
     case 'shizuku_status':
@@ -2042,6 +2663,13 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
     case 'shizuku_exec':
     case 'shizuku_install_rish':
       return '🚫 Shizuku 権限は取り消し済みのため、AI にシステム権限がありません';
+
+    case 'adb_status':
+      return execToolAdbStatus();
+    case 'adb_connect':
+      return execToolAdbConnect();
+    case 'adb_shell':
+      return execToolAdbShell(args);
 
     case 'batch_tap':
       return execToolBatchTap(args);
@@ -2213,6 +2841,28 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
       return execToolCosplayUpsert(args);
     case 'cosplay_remove':
       return execToolCosplayRemove(args);
+    case 'vd_status':
+      return execToolVdStatus(args);
+    case 'vd_create':
+      return execToolVdCreate(args);
+    case 'vd_destroy':
+      return execToolVdDestroy(args);
+    case 'vd_launch':
+      return execToolVdLaunch(args);
+    case 'vd_tap':
+      return execToolVdTap(args);
+    case 'vd_swipe':
+      return execToolVdSwipe(args);
+    case 'vd_key':
+      return execToolVdKey(args);
+    case 'vd_text':
+      return execToolVdText(args);
+    case 'vd_screenshot':
+      return execToolVdScreenshot(args);
+    case 'vd_ocr':
+      return execToolVdOcr(args);
+    case 'vd_observe':
+      return execToolVdObserve(args);
     default:
       return '不明なツール: $name';
   }
@@ -2222,4 +2872,89 @@ void initDsWorkspace() {
   ensureDir(dsWorkspaceDir);
   logp('🔧 ツールワークスペース: $dsWorkspaceDir');
   logp('🚫 [Shizuku] 権限は取り消し済みのため、自動昇格をスキップします');
+}
+
+// ------------------------------------------------------------
+// 虚拟屏幕工具实现（virtual_display.dart）
+// ------------------------------------------------------------
+Future<String> execToolVdStatus(Map<String, dynamic> args) async {
+  final st = await vdState(force: true);
+  return 'configured=${st.configured} displayId=${st.displayId} '
+      'spec="${st.spec}" ready=${st.ready}';
+}
+
+Future<String> execToolVdCreate(Map<String, dynamic> args) async {
+  final w = intArgDefault(args, 'width', vdDefaultWidth);
+  final h = intArgDefault(args, 'height', vdDefaultHeight);
+  final d = intArgDefault(args, 'dpi', vdDefaultDpi);
+  final st = await vdEnsure(width: w, height: h, dpi: d);
+  if (!st.ready) {
+    return '❌ 虚拟屏幕创建失败：configured=${st.configured} spec="${st.spec}"';
+  }
+  return '✅ 虚拟屏幕就绪：displayId=${st.displayId} spec="${st.spec}"';
+}
+
+Future<String> execToolVdDestroy(Map<String, dynamic> args) async {
+  final st = await vdDestroy();
+  return '✅ 虚拟屏幕已关闭（configured=${st.configured}）';
+}
+
+Future<String> execToolVdLaunch(Map<String, dynamic> args) async {
+  final target = mStr(args, 'target');
+  final r = await vdLaunch(target);
+  return r.output;
+}
+
+Future<String> execToolVdTap(Map<String, dynamic> args) async {
+  final x = intArgDefault(args, 'x', -1);
+  final y = intArgDefault(args, 'y', -1);
+  if (x < 0 || y < 0) return 'x 与 y 必须为非负整数';
+  final r = await vdTap(x, y);
+  return r.output;
+}
+
+Future<String> execToolVdSwipe(Map<String, dynamic> args) async {
+  final x1 = intArgDefault(args, 'x1', -1);
+  final y1 = intArgDefault(args, 'y1', -1);
+  final x2 = intArgDefault(args, 'x2', -1);
+  final y2 = intArgDefault(args, 'y2', -1);
+  if (x1 < 0 || y1 < 0 || x2 < 0 || y2 < 0) return 'x1/y1/x2/y2 必须为非负整数';
+  final dur = intArgDefault(args, 'duration_ms', 300);
+  final r = await vdSwipe(x1, y1, x2, y2, durMs: dur);
+  return r.output;
+}
+
+Future<String> execToolVdKey(Map<String, dynamic> args) async {
+  final kc = intArg(args, 'keycode');
+  if (kc == null) return 'keycode 必填';
+  final r = await vdKey(kc);
+  return r.output;
+}
+
+Future<String> execToolVdText(Map<String, dynamic> args) async {
+  final t = mStr(args, 'text');
+  if (t.isEmpty) return 'text 不能为空';
+  final r = await vdText(t);
+  return r.output;
+}
+
+Future<String> execToolVdScreenshot(Map<String, dynamic> args) async {
+  final p = mStr(args, 'save_path');
+  final r = await vdScreenshot(savePath: p);
+  return r.output;
+}
+
+Future<String> execToolVdOcr(Map<String, dynamic> args) async {
+  var lang = mStr(args, 'lang');
+  if (lang.isEmpty) lang = 'chi_sim+eng';
+  final r = await vdOcr(lang: lang);
+  return r.output;
+}
+
+Future<String> execToolVdObserve(Map<String, dynamic> args) async {
+  final ocr = mBool(args, 'ocr', true);
+  var lang = mStr(args, 'lang');
+  if (lang.isEmpty) lang = 'chi_sim+eng';
+  final r = await vdObserve(withOcr: ocr, lang: lang);
+  return r.output;
 }

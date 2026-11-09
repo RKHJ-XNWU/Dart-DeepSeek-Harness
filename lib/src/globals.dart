@@ -73,28 +73,54 @@ String escDs(String s) {
 }
 
 String unescDs(String s) {
+  // ★ 快速路径：不含转义符的字符串原样返回，零分配。
+  //   indexOf 走的是引擎内建的高效扫描，比逐字符 writeCharCode 快一个量级。
+  final first = s.indexOf('\\');
+  if (first < 0) return s;
+  // ★ 跳段处理：只在转义符处切分，中间整段一次性写出。
+  //   旧实现逐字符写 StringBuffer，长思考链（数十万字符）下是纯开销；
+  //   语义与旧实现完全等价（孤立反斜杠原样保留）。
   final out = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    final c = s.codeUnitAt(i);
-    if (c == 0x5C && i + 1 < s.length) {
-      final n = s.codeUnitAt(i + 1);
+  var i = 0;
+  final len = s.length;
+  while (i < len) {
+    final j = s.indexOf('\\', i);
+    if (j < 0) {
+      out.write(s.substring(i));
+      break;
+    }
+    // 自适应：短间隔用逐字符写出，避免 substring 分配开销；
+    // 长间隔用 substring 一次写出，靠引擎内建拷贝。
+    final gap = j - i;
+    if (gap > 0) {
+      if (gap <= 24) {
+        for (var k = i; k < j; k++) {
+          out.writeCharCode(s.codeUnitAt(k));
+        }
+      } else {
+        out.write(s.substring(i, j));
+      }
+    }
+    if (j + 1 < len) {
+      final n = s.codeUnitAt(j + 1);
       if (n == 0x6E) {
         out.writeCharCode(0x0A);
-        i++;
+        i = j + 2;
         continue;
       }
       if (n == 0x70) {
         out.writeCharCode(0x7C);
-        i++;
+        i = j + 2;
         continue;
       }
       if (n == 0x5C) {
         out.writeCharCode(0x5C);
-        i++;
+        i = j + 2;
         continue;
       }
     }
-    out.writeCharCode(c);
+    out.writeCharCode(0x5C);
+    i = j + 1;
   }
   return out.toString();
 }
@@ -2079,3 +2105,7 @@ bool dsIsDeviceIntent(String text) {
   }
   return false;
 }
+
+/// 豆包专属工具模式：置位期间 UI 操作走虚拟屏幕（副屏），主屏不受影响。
+/// 由 deepseek_api.dart 在豆包模型的工具执行批次前后置位 / 复位。
+bool dsVdForce = false;

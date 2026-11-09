@@ -28,7 +28,7 @@ const List<String> dbWikiAllowedSources = <String>[
   'douyin', // 抖音百科
   'toutiao', // 头条图文
   'moji', // 墨迹天气
-  'search_engine', // 全网检索（插件默认）
+  'search_engine', // 全网检索（默认搜索，每月免费两万额度）
 ];
 
 /// 规整信源列表：去空、去重、只保留白名单内的值。
@@ -856,8 +856,9 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
     logp('🖼️ 工具混用：附帯画像 ${wikiMedia.length} 枚を input_image として送信');
   }
 
-  final fnTools =
-      dbWikiToolsFromChat(dsToolSchemaProvider?.call() ?? const []);
+  // 这里只需要「非 DeepSeek 通道」这一信息，故直接传 ark 标记，
+  // 避免在 doubao_wiki 里反向依赖 doubao.dart（会造成循环 import）。
+  final fnTools = dbWikiToolsFromChat(dsResolveTools(model, 'ark'));
   final tools = <Map<String, dynamic>>[
     {'type': 'web_search', 'sources': src},
     ...fnTools,

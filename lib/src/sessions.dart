@@ -8,6 +8,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
@@ -169,20 +170,56 @@ SessionFile readDsSessionFile(String path, {String? dim}) {
   return SessionFile(sess, msgs);
 }
 
-DsMessage? parseDsMessageLine(String line) {
-  final t = line.trim();
-  if (!t.startsWith('#M|')) return null;
-  final parts = t.substring(3).split('|');
-  if (parts.length < 4) return null;
-  final d = parts.length >= 8 ? parts[7].trim() : DS_DIM_DS;
+DsMessage? parseDsMessageLine(String line, {int maxReasoningUnits = 0}) {
+  final len = line.length;
+  var i = 0;
+  while (i < len && line.codeUnitAt(i) <= 0x20) {
+    i++;
+  }
+  if (i + 3 > len) return null;
+  if (line.codeUnitAt(i) != 0x23 ||
+      line.codeUnitAt(i + 1) != 0x4D ||
+      line.codeUnitAt(i + 2) != 0x7C) {
+    return null; // 非 "#M|" 开头
+  }
+
+  // ★ 用 indexOf 链代替整行 split('|')：
+  //   split 会把每个字段都复制成新字符串，思考链字段动辄数十万字符，
+  //   预览路径只需要前缀，全量复制纯属浪费（长会话打开卡顿的主因之一）。
+  //   这里只复制需要的片段，超长思考链按 maxReasoningUnits 截前缀。
+  final f = <String>[];
+  var pos = i + 3;
+  while (f.length < 8) {
+    final e = line.indexOf('|', pos);
+    if (e < 0) {
+      // 与原实现 line.trim() 语义对齐：末字段去掉尾部空白
+      f.add(line.substring(pos).trimRight());
+      break;
+    }
+    if (f.length == 5 &&
+        maxReasoningUnits > 0 &&
+        e - pos > maxReasoningUnits) {
+      f.add(line.substring(pos, pos + maxReasoningUnits));
+    } else {
+      f.add(line.substring(pos, e));
+    }
+    pos = e + 1;
+  }
+  if (f.length < 4) return null;
+
+  final d = f.length >= 8 ? f[7].trim() : DS_DIM_DS;
+  final reaCut = f.length >= 6 &&
+      maxReasoningUnits > 0 &&
+      f[5].length >= maxReasoningUnits;
   return DsMessage(
-    id: parts[0],
-    role: parts[1],
-    content: unescDs(parts[2]),
-    createdAt: parts[3],
-    attachments: parts.length >= 5 ? parts[4] : '',
-    reasoning: parts.length >= 6 ? unescDs(parts[5]) : '',
-    usage: dsParseUsageField(parts),
+    id: f[0],
+    role: f[1],
+    content: unescDs(f[2]),
+    createdAt: f[3],
+    attachments: f.length >= 5 ? f[4] : '',
+    reasoning: f.length >= 6 ? unescDs(f[5]) : '',
+    reasoningTruncated: reaCut,
+    usage: dsParseUsageField(f),
     dim: d.isEmpty ? DS_DIM_DS : d,
   );
 }
@@ -206,54 +243,100 @@ TailResult readDsSessionTailMsgs(String path, int limit, {String? dim}) {
     if (size == 0) return const TailResult([], false);
     if (limit <= 0) limit = DS_MSG_PAGE_SIZE;
 
-    const blockSize = 64 * 1024;
-    var tail = <int>[];
-    var offset = size;
-    int countNewlines(List<int> b) {
-      var n = 0;
-      for (final c in b) {
-        if (c == 0x0A) n++;
-      }
-      return n;
+    int mtimeMs;
+    try {
+      mtimeMs = File(path).statSync().modified.millisecondsSinceEpoch;
+    } catch (_) {
+      mtimeMs = 0;
+    }
+    final dimKey = dim ?? '';
+    final cached = _dsTailCache[path];
+    if (cached != null &&
+        cached.size == size &&
+        cached.mtimeMs == mtimeMs &&
+        cached.limit == limit &&
+        cached.dimKey == dimKey) {
+      return cached.result;
     }
 
-    // ★ 维度过滤后条数可能不足 limit，需按倍数扩大读取窗口，
-    //   直到够用或已读到文件头。
+    const blockSize = 64 * 1024;
+    var offset = size;
+    var newlines = 0;
     var needLines = limit + 2;
+    final chunks = <List<int>>[];
     var msgs = <DsMessage>[];
     var headTruncated = false;
+
     while (true) {
-      while (offset > 0 && countNewlines(tail) < needLines) {
+      // ★ 性能关键：扩窗阶段只做「字节级换行计数」，不解码、不切分、不解析。
+      //   旧实现把 decode + split + 全量 parse 放在这个内层 while 里，
+      //   每追加一块就把整个窗口重新解析一遍（O(n²)）；
+      //   长会话 + 长思考链时这是打开历史卡顿的主因。
+      while (offset > 0 && newlines < needLines) {
         var readSize = blockSize;
         if (offset < readSize) readSize = offset.toInt();
         offset -= readSize;
         raf.setPositionSync(offset);
         final chunk = raf.readSync(readSize);
-        tail = [...chunk, ...tail];
+        chunks.add(chunk);
+        for (var i = 0; i < chunk.length; i++) {
+          if (chunk[i] == 0x0A) newlines++;
+        }
       }
 
-      var lines = utf8.decode(tail, allowMalformed: true).split('\n');
+      // 窗口确定后只合并、解码、解析各一次
+      var total = 0;
+      for (final c in chunks) {
+        total += c.length;
+      }
+      final buf = Uint8List(total);
+      var pos = 0;
+      for (var i = chunks.length - 1; i >= 0; i--) {
+        final c = chunks[i];
+        buf.setRange(pos, pos + c.length, c);
+        pos += c.length;
+      }
+
+      var lines = utf8.decode(buf, allowMalformed: true).split('\n');
       headTruncated = offset > 0;
       if (headTruncated && lines.isNotEmpty) {
         lines = lines.sublist(1); // 首行可能被截断
       }
+
       msgs = <DsMessage>[];
       for (final ln in lines) {
-        final m = parseDsMessageLine(ln);
+        // 预览上限：DS_REASONING_PREVIEW 个 rune 最多占 2 倍码元，
+        // 预留转义余量后取 8K 码元足够，避免解析整条长思考链。
+        final m = parseDsMessageLine(ln,
+            maxReasoningUnits: DS_REASONING_PREVIEW * 2 + 4096);
         if (m == null) continue;
         if (dim != null && m.dim != dim) continue;
         msgs.add(m);
       }
+
       if (msgs.length >= limit + 1 || offset <= 0) break;
-      needLines *= 2;
+      // ★ 防 64 位溢出：needLines 无限翻倍会变成负数，导致提前退出、
+      //   只读到文件尾部几条（已实测复现）。超过上限直接再读一轮即停。
+      if (needLines > (1 << 30)) {
+        needLines = 1 << 30;
+        if (newlines < needLines && offset <= 0) break;
+      } else {
+        needLines *= 2;
+      }
     }
 
+    TailResult out;
     if (msgs.length > limit) {
-      final sliced = msgs.sublist(msgs.length - limit);
-      return TailResult(sliced, true);
+      out = TailResult(msgs.sublist(msgs.length - limit), true);
+    } else {
+      // 按维度过滤时，若读取窗口已做过头部截断，说明更早处仍有内容
+      out = TailResult(msgs, dim != null ? headTruncated : false);
     }
-    // 按维度过滤时，若读取窗口已做过头部截断，说明更早处仍有内容
-    return TailResult(msgs, dim != null ? headTruncated : false);
+    _dsTailCache[path] = _DsTailEntry(size, mtimeMs, limit, dimKey, out);
+    while (_dsTailCache.length > _DS_TAIL_CACHE_MAX) {
+      _dsTailCache.remove(_dsTailCache.keys.first);
+    }
+    return out;
   } finally {
     try {
       raf.closeSync();
@@ -262,9 +345,26 @@ TailResult readDsSessionTailMsgs(String path, int limit, {String? dim}) {
 }
 
 (String, bool) truncateReasoning(String s, int max) {
-  final r = s.runes.toList();
-  if (r.length <= max) return (s, false);
-  return (String.fromCharCodes(r.sublist(0, max)), true);
+  if (max <= 0) return ('', s.isNotEmpty);
+  // ★ 快速路径：UTF-16 长度已不超过上限，必然无需截断。
+  //   旧实现无条件 s.runes.toList()，等于把整条思考链展开成 List<int>；
+  //   40 条长思考链时这里是几十万到上百万次装箱分配，是打开历史卡顿的主因之一。
+  if (s.length <= max) return (s, false);
+  // ★ 只向前扫描到第 max 个 rune 即停，O(max) 而非 O(n)，
+  //   同时按代理对边界切分，避免把 emoji / 生僻字劈成半个码元。
+  var n = 0;
+  var i = 0;
+  final len = s.length;
+  while (i < len && n < max) {
+    final c = s.codeUnitAt(i);
+    if (c >= 0xD800 && c <= 0xDBFF && i + 1 < len) {
+      i += 2;
+    } else {
+      i += 1;
+    }
+    n++;
+  }
+  return (s.substring(0, i), true);
 }
 
 // ------------------------------------------------------------
@@ -444,6 +544,20 @@ class _DsMsgsEntry {
   const _DsMsgsEntry(this.size, this.mtimeMs, this.msgs, this.chars);
 }
 
+/// ★ 尾部页缓存：会话来回切换时直接命中，避免重复读盘/解码。
+///   key 由「文件大小 + mtime + limit + 维度」共同决定，任一变化即失效。
+class _DsTailEntry {
+  final int size;
+  final int mtimeMs;
+  final int limit;
+  final String dimKey;
+  final TailResult result;
+  const _DsTailEntry(this.size, this.mtimeMs, this.limit, this.dimKey, this.result);
+}
+
+final Map<String, _DsTailEntry> _dsTailCache = <String, _DsTailEntry>{};
+const int _DS_TAIL_CACHE_MAX = 8;
+
 final Map<String, _DsHeaderEntry> _dsHeaderCache = <String, _DsHeaderEntry>{};
 final Map<String, _DsMsgsEntry> _dsMsgsCache = <String, _DsMsgsEntry>{};
 int _dsMsgsCacheChars = 0;
@@ -504,12 +618,14 @@ DsSession? readDsSessionHeaderFast(String path) {
 
 void invalidateDsSessionCaches(String path) {
   _dsHeaderCache.remove(path);
+  _dsTailCache.remove(path);
   final old = _dsMsgsCache.remove(path);
   if (old != null) _dsMsgsCacheChars -= old.chars;
 }
 
 void invalidateAllDsSessionCaches() {
   _dsHeaderCache.clear();
+  _dsTailCache.clear();
   _dsMsgsCache.clear();
   _dsMsgsCacheChars = 0;
 }

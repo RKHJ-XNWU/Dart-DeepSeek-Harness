@@ -22,6 +22,7 @@ import 'package:ddsh/src/cosplay.dart';
 import 'package:ddsh/src/deepseek_api.dart';
 import 'package:ddsh/src/devtools.dart';
 import 'package:ddsh/src/doubao.dart';
+import 'package:ddsh/src/doubao_tools.dart';
 import 'package:ddsh/src/doubao_realtime.dart';
 import 'package:ddsh/src/files.dart';
 import 'package:ddsh/src/forum.dart';
@@ -243,6 +244,9 @@ Future<void> _serveMain(List<String> args) async {
 
   // 工具模式：注入 schema 提供者与执行器
   dsToolSchemaProvider = buildDsTools;
+  // 豆包专属工具模式：按模型档位裁剪工具集（doubao_tools.dart）
+  dsDbToolSchemaProvider = buildDbTools;
+  dsDbModelDetector = dbIsDoubaoModel;
   dsToolExecutor = (name, args) => executeDsTool(name, args);
 
   registerRoutes();

@@ -17,6 +17,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'doubao_wiki.dart';
+import 'doubao_thinking.dart';
 import 'ds_crypto.dart';
 import 'files.dart';
 import 'globals.dart';
@@ -51,6 +52,8 @@ const List<DbModelSpec> dbModelCatalog = <DbModelSpec>[
       'doubao-seedream-5-0-pro-260628', 'Doubao-Seedream-5.0-pro（高精度画像生成）', 'image'),
   DbModelSpec('doubao-seededit-3-0-i2i-250628',
       '豆包 SeedEdit 3.0（画像編集・P图モデル）', 'imageedit'),
+  DbModelSpec('doubao-seedance-2-5-260628',
+      'Doubao-Seedance-2.5（次世代動画生成・4-30秒・4K対応）', 'video'),
   DbModelSpec('doubao-seedance-2-0-mini-260615', 'Doubao-Seedance-2.0-mini（動画生成）',
       'video'),
   DbModelSpec('doubao-seedance-2-0-fast-260128',
@@ -284,9 +287,9 @@ List<String> get dbVideoCapableModels =>
 /// 构造「开启深度思考」参数：让豆包在理解图片 / 音频 / 视频后
 /// 先思考再回答。仅 doubao-seed 系列接受该字段。
 Map<String, dynamic>? dbThinkingEnableParam(String model) {
-  final m = model.trim().toLowerCase();
-  if (m.isEmpty) return null;
-  if (!m.startsWith('doubao-seed')) return null;
+  final prof = dbThinkingProfileOf(model);
+  if (prof.model.isEmpty) return null;
+  if (!prof.acceptsThinking || prof.alwaysThinking) return null;
   return <String, dynamic>{
     'thinking': <String, dynamic>{'type': 'enabled'},
   };
@@ -295,9 +298,9 @@ Map<String, dynamic>? dbThinkingEnableParam(String model) {
 /// 明确关闭深度思考（仅 doubao-seed 系列接受该字段）。
 /// 与 dbThinkingParam 的区别：不受 fastMode 开关约束，由调用方按需决定。
 Map<String, dynamic>? dbThinkingDisableParam(String model) {
-  final m = model.trim().toLowerCase();
-  if (m.isEmpty) return null;
-  if (!m.startsWith('doubao-seed')) return null;
+  final prof = dbThinkingProfileOf(model);
+  if (prof.model.isEmpty) return null;
+  if (!prof.acceptsThinking || prof.alwaysThinking) return null;
   return <String, dynamic>{
     'thinking': <String, dynamic>{'type': 'disabled'},
   };
@@ -573,9 +576,30 @@ String dbChatEndpoint() => '${dbBaseUrl(null)}/chat/completions';
 Map<String, dynamic>? dbThinkingParam(String model) {
   final cfg = getDbConfig();
   if (!cfg.fastMode) return null;
-  final m = model.toLowerCase();
-  if (!m.startsWith('doubao-seed')) return null;
+  // 用能力表判定，而不是「doubao-seed 前缀」：
+  // 部分第三方模型（glm-5-3 / kimi）不接受 thinking 字段，传了就是 400。
+  final prof = dbThinkingProfileOf(model);
+  if (!prof.acceptsThinking || prof.alwaysThinking) return null;
   return <String, dynamic>{'type': 'disabled'};
+}
+
+/// reasoning_effort：方舟「调节思考长度」的旋钮（Chat API 字段）。
+///
+/// 这是降低思考链卡顿的第一杠杆：summary 型模型的包间延迟与
+/// 思维链总长度正相关，把默认 high 降到 medium/low，整段思考的
+/// 突发块数明显减少，配合 DbThinkSmoother 的节拍重排，
+/// 前端看到的就是连续滚动而不是「停一下蹦一段」。
+///
+/// 返回 null 表示本次不传（不支持的模型 / 快速模式已关闭思考）。
+String? dbReasoningEffortParam(String model,
+    {int level = 30, String mode = 'auto'}) {
+  final prof = dbThinkingProfileOf(model);
+  if (!prof.supportsEffort) return null;
+  final cfg = getDbConfig();
+  // 快速模式 = 明确不思考，再传 effort 没有意义
+  if (mode == 'off' || (mode == 'auto' && cfg.fastMode)) return null;
+  final e = dbEffortFromLevel(level, prof);
+  return e.isEmpty ? null : e;
 }
 
 /// 该模型是否属于豆包（方舟）目录 —— 用于普通聊天里的自动路由判定
@@ -1223,7 +1247,10 @@ Future<Map<String, dynamic>> dbCreateVideoTask({
   }
   var dur = duration;
   if (dur < 4) dur = 4;
-  if (dur > 15) dur = 15;
+  // Seedance 2.5（doubao-seedance-2-5-*）官方支持 4-30 秒；
+  // 其余 2.0 / 1.x 系列网关上限仍为 15 秒，按模型分别钳制。
+  final maxDur = useModel.toLowerCase().contains('seedance-2-5') ? 30 : 15;
+  if (dur > maxDur) dur = maxDur;
   final body = <String, dynamic>{
     'model': useModel,
     'content': [

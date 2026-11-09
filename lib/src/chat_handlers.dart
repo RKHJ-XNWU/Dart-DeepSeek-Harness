@@ -235,7 +235,9 @@ DsMessage _msgWithReasoningPreview(DsMessage m, String sessionID) {
     createdAt: m.createdAt,
     attachments: m.attachments,
     reasoning: r.$1,
-    reasoningTruncated: r.$2,
+    // ★ 解析层若已按预览上限截断，这里必须一并保留标记，
+    //   否则前端会误判「思考链已完整」而不给展开入口。
+    reasoningTruncated: r.$2 || m.reasoningTruncated,
     usage: m.usage,
     dim: m.dim,
   );

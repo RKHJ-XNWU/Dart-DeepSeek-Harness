@@ -147,7 +147,9 @@
                 lastWikiTap = now;
                 setWikiTotal(!isWikiOn());
             });
-            panel.appendChild(b);
+            /* 与专属工具按钮同源修复：末尾 appendChild 会被挤出横向滚动区，
+               改插到首位，保证手机窄屏首屏可见。 */
+            panel.insertBefore(b, panel.firstChild);
         }
         syncWikiBtnUI();
     }
@@ -1559,7 +1561,7 @@
         var grid = el('div', 'dsc-db-grid');
         grid.appendChild(field('アスペクト比', select('dscDbVidRatio', RATIOS, '16:9')));
         grid.appendChild(field('解像度', select('dscDbVidRes', ['480p', '720p', '1080p', '4K'], '720p')));
-        grid.appendChild(field('長さ（秒）', select('dscDbVidDur', ['4', '5', '6', '8', '10', '12', '15'], '5')));
+        grid.appendChild(field('長さ（秒）', select('dscDbVidDur', ['4', '5', '6', '8', '10', '12', '15', '20', '25', '30'], '5')));
         grid.appendChild(field('モデル', select('dscDbVidModel', [])));
         md.appendChild(grid);
         md.appendChild(switchRow('dscDbVidAudio', '音声も生成する', 'セリフ・効果音つきの動画を生成（対応モデルのみ）', true));

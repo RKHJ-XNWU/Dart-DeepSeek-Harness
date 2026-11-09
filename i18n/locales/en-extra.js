@@ -377,3 +377,25 @@ DeepSeek ディメンション|DeepSeek Dimension
 ☁️ 方舟へアップロード開始（|☁️ Starting upload to Ark (
 🎞️ 512MB 超のためローカルで圧縮中（元 |🎞️ Over 512MB, compressing locally (original 
 `);
+
+// —— 豆包专属工具模式 / 前缀强制信源（doubao_tools + doubao_intent）——
+I18N.add('en', `
+豆包専用ツールモード|Doubao Tool Mode
+豆包専用ツールモード：オン（クリックでオフ）|Doubao Tool Mode: ON (click to turn off)
+豆包専用ツールモード：オフ（クリックでオン）|Doubao Tool Mode: OFF (click to turn on)
+抖音百科が開いているため、豆包ツールモードは使用できません|Douyin Wiki is on, so Doubao Tool Mode is unavailable
+軽量|Light
+標準|Standard
+長行程|Long-run
+百科と天気の情報源を強制適用しました|Wiki and weather sources enforced
+抖音百科を強制適用しました|Douyin Wiki source enforced
+墨迹天気を強制適用しました|Moji Weather source enforced
+情報源を強制適用しました|Source enforced
+`);
+
+/* DB_TOOL_TOAST_V2 */
+I18N.add('en', `
+豆包専用ツールモードをオンにしました（99 ツール・ラウンド無制限）|Doubao Tool Mode is ON (99 tools, unlimited rounds)
+豆包専用ツールモードをオフにしました|Doubao Tool Mode is OFF
+豆包専用ツールモードが利用可能です（99 ツール・ラウンド無制限）|Doubao Tool Mode is available (99 tools, unlimited rounds)
+`);

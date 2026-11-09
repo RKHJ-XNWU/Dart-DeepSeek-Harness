@@ -252,6 +252,19 @@
         document.head.appendChild(script);
     }
 
+    // ★ 逐条排版：MathJax typesetPromise 会把传入容器的全部文本扫一遍，
+    //   之前传入整个消息容器，只要任意一条含 $ / \( / \[ 就整块全量排版，
+    //   长会话打开时这是主线程卡顿的主因之一。改成只对「真正含公式的那几条」排版。
+    function renderMathEach(root) {
+        if (!root) return;
+        if (!window.MathJax || !window.MathJax.typesetPromise) return;
+        var nodes = root.querySelectorAll ? root.querySelectorAll('.dsc-msg') : [];
+        if (!nodes.length) { renderMath(root); return; }
+        for (var i = 0; i < nodes.length; i++) {
+            renderMath(nodes[i]);
+        }
+    }
+
     function renderMath(container) {
         if (!container) return;
         if (!window.MathJax || !window.MathJax.typesetPromise) return;
@@ -1803,7 +1816,9 @@
             state.messages = data.messages || [];
             state.hasMore = !!data.hasMore;
             renderMessages();
-            dscSaveMsgsSnap();
+            // ★ 交给已有的 1200ms 延迟调度：同步 JSON.stringify + localStorage
+            //   写入会直接占住主线程，是打开会话那一下「顿住」的来源之一。
+            dscScheduleMsgsSnap();
         } catch (e) { toast('メッセージの読み込みに失敗', 'error'); }
     }
 
@@ -1869,7 +1884,7 @@
         if (state.keepScroll) {
             var delta = wrap.scrollHeight - state.pendingScrollHeight;
             wrap.scrollTop = state.pendingScrollTop + delta;
-            requestAnimationFrame(function () { renderMath(wrap); });
+            requestAnimationFrame(function () { renderMathEach(wrap); });
             state.keepScroll = false;
         } else {
             void wrap.scrollHeight;
@@ -1882,7 +1897,7 @@
             wrap.scrollTop = wrap.scrollHeight;
             scrollToBottom(true);
             requestAnimationFrame(function () {
-                renderMath(wrap);
+                renderMathEach(wrap);
                 scrollToBottom(true);
             });
             setTimeout(function () { scrollToBottom(true); }, 120);
@@ -1919,7 +1934,7 @@
         }
         var newScrollHeight = wrap.scrollHeight;
         wrap.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
-        requestAnimationFrame(function () { renderMath(wrap); });
+        requestAnimationFrame(function () { renderMathEach(wrap); });
     }
 
     async function loadOlderMessages() {

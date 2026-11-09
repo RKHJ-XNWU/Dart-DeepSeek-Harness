@@ -13,6 +13,9 @@ import 'deepseek_api.dart';
 import 'doubao.dart';
 import 'doubao_video_ark.dart';
 import 'doubao_wiki.dart';
+import 'doubao_intent.dart';
+import 'doubao_thinking.dart';
+import 'doubao_tools.dart';
 import 'ds_crypto.dart';
 import 'ds_usage.dart';
 import 'files.dart';
@@ -21,6 +24,28 @@ import 'httpsrv.dart';
 import 'model_router.dart';
 import 'sessions.dart';
 import 'session_ref.dart';
+
+// ------------------------------------------------------------
+// 工具模式系统提示 / 轮次上限：按通道分流
+//   · 豆包通道 → doubao_tools.dart 的专属提示词与档位轮次
+//   · DeepSeek 通道 → 原有全量提示词与 DS_TOOL_MAX_ITERATIONS
+//   专项适配的好处：lite 档不会被灌进 85 条工具约定的长提示，
+//   首包更快；pro/evolving 档则拿到「可长程编排」的更强约束。
+// ------------------------------------------------------------
+String dbToolSystemPromptFor(String model, String apiUrl, String lang) {
+  if (apiUrl != DS_API_URL) {
+    final p = dbToolAgentPrompt(model, lang);
+    if (p.trim().isNotEmpty) return p;
+  }
+  return dsToolAgentPrompt(lang, DS_TOOL_AGENT_SYSTEM_PROMPT);
+}
+
+int dbToolMaxIterFor(String model, String apiUrl, int rounds) {
+  var maxIter = apiUrl != DS_API_URL ? dbToolMaxRounds(model) : DS_TOOL_MAX_ITERATIONS;
+  if (maxIter <= 0) maxIter = DS_TOOL_MAX_ITERATIONS;
+  if (rounds > maxIter) maxIter = rounds;
+  return maxIter;
+}
 
 // ------------------------------------------------------------
 // SSE：流式发送
@@ -57,8 +82,26 @@ Future<void> handleDsChatSendStream(
 
   /// 尚未准备的大视频 id（在 SSE 建连后走 Files API 上传）
   List<String> pendingVideoIds = const <String>[],
+
+  /// 前缀强制信源（doubao_intent.dart）。
+  /// 非空时无视「抖音百科总闸」与「信源开关」的当前状态：
+  /// 用户在有消息里写了「抖音百科：/百科：/墨迹天气：/天气：」，
+  /// 就必须真的去检索，不允许因为开关关着而静默跳过。
+  List<String> forcedSources = const <String>[],
 }) async {
   final sse = Sse(req.response);
+
+  // ★ 豆包思考链泵（见 doubao_thinking.dart）
+  //   summary 型模型的 reasoning 是「大块突发 + 长空档」，
+  //   这里在服务端就重排成一字级 micro-delta，前端每帧都有新字进来。
+  //   DeepSeek 通道 isArk=false，pump 退化为直通，行为零变化。
+  final reasoningPump = DbReasoningPump(
+    model: model,
+    isArkChannel: apiUrl != DS_API_URL,
+    emit: (String d) {
+      sse.send('reasoning', {'delta': d});
+    },
+  );
 
   // ---------- 大视频：SSE 已建连，后续上传期间由心跳保活 ----------
   if (pendingVideoIds.isNotEmpty) {
@@ -114,8 +157,11 @@ Future<void> handleDsChatSendStream(
     // 工具模式 × 联网内容插件：方舟客服确认 Responses API 的 tools
     // 数组可同时放置 web_search 与 function，由模型自动选择调用，故不再互斥。
     // 仅在豆包通道 + 已开信源 + 无音视频时混用，其余退回原有工具链。
-    final toolWikiSources = (apiUrl != DS_API_URL && webSearch)
-        ? dbWikiEffectiveSources()
+    final toolWikiSources = (apiUrl != DS_API_URL &&
+            (webSearch || forcedSources.isNotEmpty))
+        ? dbResolveSources(
+            forcedSources: forcedSources,
+            configSources: dbWikiEffectiveSources())
         : const <String>[];
     final useWikiTools = toolWikiSources.isNotEmpty &&
         pendingVideoIds.isEmpty &&
@@ -130,11 +176,14 @@ Future<void> handleDsChatSendStream(
     await sse.send('tool_mode_start', {'start': true});
 
     final agentMsgs = <Map<String, dynamic>>[
-      {'role': 'system', 'content': dsToolAgentPrompt(lang, DS_TOOL_AGENT_SYSTEM_PROMPT)},
+      {'role': 'system', 'content': dbToolSystemPromptFor(model, apiUrl, lang)},
       ...apiMessages,
     ];
-    var maxIter = DS_TOOL_MAX_ITERATIONS;
-    if (rounds > maxIter) maxIter = rounds;
+    final maxIter = dbToolMaxIterFor(model, apiUrl, rounds);
+    if (apiUrl != DS_API_URL) {
+      logp('🫘 豆包専用ツールモード: ${dbToolProfileOf(model)} '
+          '／ツール ${dbToolCountOf(model)} 件');
+    }
     logp('🔧 ツールモード起動: 最大 $maxIter 回の反復（Agent システムプロンプト注入済み）');
 
     final toolReasoningBuf = StringBuffer();
@@ -151,6 +200,7 @@ Future<void> handleDsChatSendStream(
           maxIter,
           (s) {
             firstContentAt ??= DateTime.now();
+            reasoningPump.hurry();
             contentBuf.write(s);
             sse.send('content', {'delta': s});
           },
@@ -164,7 +214,7 @@ Future<void> handleDsChatSendStream(
           },
           (s) {
             toolReasoningBuf.write(s);
-            sse.send('reasoning', {'delta': s});
+            reasoningPump.push(s);
           },
           usageAcc,
           mediaParts: mediaParts,
@@ -183,6 +233,7 @@ Future<void> handleDsChatSendStream(
           maxIter,
           (s) {
             firstContentAt ??= DateTime.now();
+            reasoningPump.hurry();
             contentBuf.write(s);
             sse.send('content', {'delta': s});
           },
@@ -196,7 +247,7 @@ Future<void> handleDsChatSendStream(
           },
           (s) {
             toolReasoningBuf.write(s);
-            sse.send('reasoning', {'delta': s});
+            reasoningPump.push(s);
           },
           usageAcc,
           apiUrl: apiUrl,
@@ -237,9 +288,8 @@ Future<void> handleDsChatSendStream(
         'reasoning=${runeLen(toolReasoningBuf.toString())} 字, toolLogs=${toolLogs.length} 条');
 
     if (toolLogs.isEmpty && contentBuf.toString().trim().isEmpty) {
-      await sse.send('reasoning', {
-        'delta': 'AI はこの質問にツール呼び出しが不要と判断し、本文も返しませんでした。\n',
-      });
+      reasoningPump.push(
+          'AI はこの質問にツール呼び出しが不要と判断し、本文も返しませんでした。\n');
     }
 
     final now = DateTime.now();
@@ -315,11 +365,13 @@ Future<void> handleDsChatSendStream(
   // 仅 Responses API 支持，Chat Completions 无法指定；因此这里分流。
   // 仅豆包通道 + 用户显式开启信源 + 纯文本输入时启用。
   final wikiSources = apiUrl != DS_API_URL
-      ? dbWikiEffectiveSources()
+      ? dbResolveSources(
+          forcedSources: forcedSources,
+          configSources: dbWikiEffectiveSources())
       : const <String>[];
   // 图片（image_url）可随 input_image 一起提交，与 web_search 并存；
   // 音频 / 视频在插件通道不保证可用，出现时回退原生多模态。
-  final canUseWiki = webSearch &&
+  final canUseWiki = (webSearch || forcedSources.isNotEmpty) &&
       wikiSources.isNotEmpty &&
       pendingVideoIds.isEmpty &&
       dbWikiMediaSupported(mediaParts);
@@ -336,7 +388,7 @@ Future<void> handleDsChatSendStream(
         (s) {
           reasoningBuf.write(s);
           reasoningStart ??= DateTime.now();
-          sse.send('reasoning', {'delta': s});
+          reasoningPump.push(s);
         },
         (s) {
           if (reasoningStart != null) {
@@ -376,7 +428,7 @@ Future<void> handleDsChatSendStream(
       (s) {
         reasoningBuf.write(s);
         reasoningStart ??= DateTime.now();
-        sse.send('reasoning', {'delta': s});
+        reasoningPump.push(s);
       },
       (s) {
         if (s == '\x00__NEW_ROUND__\x00') {
@@ -459,6 +511,13 @@ Future<void> handleDsChatSendStream(
     thinkingTimeMs = reasoningTotalMs;
   } else if (firstContentAt != null) {
     thinkingTimeMs = firstContentAt!.difference(streamStart).inMilliseconds;
+  }
+
+  // ★ 收尾：先把思考链泵里剩余的字全部吐完，再发 done。
+  //   否则最后一段思考会被 done 截断，前端表现为「思考链少了一截」。
+  await reasoningPump.finish();
+  if (reasoningPump.smoothed) {
+    logp('🧠 思考链平滑: ${reasoningPump.chars} 字已按 micro-delta 重排下发');
   }
 
   await sse.send('done', {
@@ -730,6 +789,20 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   logp('🚀 使用モデル: $model (リクエスト=${mStr(body, 'model')}, 設定=${cfg.model}, '
       '経路=${useDoubao ? '豆包/方舟' : 'DeepSeek'})');
 
+  // ★★ 前缀强制信源（doubao_intent.dart）
+  //   「抖音百科：」「抖音百科搜索：」「百科：」→ 强制 douyin
+  //   「墨迹天气：」「天气：」            → 强制 moji
+  //   判定范围是消息任意位置；前缀本身从正文里剥掉，不进入模型与标题。
+  //   DeepSeek 通道不解析（那套插件只存在于方舟），行为零变化。
+  var dbIntent = useDoubao ? dbParseIntent(content) : DbIntent.none;
+  final List<String> forcedSources =
+      dbIntent.forced ? dbIntent.sources : const <String>[];
+  if (dbIntent.forced) {
+    content = dbIntent.cleaned;
+    logp('📌 信源プレフィックスを検出: ${dbIntent.hits.join(' / ')} '
+        '→ 強制 sources=${forcedSources.join(',')}');
+  }
+
   // ========== 小说模式分流 ==========
   if (novelMode) {
     if (stream) {
@@ -768,7 +841,15 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     }
     rounds = 1;
   }
-  if (useDoubao && enableTools && dbWikiEffectiveSources().isNotEmpty) {
+  // 抖音百科生效（含前缀强制）时工具模式必须让路：
+  // 用户在豆包专属工具模式下打开百科，开关一开就自动关闭工具模式，
+  // 且按钮置灰不可点——这里再做一次服务端强制，防止前端状态不同步。
+  final dbWikiActiveNow = useDoubao &&
+      dbResolveSources(
+              forcedSources: forcedSources,
+              configSources: dbWikiEffectiveSources())
+          .isNotEmpty;
+  if (useDoubao && enableTools && dbWikiActiveNow) {
     enableTools = false;
     logp('🛑 抖音百科が有効なためツールモードを自動解除（検索とツール呼び出しの衝突を根本回避）');
   }
@@ -851,8 +932,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   //   旧实现里 ② 走的却是 DeepSeek 官方搜索（用 DeepSeek Key 计费），
   //   豆包模式白白多打一次国外请求，首包也被拖慢数秒。
   var dbNativeSearch = false;
-  if (webSearch && content.isNotEmpty) {
-    final wikiOn = useDoubao && dbWikiEffectiveSources().isNotEmpty;
+  if ((webSearch || forcedSources.isNotEmpty) && content.isNotEmpty) {
+    final wikiOn = useDoubao && dbWikiActiveNow;
     if (wikiOn) {
       // 插件自己会检索；再叠一次官方搜索就是「两次联网」，首包被拖后数秒。
       logp('🔍 豆包モード：联网内容プラグインが検索を担当するため、公式検索は省略（二重検索回避）');
@@ -928,6 +1009,20 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     dbExtraBody = deepThink
         ? dbThinkingEnableParam(model)
         : dbThinkingDisableParam(model);
+    // ★ 思考长度旋钮（方舟 reasoning_effort）
+    //   「思考链卡」的第一因是 summary 块间延迟，与思维链总长正相关。
+    //   这里按 UI 推理等级把默认 high 降下来，配合服务端 micro-delta
+    //   重排（DbReasoningPump），两者叠加才是真正不卡的组合。
+    final effort = dbReasoningEffortParam(model,
+        level: level, mode: deepThink ? 'on' : 'auto');
+    if (effort != null) {
+      dbExtraBody = <String, dynamic>{
+        ...?dbExtraBody,
+        'reasoning_effort': effort,
+      };
+      logp('🧠 豆包の思考長を調整: reasoning_effort=$effort'
+          '（推論レベル $level / ${dbThinkingProfileOf(model)}）');
+    }
   }
   // ★ 豆包自带联网搜索（百科关闭 + 联网开启）：Chat Completions 的
   //   web_search_options 直接由方舟执行检索，消耗豆包搜索免费额度。
@@ -1083,11 +1178,12 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   if (stream && !longTextMode) {
     await handleDsChatSendStream(req, callKey, model, apiMessages,
         maxTokens, temperature, rounds, sessionID, content, fileIDs, useTools,
-        webSearch: webSearch,
+        webSearch: webSearch || forcedSources.isNotEmpty,
         route: route,
         apiUrl: callUrl,
         extraBody: dbExtraBody,
         lang: uiLang,
+        forcedSources: forcedSources,
         userPrompt: deferVideoPrepare ? userPrompt : '',
         mediaParts: dbMediaParts,
         pendingVideoIds:
@@ -1100,13 +1196,14 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     logp('🔧 ツールモードを有効化し、マルチターンの function calling を開始します（最大 $DS_TOOL_MAX_ITERATIONS ラウンド）');
     final usageAcc = DsUsageAcc();
     final agentMsgs = <Map<String, dynamic>>[
-      {'role': 'system', 'content': dsToolAgentPrompt(uiLang, DS_TOOL_AGENT_SYSTEM_PROMPT)},
+      {'role': 'system', 'content': dbToolSystemPromptFor(model, callUrl, uiLang)},
       ...apiMessages,
     ];
     ToolStreamOutcome outcome;
     try {
       outcome = await callDsWithTools(callKey, model, agentMsgs, maxTokens,
-          temperature, DS_TOOL_MAX_ITERATIONS, usageAcc, apiUrl: callUrl);
+          temperature, dbToolMaxIterFor(model, callUrl, rounds), usageAcc,
+          apiUrl: callUrl);
     } catch (e) {
       await dsJSONErr(res, 500, 'ツール呼び出しに失敗しました: $e');
       return;
@@ -1184,9 +1281,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   String reply;
   String reasoning;
   final wikiSrcFallback = useDoubao
-      ? dbWikiEffectiveSources()
+      ? dbResolveSources(
+          forcedSources: forcedSources,
+          configSources: dbWikiEffectiveSources())
       : const <String>[];
-  final wikiOkFallback = webSearch &&
+  final wikiOkFallback = (webSearch || forcedSources.isNotEmpty) &&
       wikiSrcFallback.isNotEmpty &&
       fileCtx.videoFileIds.isEmpty &&
       dbWikiMediaSupported(dbMediaParts);

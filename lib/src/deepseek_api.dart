@@ -156,12 +156,55 @@ const String DS_TOOL_AGENT_SYSTEM_PROMPT = '''
 · すべての操作を完了し検証した後、簡潔に2～4文でご報告いたします：何を行ったか、結果はどうであったか、どのように検証したか。
 · また、必ずご報告いたします。ありのままにお伝えしなければなりません。全程は私自身が自動で行い、ユーザーにご判断をお願いすることは固く禁止いたします。ユーザーにご判断をお願いすることは完全に禁止でございます。ユーザーにご判断をお願いすることは絶対に禁止でございます。
 
-今からタスクを実行します。''';
+今からタスクを実行します。
+
+''';
 
 // ------------------------------------------------------------
 // 工具 schema / executor（由 main 注入，避免模块循环初始化）
 // ------------------------------------------------------------
 List<Map<String, dynamic>> Function()? dsToolSchemaProvider;
+
+/// 豆包专属工具集回调（按模型返回）。
+/// 由 bin/main.dart 注入 doubao_tools.dart 的 buildDbTools。
+/// 之所以做成回调而不是直接 import，是为了避免
+/// deepseek_api ↔ doubao_tools ↔ tools 三方循环依赖。
+List<Map<String, dynamic>> Function(String model)? dsDbToolSchemaProvider;
+
+/// 是否豆包模型的判定（由 `bin/main.dart` 注入 `dbIsDoubaoModel`）。
+/// 豆包通道的工具模式不做「续跑提示 / 累计同签名硬停 / 轮次预算提示」，
+/// 工具调用次数不设上限，由模型自行决定何时收尾。
+bool Function(String model)? dsDbModelDetector;
+
+bool dsIsDbModel(String model) {
+  final d = dsDbModelDetector;
+  if (d != null) {
+    try {
+      if (d(model)) return true;
+    } catch (_) {
+      // 探测器异常不得影响主链路，走下面的名称兜底
+    }
+  }
+  // 兜底：不依赖注入时序，模型名本身即可判定豆包通道
+  return model.trim().toLowerCase().startsWith('doubao');
+}
+
+/// 解析本次请求该用哪套工具 schema。
+/// 豆包通道优先用专属集；专属集为空（非豆包模型）时回落到全量集。
+List<Map<String, dynamic>> dsResolveTools(String model, String apiUrl) {
+  if (apiUrl != DS_API_URL) {
+    final dbp = dsDbToolSchemaProvider;
+    if (dbp != null) {
+      try {
+        final t = dbp(model);
+        if (t.isNotEmpty) return t;
+      } catch (_) {
+        // 专属集构建异常绝不阻断主链路：回落全量集
+      }
+    }
+  }
+  return dsToolSchemaProvider?.call() ?? const <Map<String, dynamic>>[];
+}
 Future<String> Function(String name, Map<String, dynamic> args)? dsToolExecutor;
 
 Future<String> dsSafeExecTool(String name, String argsJson) async {
@@ -461,7 +504,7 @@ Future<DsRawResponse> callDsChatAPIRaw(
     'temperature': temperature,
   };
   if (withTools) {
-    body['tools'] = dsToolSchemaProvider?.call() ?? const [];
+    body['tools'] = dsResolveTools(model, apiUrl);
     body['tool_choice'] = 'auto';
   }
   final client = globalHTTPClient;
@@ -657,6 +700,34 @@ Future<void> callDsChatAPIStream(
 }
 
 // ------------------------------------------------------------
+// 工具模式轮次治理
+//
+// 背景：DS_TOOL_MAX_ITERATIONS 是「实质无限」的哨兵值（50 亿），
+// 而轮次上限本身不进请求体、不消耗 token，因此它不能充当防死循环手段。
+// 真正需要管的是「原地打转」，分两级：
+//   · 连续同签名 4 次  → 注入纠偏提示（软，允许模型自我修正）
+//   · 同签名累计 8 次  → 判定无进展，硬收尾（防 A→B→A→B 交替空转）
+// ------------------------------------------------------------
+
+/// 同一轮工具调用签名（工具名 + 参数）累计出现多少次判定为「原地打转」。
+/// 取 8：给模型留出「失败后换方案重试」的空间（常见 2〜3 次），
+/// 又不至于让一次参数微调被误杀。
+const int _dsToolSigGiveUp = 8;
+
+/// 轮次预算提示的门槛。
+/// 仅当 maxIter 是「有限且规模合理」时末尾提示才有意义；
+/// 对哨兵值启用会让 `remaining <= 阈值` 退化为恒假（50 亿），
+/// 而对小上限（豆包旧档位 6/10/16/20）则恒真、每轮都注入劝退提示，两种都不对。
+const int _dsBudgetFiniteMax = 10000;
+
+/// 计算轮次预算提示的触发阈值，返回 0 表示本场景不启用预算提示。
+int _dsBudgetWarnAt(int maxIter) {
+  if (maxIter <= 0 || maxIter > _dsBudgetFiniteMax) return 0;
+  final v = maxIter ~/ 10;
+  return v < 1 ? 1 : v;
+}
+
+// ------------------------------------------------------------
 // 工具模式：流式多轮
 // ------------------------------------------------------------
 class ToolStreamOutcome {
@@ -683,7 +754,7 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
   var maxIter = maxIterations <= 0 ? DS_TOOL_MAX_ITERATIONS : maxIterations;
   var mt = maxTokens <= 0 ? 330000 : maxTokens;
   temperature = 0.0; // 工具模式恒为 0（确定性输出）
-  final tools = dsToolSchemaProvider?.call() ?? const <Map<String, dynamic>>[];
+  final tools = dsResolveTools(model, apiUrl);
 
   final finalContent = StringBuffer();
   final finalReasoning = StringBuffer();
@@ -691,6 +762,9 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
   final msgs = <Map<String, dynamic>>[...messages];
   var lastToolSig = '';
   var repeatCount = 0;
+  final sigSeen = <String, int>{};
+  final budgetWarnAt = _dsBudgetWarnAt(maxIter);
+  final isDb = dsIsDbModel(model);
 
   for (var iter = 0; iter < maxIter; iter++) {
     final r = await _streamOnce(
@@ -723,6 +797,7 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
     });
 
     final roundSigs = <String>[];
+    dsVdForce = isDb;
     for (final tcm in r.toolCalls) {
       final callID = mStr(tcm, 'id');
       final fn = asMap(tcm['function']);
@@ -748,31 +823,47 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
         'content': result,
       });
     }
+    dsVdForce = false;
 
-    // 卡死检测 + 预算感知
-    final sig = roundSigs.join('\u0000');
-    if (sig.isNotEmpty && sig == lastToolSig) {
-      repeatCount++;
-    } else {
-      lastToolSig = sig;
-      repeatCount = 1;
-    }
-    if (repeatCount >= 4) {
-      msgs.add({
-        'role': 'user',
-        'content':
-            '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
-      });
-      repeatCount = 0;
-      lastToolSig = '';
-    }
-    final remaining = maxIter - 1 - iter;
-    if (remaining <= 200 && remaining > 0) {
-      msgs.add({
-        'role': 'user',
-        'content':
-            '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
-      });
+    // 豆包通道：跳过一切续跑提示 / 累计同签名硬停 / 轮次预算提示。
+    // 工具调用次数不设上限，由模型自行决定何时收尾；其余通道行为不变。
+    if (!isDb) {
+      // 卡死检测 + 预算感知
+      final sig = roundSigs.join('\u0000');
+      if (sig.isNotEmpty && sig == lastToolSig) {
+        repeatCount++;
+      } else {
+        lastToolSig = sig;
+        repeatCount = 1;
+      }
+      if (repeatCount >= 4) {
+        msgs.add({
+          'role': 'user',
+          'content':
+              '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
+        });
+        repeatCount = 0;
+        lastToolSig = '';
+      }
+
+      // 累计同签名：判定原地打转则硬收尾，避免无限轮下空转烧配额
+      if (sig.isNotEmpty) {
+        final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
+        if (seen >= _dsToolSigGiveUp) {
+          logp('🛑 同一操作の累計実行が $_dsToolSigGiveUp 回に達しました。'
+              '進展なしと判定し、ツール呼び出しを打ち切ります。');
+          break;
+        }
+      }
+
+      final remaining = maxIter - 1 - iter;
+      if (budgetWarnAt > 0 && remaining <= budgetWarnAt && remaining > 0) {
+        msgs.add({
+          'role': 'user',
+          'content':
+              '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
+        });
+      }
     }
   }
 
@@ -797,6 +888,9 @@ Future<ToolStreamOutcome> callDsWithTools(
   final toolLogs = <String>[];
   var lastToolSig = '';
   var repeatCount = 0;
+  final sigSeen = <String, int>{};
+  final budgetWarnAt = _dsBudgetWarnAt(maxIter);
+  final isDb = dsIsDbModel(model);
 
   for (var round = 0; round < maxIter; round++) {
     final resp = await callDsChatAPIRaw(
@@ -813,6 +907,7 @@ Future<ToolStreamOutcome> callDsWithTools(
       'tool_calls': resp.toolCalls,
     });
     final roundSigs = <String>[];
+    dsVdForce = isDb;
     for (final tc in resp.toolCalls) {
       final fn = asMap(tc['function']);
       final name = mStr(fn, 'name');
@@ -826,30 +921,46 @@ Future<ToolStreamOutcome> callDsWithTools(
         'content': result,
       });
     }
+    dsVdForce = false;
 
-    final sig = roundSigs.join('\u0000');
-    if (sig.isNotEmpty && sig == lastToolSig) {
-      repeatCount++;
-    } else {
-      lastToolSig = sig;
-      repeatCount = 1;
-    }
-    if (repeatCount >= 4) {
-      currentMsgs.add({
-        'role': 'user',
-        'content':
-            '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
-      });
-      repeatCount = 0;
-      lastToolSig = '';
-    }
-    final remaining = maxIter - 1 - round;
-    if (remaining <= 200 && remaining > 0) {
-      currentMsgs.add({
-        'role': 'user',
-        'content':
-            '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
-      });
+    // 豆包通道：跳过一切续跑提示 / 累计同签名硬停 / 轮次预算提示。
+    // 工具调用次数不设上限，由模型自行决定何时收尾；其余通道行为不变。
+    if (!isDb) {
+      final sig = roundSigs.join('\u0000');
+      if (sig.isNotEmpty && sig == lastToolSig) {
+        repeatCount++;
+      } else {
+        lastToolSig = sig;
+        repeatCount = 1;
+      }
+      if (repeatCount >= 4) {
+        currentMsgs.add({
+          'role': 'user',
+          'content':
+              '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
+        });
+        repeatCount = 0;
+        lastToolSig = '';
+      }
+
+        // 累计同签名：判定原地打转则硬收尾
+        if (sig.isNotEmpty) {
+          final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
+          if (seen >= _dsToolSigGiveUp) {
+            logp('🛑 同一操作の累計実行が $_dsToolSigGiveUp 回に達しました。'
+                '進展なしと判定し、ツール呼び出しを打ち切ります。');
+            break;
+          }
+        }
+
+        final remaining = maxIter - 1 - round;
+        if (budgetWarnAt > 0 && remaining <= budgetWarnAt && remaining > 0) {
+          currentMsgs.add({
+            'role': 'user',
+            'content':
+                '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
+          });
+        }
     }
   }
   return ToolStreamOutcome('', '', toolLogs);
