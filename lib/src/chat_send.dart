@@ -37,6 +37,11 @@ Future<void> handleDsChatSendStream(
   String content,
   List<String> fileIDs,
   bool enableTools, {
+  /// 用户是否在 UI 上开启了「联网搜索」。
+  /// 抖音百科（方舟联网内容插件）只在确实要联网时才启用：
+  /// 否则每一句普通聊天都会先跑一轮检索，首包被拖到数秒之后，
+  /// 表现就是「豆包模式不是流式、非常慢」。
+  bool webSearch = false,
   ModelRouteDecision? route,
   String apiUrl = DS_API_URL,
   /// UI 言語（拒否禁令の選択に使用）
@@ -109,8 +114,8 @@ Future<void> handleDsChatSendStream(
     // 工具模式 × 联网内容插件：方舟客服确认 Responses API 的 tools
     // 数组可同时放置 web_search 与 function，由模型自动选择调用，故不再互斥。
     // 仅在豆包通道 + 已开信源 + 无音视频时混用，其余退回原有工具链。
-    final toolWikiSources = apiUrl != DS_API_URL
-        ? dbWikiNormalizeSources(getDbConfig().webSources)
+    final toolWikiSources = (apiUrl != DS_API_URL && webSearch)
+        ? dbWikiEffectiveSources()
         : const <String>[];
     final useWikiTools = toolWikiSources.isNotEmpty &&
         pendingVideoIds.isEmpty &&
@@ -163,6 +168,9 @@ Future<void> handleDsChatSendStream(
           },
           usageAcc,
           mediaParts: mediaParts,
+          onSources: (list) {
+            sse.send('sources', {'items': list, 'channel': 'wiki'});
+          },
         );
         outcome = ToolStreamOutcome(w.content, w.reasoning, w.toolLogs);
       } else {
@@ -307,11 +315,12 @@ Future<void> handleDsChatSendStream(
   // 仅 Responses API 支持，Chat Completions 无法指定；因此这里分流。
   // 仅豆包通道 + 用户显式开启信源 + 纯文本输入时启用。
   final wikiSources = apiUrl != DS_API_URL
-      ? dbWikiNormalizeSources(getDbConfig().webSources)
+      ? dbWikiEffectiveSources()
       : const <String>[];
   // 图片（image_url）可随 input_image 一起提交，与 web_search 并存；
   // 音频 / 视频在插件通道不保证可用，出现时回退原生多模态。
-  final canUseWiki = wikiSources.isNotEmpty &&
+  final canUseWiki = webSearch &&
+      wikiSources.isNotEmpty &&
       pendingVideoIds.isEmpty &&
       dbWikiMediaSupported(mediaParts);
 
@@ -342,6 +351,9 @@ Future<void> handleDsChatSendStream(
         usageAcc: usageAcc,
         baseUrl: dbBaseUrl(null),
         mediaParts: mediaParts,
+        onSources: (list) {
+          sse.send('sources', {'items': list, 'channel': 'wiki'});
+        },
       );
     } catch (e) {
       logp('豆包联网内容插件の呼び出しに失敗: $e');
@@ -383,6 +395,10 @@ Future<void> handleDsChatSendStream(
       usageAcc,
       apiUrl: apiUrl,
       extraBody: extraBody,
+      onReferences: (list) {
+        // 豆包自带联网搜索的信源：仅在方舟通道出现，DeepSeek 恒为空。
+        sse.send('sources', {'items': list, 'channel': 'doubao'});
+      },
     );
   } catch (e) {
     await sse.send('error', {'message': '$e'});
@@ -677,7 +693,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   final novelGenre = mStr(body, 'novelGenre');
   final novelStory = mStr(body, 'novelStory');
   final novelChars = intArgDefault(body, 'novelChars', 0);
-  final enableTools = mBool(body, 'enableTools');
+  var enableTools = mBool(body, 'enableTools');
   final injectedPrompts = asList(body['injectedPrompts']).map((e) => '$e').toList();
   final stream = mBool(body, 'stream');
 
@@ -740,6 +756,22 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     logp('📚 超長文モード有効: maxTokens=$maxTokens, 目標文字数=$targetChars');
   }
   if (enableTools) temperature = 0.0;
+
+  // ========== 豆包模式 × 抖音百科：职责单一，绝不叠加 ==========
+  // 1) 豆包通道一律单轮：推論レベル只抬高 max_tokens，不再触发多轮自我反思。
+  // 2) 抖音百科（联网内容插件，仅 Responses API）生效期间强制关闭工具模式：
+  //    否则 Chat Completions 的 function calling 与插件的 web_search 会在同一轮
+  //    互相抢占，表现为「豆包模式搜索抖音百科时突然调用工具」的严重 bug。
+  if (useDoubao && !longTextMode) {
+    if (rounds != 1) {
+      logp('🫘 豆包モード: 多輪反思を無効化（rounds=$rounds → 1、max_tokens=$maxTokens は維持）');
+    }
+    rounds = 1;
+  }
+  if (useDoubao && enableTools && dbWikiEffectiveSources().isNotEmpty) {
+    enableTools = false;
+    logp('🛑 抖音百科が有効なためツールモードを自動解除（検索とツール呼び出しの衝突を根本回避）');
+  }
 
   // 注入提示词（system 角色）
   // 本机开发者工具（devtools）功能，按所有者要求恢复启用。
@@ -811,15 +843,26 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     userPrompt += fileCtx.text;
   }
 
+  // ★ 联网检索的归属（三条互斥通道，绝不同时触发）
+  //   ① 抖音百科（联网内容插件）开启 → Responses API 自带检索
+  //   ② 百科关闭、仅开「联网搜索」→ 豆包自带联网搜索（web_search_options，
+  //      方舟豆包搜索 Custom 版，每月 2 万次免费额度）
+  //   ③ DeepSeek 通道 → DeepSeek 官方 /v1/tools/search
+  //   旧实现里 ② 走的却是 DeepSeek 官方搜索（用 DeepSeek Key 计费），
+  //   豆包模式白白多打一次国外请求，首包也被拖慢数秒。
+  var dbNativeSearch = false;
   if (webSearch && content.isNotEmpty) {
-    // 豆包通道同样允许调用 DeepSeek 官方 /v1/tools/search 联网搜索。
-    // 搜索结果只是以纯文本注入 userPrompt，最终仍由豆包模型作答；
-    // 请求走的是 getDsConfig().apiKey（DeepSeek 官方 Key），与豆包 Key 无关。
-    if (useDoubao) {
-      logp('🔍 豆包モード：DeepSeek 公式联网検索を呼び出します（結果はプロンプトに注入）');
+    final wikiOn = useDoubao && dbWikiEffectiveSources().isNotEmpty;
+    if (wikiOn) {
+      // 插件自己会检索；再叠一次官方搜索就是「两次联网」，首包被拖后数秒。
+      logp('🔍 豆包モード：联网内容プラグインが検索を担当するため、公式検索は省略（二重検索回避）');
+    } else if (useDoubao) {
+      dbNativeSearch = true;
+      logp('🔍 豆包モード：豆包ネイティブ検索（web_search_options / 月2万回無料枠）を使用');
+    } else {
+      final ctx = await buildWebSearchContext(content);
+      if (ctx.isNotEmpty) userPrompt += ctx;
     }
-    final ctx = await buildWebSearchContext(content);
-    if (ctx.isNotEmpty) userPrompt += ctx;
   }
   if (userPrompt.trim().isEmpty) userPrompt = 'アップロードしたファイルを確認してください。';
 
@@ -877,6 +920,25 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     logp('🔧 設備操作意図を検出：ツールモードを自動有効化し、ツール定義を送信します');
   }
   Map<String, dynamic>? dbExtraBody;
+  // ★ 豆包通道：把「深い思考」开关直接映射到方舟的 thinking 字段。
+  //   不传时方舟按模型默认开启深度思考，首包会被拖到 60 秒以上，
+  //   前端看到的就是「不是流式、非常慢」。关闭时不思考，立刻逐字出流。
+  //   含媒体时由下面的 dbThinkingEnableParam 覆盖为 enabled（先看再想）。
+  if (useDoubao) {
+    dbExtraBody = deepThink
+        ? dbThinkingEnableParam(model)
+        : dbThinkingDisableParam(model);
+  }
+  // ★ 豆包自带联网搜索（百科关闭 + 联网开启）：Chat Completions 的
+  //   web_search_options 直接由方舟执行检索，消耗豆包搜索免费额度。
+  //   工具模式与它互斥（同时出现会被方舟拒绝），故工具模式下不附加。
+  if (dbNativeSearch && !useTools) {
+    dbExtraBody = <String, dynamic>{
+      ...(dbExtraBody ?? const <String, dynamic>{}),
+      'web_search_options': dbWebSearchOptions(),
+    };
+    logp('🌐 豆包ネイティブ検索を有効化（web_search_options, 月2万回無料枠）');
+  }
   final dbMediaParts = <Map<String, dynamic>>[];
   // 视频统一由 doubao_video_ark 处理：≤45MB 直接作为 video_url 片段，
   // >45MB 用 ffmpeg 无损切片后逐段理解（2GB 也能看完）。
@@ -1021,6 +1083,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   if (stream && !longTextMode) {
     await handleDsChatSendStream(req, callKey, model, apiMessages,
         maxTokens, temperature, rounds, sessionID, content, fileIDs, useTools,
+        webSearch: webSearch,
         route: route,
         apiUrl: callUrl,
         extraBody: dbExtraBody,
@@ -1121,9 +1184,10 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   String reply;
   String reasoning;
   final wikiSrcFallback = useDoubao
-      ? dbWikiNormalizeSources(getDbConfig().webSources)
+      ? dbWikiEffectiveSources()
       : const <String>[];
-  final wikiOkFallback = wikiSrcFallback.isNotEmpty &&
+  final wikiOkFallback = webSearch &&
+      wikiSrcFallback.isNotEmpty &&
       fileCtx.videoFileIds.isEmpty &&
       dbWikiMediaSupported(dbMediaParts);
   try {

@@ -176,6 +176,35 @@ Future<String> dsSafeExecTool(String name, String argsJson) async {
 }
 
 // ------------------------------------------------------------
+// 联网引用（references）解析 —— 豆包自带联网搜索 / 方舟插件共用
+//   方舟给的结构在不同网关上有几种写法：
+//     {url,title,summary} / {link,name,snippet} / {url,title,site_name}
+//   全部宽松兼容，统一成 {title,url,snippet,source} 供前端渲染交互卡片。
+// ------------------------------------------------------------
+List<Map<String, dynamic>> dsExtractReferences(Object? raw) {
+  final out = <Map<String, dynamic>>[];
+  if (raw is! List) return out;
+  for (final r in raw) {
+    if (r is! Map) continue;
+    var url = '${r['url'] ?? r['link'] ?? r['href'] ?? ''}'.trim();
+    if (url.isEmpty) continue;
+    if (!url.startsWith('http')) continue;
+    var title = '${r['title'] ?? r['name'] ?? r['site_name'] ?? ''}'.trim();
+    if (title.isEmpty) title = url;
+    var snippet =
+        '${r['summary'] ?? r['snippet'] ?? r['content'] ?? r['text'] ?? ''}'.trim();
+    if (snippet.length > 400) snippet = snippet.substring(0, 400);
+    out.add({
+      'title': title,
+      'url': url,
+      'snippet': snippet,
+      'source': '${r['site_name'] ?? r['source'] ?? ''}'.trim(),
+    });
+  }
+  return out;
+}
+
+// ------------------------------------------------------------
 // SSE 解析
 // ------------------------------------------------------------
 Stream<Map<String, dynamic>> sseData(HttpClientResponse resp) async* {
@@ -241,6 +270,12 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
     r.headers.set('Content-Type', 'application/json');
     r.headers.set('Authorization', 'Bearer $apiKey');
     r.headers.set('Accept', 'text/event-stream');
+    // ★ 上流の圧縮を明示的に拒否する。
+    //   gzip を許すと、圧縮器（ゲートウェイ側）が内部バッファに数フレーム分
+    //   溜めてから吐くため、思考チェーンの delta が 0.3〜1.0 秒単位で
+    //   まとめて届く。フロントでは「一瞬止まる → 急に飛ぶ」の連続になる。
+    //   identity を要求すれば 1 イベント = 1 TCP 送信になり、そのまま流れる。
+    r.headers.set('Accept-Encoding', 'identity');
     r.add(utf8.encode(jsonEncode(b)));
     return r.close();
   }
@@ -472,6 +507,8 @@ Future<void> callDsChatAPIStream(
   DsUsageAcc? usageAcc, {
   String apiUrl = DS_API_URL,
   Map<String, dynamic>? extraBody,
+  /// 联网引用（豆包自带联网搜索 references）出现时回调，供前端渲染交互卡片
+  void Function(List<Map<String, dynamic>> references)? onReferences,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
@@ -479,6 +516,18 @@ Future<void> callDsChatAPIStream(
   var temp = temperature;
   if (temp <= 0) temp = 1.0;
 
+  // ★ 豆包（方舟）通道：快速模式必须真正生效。
+  //   extraBody 只在「含图片 / 音频 / 视频」时才携带 thinking:{type:enabled}；
+  //   其余情况此前完全不传 thinking，方舟于是按模型默认开启深度思考，
+  //   实测首个 content 被拖到 60s / 122s 之后（普通聊天也要整段思考）。
+  //   这里回落到 dbThinkingParam(model)（快速模式 → thinking:{type:disabled}），
+  //   与 _streamOnce 的处理保持一致。
+  //   DeepSeek 通道 apiUrl == DS_API_URL，arkThink 恒为 null，行为零变化。
+  final arkHasThinking =
+      extraBody != null && extraBody.containsKey('thinking');
+  final arkThink = (apiUrl == DS_API_URL || arkHasThinking)
+      ? null
+      : dbThinkingParam(model);
   final body = <String, dynamic>{
     'model': model,
     'messages': messages,
@@ -488,29 +537,122 @@ Future<void> callDsChatAPIStream(
     if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
     // 方舟专用附加字段（如 thinking）。DeepSeek 通道不传，避免 400。
     if (extraBody != null && extraBody.isNotEmpty) ...extraBody,
+    if (arkThink != null) 'thinking': arkThink,
   };
   final client = globalHTTPClient;
   final req = await client.postUrl(Uri.parse(apiUrl));
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.headers.set('Accept', 'text/event-stream');
+  // ★ 上流圧縮の無効化（SSE が数フレーム分まとめて遅延するのを防ぐ）
+  req.headers.set('Accept-Encoding', 'identity');
   req.add(utf8.encode(jsonEncode(body)));
-  final resp = await req.close();
+  var resp = await req.close();
+  // ★ 豆包自带联网搜索的兼容降级：个别模型/版本不接受 web_search_options，
+  //   方舟会直接 400。此时去掉该字段重试一次，绝不让「联网搜索开关」变成
+  //   「一开就报错」的新 bug（本次任务明确要求不得引入其它故障）。
+  if (resp.statusCode == 400 && body.containsKey('web_search_options')) {
+    final txt = utf8.decode(
+        await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
+        allowMalformed: true);
+    if (txt.toLowerCase().contains('web_search')) {
+      logp('⚠️ 方舟が web_search_options を拒否しました。外して再試行します');
+      body.remove('web_search_options');
+      final req2 = await client.postUrl(Uri.parse(apiUrl));
+      req2.headers.set('Content-Type', 'application/json');
+      req2.headers.set('Authorization', 'Bearer $apiKey');
+      req2.headers.set('Accept', 'text/event-stream');
+      req2.headers.set('Accept-Encoding', 'identity');
+      req2.add(utf8.encode(jsonEncode(body)));
+      resp = await req2.close();
+    } else {
+      throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
+    }
+  }
   if (resp.statusCode != 200) {
     final txt = utf8.decode(await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
         allowMalformed: true);
     throw Exception('HTTP ${resp.statusCode}: ${truncateBytes(txt, 400)}');
   }
+  // ★ 豆包通道：实测首帧 / 首正文 / 总耗时（诊断流式延迟用）。
+  //   DeepSeek 通道不启用（sw == null），行为零变化。
+  final sw = apiUrl == DS_API_URL ? null : (Stopwatch()..start());
+  var firstFrameMs = -1;
+  var firstContentMs = -1;
+  var firstReasoningMs = -1;
+  final reportedRefs = <String>{};
+  var reportedSearchCount = 0;
   await for (final chunk in sseData(resp)) {
+    if (sw != null && firstFrameMs < 0) firstFrameMs = sw.elapsedMilliseconds;
     final usage = RawDsUsage.fromJson(chunk['usage']);
     if (usage != null) usageAcc?.addRaw(usage);
+    // ★ 豆包自带联网搜索的实际检索次数（方舟 usage.tool_usage.web_search）
+    if (apiUrl != DS_API_URL) {
+      final tu = asMap(asMap(chunk['usage'])['tool_usage']);
+      final wsRaw = tu['web_search'];
+      final wsCount = wsRaw is int
+          ? wsRaw
+          : (wsRaw is num ? wsRaw.toInt() : int.tryParse('${wsRaw ?? ''}') ?? 0);
+      if (wsCount > reportedSearchCount) {
+        reportedSearchCount = wsCount;
+        logp('📊 豆包联网検索の実行回数: $wsCount');
+      }
+    }
     final choices = asList(chunk['choices']);
     if (choices.isEmpty) continue;
     final delta = asMap(asMap(choices[0])['delta']);
+
+    // ★ 豆包自带联网搜索的引用（references）：出现即上报，同一 url 只报一次。
+    //   这是前端「交互式卡片」的数据源，与正文流互不影响。
+    if (onReferences != null) {
+      final fresh = <Map<String, dynamic>>[];
+      void take(Object? raw) {
+        for (final r in dsExtractReferences(raw)) {
+          if (!reportedRefs.add('${r['url']}')) continue;
+          fresh.add(r);
+        }
+      }
+      // 方舟文档：联网引用于 choices[].message.annotations（url_citation 列表）；
+      // 部分网关用顶层 references，两种都收。
+      final chMsg = asMap(asMap(choices[0])['message']);
+      take(delta['annotations']);
+      take(chMsg['annotations']);
+      take(delta['references']);
+      take(chunk['references']);
+      take(chMsg['references']);
+      if (fresh.isNotEmpty) onReferences(fresh);
+    }
     final rc = mStr(delta, 'reasoning_content');
-    if (rc.isNotEmpty) onReasoning?.call(rc);
-    final c = mStr(delta, 'content');
-    if (c.isNotEmpty) onContent?.call(c);
+    if (rc.isNotEmpty) {
+      if (sw != null && firstReasoningMs < 0) {
+        firstReasoningMs = sw.elapsedMilliseconds;
+      }
+      onReasoning?.call(rc);
+    }
+    var c = mStr(delta, 'content');
+    if (c.isEmpty) {
+      // ★ 兜底：部分网关/模型在 stream:true 下仍按非流式结构返回整段
+      //   message（或 delta 与 message 混合）。只认 delta 会把正文整段丢掉，
+      //   前端看到的就是「没有流式、最后才一次性出现」。
+      final msg = asMap(asMap(choices[0])['message']);
+      c = mStr(msg, 'content');
+      if (c.isEmpty && rc.isEmpty) {
+        final rcm = mStr(msg, 'reasoning_content');
+        if (rcm.isNotEmpty) onReasoning?.call(rcm);
+      }
+    }
+    if (c.isNotEmpty) {
+      if (sw != null && firstContentMs < 0) {
+        firstContentMs = sw.elapsedMilliseconds;
+      }
+      onContent?.call(c);
+    }
+  }
+  if (sw != null) {
+    logp('📡 [豆包流] model=$model '
+        '首帧=${firstFrameMs}ms 首思考=${firstReasoningMs}ms '
+        '首正文=${firstContentMs}ms 结束=${sw.elapsedMilliseconds}ms '
+        '(thinking=${arkThink == null ? '未传' : arkThink['type']})');
   }
 }
 
@@ -788,6 +930,7 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   DsUsageAcc? usageAcc, {
   String apiUrl = DS_API_URL,
   Map<String, dynamic>? extraBody,
+  void Function(List<Map<String, dynamic>> references)? onReferences,
 }) async {
   if (rounds < 1) rounds = 1;
   onRound?.call(1, rounds, '正在生成初稿...');
@@ -801,7 +944,8 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
   }, (s) {
     firstContent.write(s);
     onContent?.call(s);
-  }, usageAcc, apiUrl: apiUrl, extraBody: extraBody);
+  }, usageAcc, apiUrl: apiUrl, extraBody: extraBody,
+      onReferences: onReferences);
 
   if (rounds == 1) {
     return (
@@ -833,7 +977,8 @@ Future<({String content, String reasoning})> callDsMultiRoundStream(
       }, (s) {
         newContent.write(s);
         onContent?.call(s);
-      }, usageAcc, apiUrl: apiUrl, extraBody: extraBody);
+      }, usageAcc, apiUrl: apiUrl, extraBody: extraBody,
+          onReferences: onReferences);
     } catch (e) {
       logp('⚠️ 第 $i ラウンドの内省に失敗しました: $e。前回の結果を使用します');
       break;

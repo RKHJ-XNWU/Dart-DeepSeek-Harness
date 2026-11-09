@@ -31,6 +31,131 @@
     // 豆包联网内容插件信源（仅 douyin 由 UI 控制，其余保留后端值）
     var DB_WEB_SOURCES = [];
 
+    // ------------------------------------------------------------
+    // 抖音百科搜索「总开关」（输入框下方工具栏的豆包按钮）
+    //   总闸关闭时，设置里的「抖音百科を情報源にする」开关一律无效：
+    //   后端 dbWikiEffectiveSources() 直接返回空列表，抖音百科彻底失效。
+    //   这就是「总闸拔了，空调打不开」的串联逻辑。
+    // ------------------------------------------------------------
+    var WIKI_KEY = 'dsc_douyin_wiki_total';
+
+    function isWikiOn() {
+        try { return localStorage.getItem(WIKI_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    // 豆包（包子）形象：不依赖 emoji 字体，任何设备都必然渲染
+    var WIKI_ICON_SVG =
+        '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">' +
+        '<path d="M12 3.1c1.06 0 1.94.62 2.44 1.5.63-.3 1.33-.2 1.82.29.5.5.57 1.2.3 1.82.72.5 1.14 1.36 1.14 2.26 0 3.66-2.56 6.2-5.7 6.2S6.3 12.63 6.3 8.97c0-.9.42-1.76 1.14-2.26a1.63 1.63 0 0 1 .3-1.82c.49-.49 1.19-.59 1.82-.29.5-.88 1.38-1.5 2.44-1.5Z" fill="currentColor"/>' +
+        '<path d="M8.5 8.1c.62-1.1 1.9-1.75 3.5-1.75s2.88.65 3.5 1.75" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".7"/>' +
+        '<circle cx="9.95" cy="10.1" r=".92" fill="#ffffff"/>' +
+        '<circle cx="14.05" cy="10.1" r=".92" fill="#ffffff"/>' +
+        '<path d="M10.2 12.6c.45.55 1.05.85 1.8.85s1.35-.3 1.8-.85" stroke="#ffffff" stroke-width="1.05" stroke-linecap="round" fill="none" opacity=".85"/>' +
+        '</svg>';
+
+    function syncWikiBtnUI() {
+        var b = $('dscDbWikiBtn');
+        if (!b) return;
+        var on = isWikiOn();
+        // 仅豆包模式显示（DeepSeek 通道没有联网内容插件）
+        b.style.display = isDbMode() ? '' : 'none';
+        if (on) b.classList.add('active'); else b.classList.remove('active');
+        b.title = on ? T('抖音百科：オン（クリックでオフ）') : T('抖音百科：オフ（クリックでオン）');
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+
+    // 设置里的信源开关跟随总闸：总闸关闭时灰化并强制取消勾选
+    function syncWikiSwitchUI() {
+        var row = $('dscDbWikiRow');
+        var box = $('dscDbWikiDouyin');
+        if (!row || !box) return;
+        var on = isWikiOn();
+        if (on) row.classList.remove('dsc-toggle-locked');
+        else row.classList.add('dsc-toggle-locked');
+        if (!on) box.checked = false;
+        box.setAttribute('aria-disabled', on ? 'false' : 'true');
+    }
+
+    // 只提交关键字段，其余设置由后端沿用旧值。
+    // 先取最新配置再写回，避免「其它信源（toutiao / moji 等）被空列表覆盖」。
+    function persistWikiState() {
+        var ready = S.cfg ? Promise.resolve(S.cfg) : loadConfig(true);
+        return ready.then(function (cfg) {
+            var base = (cfg && Array.isArray(cfg.webSources)) ? cfg.webSources : (DB_WEB_SOURCES || []);
+            var ws = base.filter(function (x) { return x !== 'douyin'; });
+            if (isWikiOn()) ws.push('douyin');
+            return api('/config', {
+                method: 'POST',
+                body: { wikiEnabled: isWikiOn(), webSources: ws }
+            });
+        }).then(function (d) {
+            S.cfg = d;
+            DB_WEB_SOURCES = Array.isArray(d.webSources) ? d.webSources.slice() : [];
+        });
+    }
+
+    function setWikiTotal(on, silent) {
+        var want = !!on;
+        if (want && !isDbMode()) {
+            toast(T('抖音百科は豆包モードでのみ利用可能です'), 'error');
+            return false;
+        }
+        try { localStorage.setItem(WIKI_KEY, want ? '1' : '0'); } catch (e) {}
+        var box = $('dscDbWikiDouyin');
+        if (box) box.checked = want;   // 开总闸即勾上信源；关总闸即强制取消
+        syncWikiBtnUI();
+        syncWikiSwitchUI();
+        if (want) {
+            // 抖音百科与工具模式互斥：开启瞬间自动关闭工具模式
+            if (typeof window.dscSetToolMode === 'function') window.dscSetToolMode(false);
+            var tb = $('dscToolModeBtn');
+            if (tb) tb.classList.remove('active');
+        }
+        persistWikiState().catch(function (e) {
+            console.log('[DB] wiki state save failed:', e && e.message);
+        });
+        if (!silent) {
+            toast(want ? T('抖音百科をオンにしました') : T('抖音百科をオフにしました'), want ? 'success' : 'info');
+            // オンにした瞬間、ツールが呼び出されないことを追加で警告
+            if (want) {
+                setTimeout(function () {
+                    toast(T('抖音百科が開いているため、ツールは呼び出されません'), 'info');
+                }, 450);
+            }
+        }
+        return true;
+    }
+
+    function injectWikiBtn() {
+        var panel = $('dscToolsExtra');
+        if (!panel) return;
+        if (!$('dscDbWikiBtn')) {
+            var b = el('button', 'dsc-switch-btn dsc-db-wiki-btn');
+            b.id = 'dscDbWikiBtn';
+            b.type = 'button';
+            var ic = el('span', 'ic');
+            ic.innerHTML = WIKI_ICON_SVG;
+            b.appendChild(ic);
+            // 去抖：WebView 里注入式点击偶尔会派发两次 click，
+            // 不去抖就会出现「开了又立刻关」的假象。
+            var lastWikiTap = 0;
+            b.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var now = Date.now();
+                if (now - lastWikiTap < 350) return;
+                lastWikiTap = now;
+                setWikiTotal(!isWikiOn());
+            });
+            panel.appendChild(b);
+        }
+        syncWikiBtnUI();
+    }
+
+    // 供 deepseek-chat.js 判断：豆包模式 + 总闸开启 = 工具模式必须让路
+    window.dscWikiTotalOn = function () { return isWikiOn(); };
+    window.dscWikiEffectiveOn = function () { return isDbMode() && isWikiOn(); };
+
     var RATIOS = ['16:9', '3:4', '4:3', '19:6', '21:9', '1:1', '9:16'];
     var IMG_STYLES_JA = ['アニメ', '二次元', '日本アニメ風', 'ピクセル', 'シネマティック', '特撮風', '中国アニメ風', '田園風'];
 
@@ -500,8 +625,19 @@
 
         card.appendChild(switchRow('dscDbFastMode', '高速モード（深い思考をオフ）',
             '豆包の言語モデルで深い思考を無効化し、最初の一文字が届くまでの待ち時間を大幅に短縮します（実測 16.8 秒 → 0.9 秒）', true));
-        card.appendChild(switchRow('dscDbWikiDouyin', '抖音百科を情報源にする（豆包モード限定）',
-            '火山方舟の「联网内容插件」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません', false));
+        var wikiRow = switchRow('dscDbWikiDouyin', '抖音百科を情報源にする（豆包モード限定）',
+            '火山方舟の「ウェブ連携プラグイン」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません', false);
+        wikiRow.id = 'dscDbWikiRow';
+        card.appendChild(wikiRow);
+        // 总闸未开时，这个信源开关点不开 —— 只会提示去开总闸
+        wikiRow.addEventListener('click', function (e) {
+            if (isWikiOn()) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var box = $('dscDbWikiDouyin');
+            if (box) box.checked = false;
+            toast(T('抖音百科のマスタースイッチを先にオンにしてください'), 'error');
+        }, true);
         card.appendChild(switchRow('dscDbAutoRoute', '録音ファイルを豆包へ自動ルーティング',
             '豆包以外のモデルを選んでいても、録音を送ると豆包で認識・分析します', true));
         card.appendChild(switchRow('dscDbWatermark', '生成物に透かしを入れる',
@@ -618,8 +754,14 @@
             k.placeholder = c.hasKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedKey) : T('ARK API Key を入力');
         }
         DB_WEB_SOURCES = Array.isArray(c.webSources) ? c.webSources.slice() : [];
+        // 总闸以后端为准（旧配置没有该字段时不动本地状态）
+        if (Object.prototype.hasOwnProperty.call(c, 'wikiEnabled')) {
+            try { localStorage.setItem(WIKI_KEY, c.wikiEnabled ? '1' : '0'); } catch (e) {}
+        }
         var wd = $('dscDbWikiDouyin');
-        if (wd) wd.checked = DB_WEB_SOURCES.indexOf('douyin') >= 0;
+        if (wd) wd.checked = isWikiOn() && DB_WEB_SOURCES.indexOf('douyin') >= 0;
+        syncWikiSwitchUI();
+        syncWikiBtnUI();
         var fm = $('dscDbFastMode');
         if (fm) fm.checked = (c.fastMode !== false);
         var ar = $('dscDbAutoRoute');
@@ -652,10 +794,12 @@
             voice: ($('dscDbVoiceA') || {}).value || '',
             voiceB: ($('dscDbVoiceB') || {}).value || '',
             fastMode: !!(($('dscDbFastMode') || {}).checked),
+            wikiEnabled: isWikiOn(),
             webSources: (function () {
                 var ws = (DB_WEB_SOURCES || []).filter(function (x) { return x !== 'douyin'; });
                 var d = $('dscDbWikiDouyin');
-                if (d && d.checked) ws.push('douyin');
+                // 串联：总闸未开时，信源开关勾着也不生效
+                if (isWikiOn() && d && d.checked) ws.push('douyin');
                 return ws;
             })(),
             autoRouteAudio: !!(($('dscDbAutoRoute') || {}).checked),
@@ -2286,6 +2430,7 @@
             ? T('豆包モード：オン（送信は豆包モデル）') + ' · ' + dbChatModel()
             : T('豆包モード：オフ（送信は DeepSeek）');
         b.setAttribute('aria-label', b.title);
+        syncWikiBtnUI();   // 豆包模式切换时同步抖音百科按钮的显隐
     }
 
     function openDbSettings() {
@@ -2597,6 +2742,7 @@
         injectMenu();
         buildSettingsCard();
         injectDbModeButton();
+        injectWikiBtn();
         installFetchHook();
         // 言語切替時（再読込が無効化されている場合も）ボタンの title を追従させる
         document.addEventListener('dsc:langchange', function () {

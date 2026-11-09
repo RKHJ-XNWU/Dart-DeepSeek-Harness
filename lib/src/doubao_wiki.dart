@@ -102,8 +102,8 @@ List<Map<String, dynamic>> dbWikiMediaToInput(
 /// `instructions` + `input` 结构。
 ///
 /// · system → instructions（多条时用换行拼接）
-/// · user   → {role: user, content: [{type: input_text, text}]}
-/// · assistant → {role: assistant, content: [{type: output_text, text}]}
+/// · user   → {type: "message", role: user, content: [{type: input_text, text}]}
+/// · assistant → {type: "message", role: assistant, content: [{type: output_text, text}]}
 ({String instructions, List<Map<String, dynamic>> input})
     dbWikiBuildInput(
   List<Map<String, dynamic>> messages, {
@@ -136,6 +136,7 @@ List<Map<String, dynamic>> dbWikiMediaToInput(
     }
     if (role == 'assistant') {
       input.add({
+        'type': 'message',
         'role': 'assistant',
         'content': [
           {'type': 'output_text', 'text': text},
@@ -144,6 +145,7 @@ List<Map<String, dynamic>> dbWikiMediaToInput(
       continue;
     }
     input.add({
+      'type': 'message',
       'role': 'user',
       'content': <Map<String, dynamic>>[
         {'type': 'input_text', 'text': text},
@@ -167,6 +169,7 @@ List<Map<String, dynamic>> dbWikiMediaToInput(
     } else {
       // 整个历史里只有 system、没有 user（极少见）：单独补一条
       input.add({
+        'type': 'message',
         'role': 'user',
         'content': <Map<String, dynamic>>[
           {'type': 'input_text', 'text': ''},
@@ -176,6 +179,34 @@ List<Map<String, dynamic>> dbWikiMediaToInput(
     }
   }
   return (instructions: sys.join('\n\n'), input: input);
+}
+
+/// 从 Responses API 的 output item 里抽取联网引用（url_citation）。
+///
+/// 方舟把引用放在 `output_text.content[].annotations`
+/// （{type:'url_citation', url, title, ...}）；部分网关改放在
+/// item['results'] 或 item['action']['sources'] 里。三者全部兼容，
+/// 统一交给 [dsExtractReferences] 归一化。
+List<Map<String, dynamic>> dbWikiCitationsOfItem(Map<dynamic, dynamic> item) {
+  final out = <Map<String, dynamic>>[];
+  void take(Object? raw) {
+    out.addAll(dsExtractReferences(raw));
+  }
+
+  final cs = item['content'];
+  if (cs is List) {
+    for (final c in cs) {
+      if (c is! Map) continue;
+      take(c['annotations']);
+    }
+  }
+  take(item['results']);
+  final act = item['action'];
+  if (act is Map) {
+    take(act['sources']);
+    take(act['results']);
+  }
+  return out;
 }
 
 /// 通过 Responses API 发起流式请求，并接入联网内容插件信源。
@@ -196,6 +227,9 @@ Future<void> callDbWikiResponsesStream(
 
   /// 与最后一条 user 消息一同提交的图片（Chat 风格片段，内部自动转码）
   List<Map<String, dynamic>> mediaParts = const <Map<String, dynamic>>[],
+
+  /// 联网引用（交互式卡片数据源）：流结束前回调一次
+  void Function(List<Map<String, dynamic>> sources)? onSources,
 }) async {
   final src = dbWikiNormalizeSources(sources);
   if (src.isEmpty) {
@@ -239,6 +273,8 @@ Future<void> callDbWikiResponsesStream(
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.headers.set('Accept', 'text/event-stream');
+  // ★ 上流圧縮の無効化（思考チェーンが数フレーム分まとめて届くのを防ぐ）
+  req.headers.set('Accept-Encoding', 'identity');
   req.add(utf8.encode(jsonEncode(body)));
 
   final resp = await req.close();
@@ -333,6 +369,20 @@ Future<void> callDbWikiResponsesStream(
     // ---- 用量 ----
     if (type == 'response.completed' || type == 'response.incomplete') {
       final r = ev['response'];
+      // ★ 联网引用（url_citation）→ 前端交互式卡片
+      if (onSources != null && r is Map) {
+        final acc = <String, Map<String, dynamic>>{};
+        final outItems = r['output'];
+        if (outItems is List) {
+          for (final it in outItems) {
+            if (it is! Map) continue;
+            for (final c in dbWikiCitationsOfItem(it)) {
+              acc['${c['url']}'] = c;
+            }
+          }
+        }
+        if (acc.isNotEmpty) onSources(acc.values.toList());
+      }
       if (r is Map && usageAcc != null) {
         final u = r['usage'];
         if (u is Map) {
@@ -541,6 +591,7 @@ Future<DbWikiRound> _dbWikiStreamRound({
   void Function(String)? onReasoning,
   DsUsageAcc? usageAcc,
   String baseUrl = '',
+  void Function(List<Map<String, dynamic>> sources)? onSources,
 }) async {
   var mt = maxTokens;
   if (mt <= 0) mt = 8192;
@@ -561,6 +612,8 @@ Future<DbWikiRound> _dbWikiStreamRound({
   req.headers.set('Content-Type', 'application/json');
   req.headers.set('Authorization', 'Bearer $apiKey');
   req.headers.set('Accept', 'text/event-stream');
+  // ★ 上流圧縮の無効化（思考チェーンが数フレーム分まとめて届くのを防ぐ）
+  req.headers.set('Accept-Encoding', 'identity');
   req.add(utf8.encode(jsonEncode(body)));
 
   final resp = await req.close();
@@ -670,6 +723,20 @@ Future<DbWikiRound> _dbWikiStreamRound({
     if (type == 'response.completed' || type == 'response.incomplete') {
       sawCompleted = true;
       final r = ev['response'];
+      // ★ 联网引用（url_citation）→ 前端交互式卡片（工具模式同样上报）
+      if (onSources != null && r is Map) {
+        final acc = <String, Map<String, dynamic>>{};
+        final citList = r['output'];
+        if (citList is List) {
+          for (final it in citList) {
+            if (it is! Map) continue;
+            for (final c in dbWikiCitationsOfItem(it)) {
+              acc['${c['url']}'] = c;
+            }
+          }
+        }
+        if (acc.isNotEmpty) onSources(acc.values.toList());
+      }
       if (r is Map) {
         final out = r['output'];
         if (out is List) {
@@ -777,6 +844,7 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
   DsUsageAcc? usageAcc, {
   String baseUrl = '',
   List<Map<String, dynamic>> mediaParts = const <Map<String, dynamic>>[],
+  void Function(List<Map<String, dynamic>> sources)? onSources,
 }) async {
   final src = dbWikiNormalizeSources(sources);
   if (src.isEmpty) throw Exception('未选择任何有效的联网内容插件信源');
@@ -817,6 +885,7 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
       onReasoning: onReasoning,
       usageAcc: usageAcc,
       baseUrl: baseUrl,
+      onSources: onSources,
     );
 
     allContent.write(r.content);
@@ -866,6 +935,7 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
     }
     if (repeat >= 4) {
       input.add({
+        'type': 'message',
         'role': 'user',
         'content': [
           {
@@ -880,6 +950,7 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
     final remaining = maxIter - 1 - iter;
     if (remaining <= 200 && remaining > 0) {
       input.add({
+        'type': 'message',
         'role': 'user',
         'content': [
           {

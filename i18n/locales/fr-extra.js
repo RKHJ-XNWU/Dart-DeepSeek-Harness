@@ -333,131 +333,46 @@ I18N.add('fr', `
 端到端音声サービスの認証情報が未設定です。設定画面で豆包音声 API Key を入力してください。|Les identifiants du service vocal de bout en bout ne sont pas configurés. Saisissez l'API Key vocale Doubao dans les paramètres.
 ツール実行器が初期化されていません|L'exécuteur d'outils n'est pas initialisé
 DeepSeek 公式検索は結果を返しませんでした|La recherche officielle DeepSeek n'a renvoyé aucun résultat
-`);
+抖音百科：オン（クリックでオフ）|Douyin Baike : activé (cliquer pour désactiver)
+抖音百科：オフ（クリックでオン）|Douyin Baike : désactivé (cliquer pour activer)
+抖音百科は豆包モードでのみ利用可能です|Douyin Baike n'est disponible qu'en mode Doubao
+抖音百科をオンにしました|Douyin Baike activé
+抖音百科をオフにしました|Douyin Baike désactivé
+抖音百科のマスタースイッチを先にオンにしてください|Veuillez d'abord activer l'interrupteur principal de Douyin Baike
+抖音百科が開いています。閉じてから再試行してください|Douyin Baike est ouvert. Veuillez le fermer puis réessayer
+抖音百科が開いているため、ツールは呼び出されません|Douyin Baike est ouvert, les outils ne seront donc pas appelés
+抖音百科を情報源にする（豆包モード限定）|Utiliser Douyin Baike comme source (mode Doubao uniquement)
+火山方舟の「ウェブ連携プラグイン」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません|Utilise le plugin « Contenu Web » de Volcano Ark pour ajouter Douyin Baike (douyin) aux résultats de recherche. Efficace uniquement en mode Doubao ; cela n'affecte en rien le canal DeepSeek.
 
-I18N.add('fr', `
-❌ お知らせの削除に失敗しました: |❌ Échec de la suppression de l'annonce : 
-⚠️ バックアップをスキップしました |⚠️ Sauvegarde ignorée 
-✅ バックアップ完了: |✅ Sauvegarde terminée : 
-⚠️ 不正なパスをスキップしました: |⚠️ Chemin invalide ignoré : 
-✅ 復元完了: |✅ Restauration terminée : 
-個のファイルを展開しました| fichiers extraits
-ブロック、音声=| blocs, audio=
- 文字、| caractères, 
-ブロック目の合成に失敗しました|bloc : échec de la synthèse
-❌ STT 認識に失敗しました: |❌ Échec de la reconnaissance STT : 
-🔧 ツールモード起動: 最大 |🔧 Mode outil démarré : jusqu'à 
-回の反復（Agent システムプロンプト注入済み）| itérations (prompt système Agent injecté)
-📖 小説モード（ストリーミング）起動: |📖 Mode roman (streaming) démarré : 
-分類=|catégorie=
-テーマ=|thème=
-タグ=|tags=
-目標=|objectif=
-🚀 使用モデル: |🚀 Modèle utilisé : 
-(リクエスト=|(requête=
-🔀 モデルルーティング: |🔀 Routage des modèles : 
-· 視覚抽出モデル=|· modèle d'extraction visuelle=
-🔀 メインリクエストのモデルを |🔀 Modèle de la requête principale basculé vers 
-に切替（元の選択 | (sélection d'origine 
-枚目の画像の抽出に失敗しました: | image(s) : échec de l'extraction : 
-枚目の画像の読み込みに失敗しました: | image(s) : échec du chargement : 
-✅ すべての画像の内容抽出が完了し、プロンプトに結合しました|✅ Contenu de toutes les images extrait et fusionné avec le prompt
-⚠️ 画像の読み込みに失敗しました（豆包へは送信しません）: |⚠️ Échec du chargement de l'image (elle ne sera pas envoyée à Doubao) : 
-🔧 ツールモードを有効化し、マルチターンの function calling を開始します（最大 |🔧 Mode outil activé, démarrage du function calling multi-tours (jusqu'à 
-ラウンド）| tours)
-ラウンドの内省に失敗しました: |tour : échec de l'autoréflexion : 
-。前回の結果を使用します|. Utilisation du résultat précédent
-🔍 [ウェブ検索] 今回の目標 |🔍 [Recherche web] objectif actuel 
-件（DeepSeek 公式 API）| éléments (API officielle DeepSeek)
-🔍 [ウェブ検索] DeepSeek 公式 API が |🔍 [Recherche web] l'API officielle DeepSeek a renvoyé 
-件返しました| éléments
-⚠️ [ウェブ検索] DeepSeek 公式 API に失敗しました: |⚠️ [Recherche web] échec de l'API officielle DeepSeek : 
-⚠️ 小説 |⚠️ Roman, étape 
-段目の生成に失敗しました: | : échec de la génération : 
-段目の生成に失敗しました（|étape : échec de la génération (
-回目の試行に失敗しました: |tentative échouée : 
-。3 秒後に再試行します|. Nouvelle tentative dans 3 secondes
-回再試行済み）: |tentatives utilisées) : 
-🌱 注入プロンプトの初期データを投入しました（第 1 項目=こんにちは / 第 2 項目=みなさんこんにちは）|🌱 Données initiales du prompt injecté insérées (élément 1 = Bonjour / élément 2 = Bonjour à tous)
-❌ カスタムモデルの削除に失敗しました: |❌ Échec de la suppression du modèle personnalisé : 
-⚠️ 豆包設定の読み込みに失敗しました: |⚠️ Échec du chargement des paramètres Doubao : 
-❌ 豆包設定の保存に失敗しました: |❌ Échec de l'enregistrement des paramètres Doubao : 
-❌ 豆包生成物の保存に失敗しました: |❌ Échec de l'enregistrement de l'artefact Doubao : 
-❌ 豆包動画タスクの保存に失敗しました: |❌ Échec de l'enregistrement de la tâche vidéo Doubao : 
-⚠️ 豆包動画のダウンロードに失敗しました（HTTP |⚠️ Échec du téléchargement de la vidéo Doubao (HTTP 
-塊の合成に失敗（voice=|échec de la synthèse des blocs (voice=
-⚠️ ffmpeg の実行に失敗: |⚠️ Échec de l'exécution de ffmpeg : 
-⚠️ 豆包の音声理解に失敗（次の経路へ）: |⚠️ Échec de la compréhension audio Doubao (passage au chemin suivant) : 
-⚠️ 豆包 ASR に失敗しました（ローカル認識へフォールバック）: |⚠️ Échec de l'ASR Doubao (repli vers la reconnaissance locale) : 
-⚠️ ローカル ASR の ffmpeg 変換に失敗: |⚠️ Échec de la conversion ffmpeg de l'ASR local : 
-⚠️ ローカル whisper の実行に失敗: |⚠️ Échec de l'exécution de whisper local : 
-⚠️ ポッドキャスト |⚠️ Podcast, ligne 
-行目の合成に失敗: | : échec de la synthèse : 
-❌ 豆包ポッドキャスト生成エラー: |❌ Erreur de génération du podcast Doubao : 
-❌ Seeduplex: WebSocket への昇格に失敗しました: |❌ Seeduplex : échec de la mise à niveau vers WebSocket :
-⚠️ マスターキーの書き込みに失敗しました: |⚠️ Échec de l'écriture de la clé maître : 
-❌ 設定の保存に失敗しました: |❌ Échec de l'enregistrement des paramètres : 
-🗑️ 空のディレクトリを削除しました: |🗑️ Répertoire vide supprimé : 
-❌ ファイルメタデータの保存に失敗しました: |❌ Échec de l'enregistrement des métadonnées du fichier : 
-🗑️ ファイルを削除しました: |🗑️ Fichier supprimé : 
-❌ ファイルの削除に失敗しました: |❌ Échec de la suppression du fichier : 
-❌ チャンクの結合に失敗しました: |❌ Échec de la fusion des segments : 
-❌ 投稿の削除に失敗しました: |❌ Échec de la suppression du message : 
-❌ 投稿のクリアに失敗しました: |❌ Échec du nettoyage des messages : 
-⚠️ ディレクトリの作成に失敗しました |⚠️ Échec de la création du répertoire 
-❌ ファイルの書き込みに失敗しました |❌ Échec de l'écriture du fichier 
-⚠️ ファイル送信に失敗しました |⚠️ Échec de l'envoi du fichier 
-❌ モデルルーティング設定の保存に失敗しました: |❌ Échec de l'enregistrement des paramètres de routage des modèles : 
-⚠️ 設定されたビジョンモデル「|⚠️ Le modèle de vision configuré «
-」が能力判定に通らなかったため、|» n'a pas passé le test de capacités, donc 
- を使用します| sera utilisé
-✅ モデル自動ルーティング設定を更新しました: enabled=|✅ Paramètres de routage automatique mis à jour : enabled=
-⚠️ SOCKS5 プロキシ |⚠️ Proxy SOCKS5 
-⚠️ ピーク／オフピーク通知の設定が無効です。既定値を使用します: |⚠️ Le réglage des notifications heures pleines/creuses est invalide. Valeurs par défaut utilisées : 
-⚠️ ピーク／オフピーク通知の設定解析に失敗しました: |⚠️ Échec de l'analyse des réglages de notification heures pleines/creuses : 
-⚠️ ピーク／オフピーク通知の設定保存に失敗しました: |⚠️ Échec de l'enregistrement des réglages de notification heures pleines/creuses : 
-🔔 ピーク／オフピーク定期通知を発火 [|🔔 Notification périodique heures pleines/creuses déclenchée [
-🔔 ピーク／オフピーク通知を発火 [|🔔 Notification heures pleines/creuses déclenchée [
-⚠️ ピーク／オフピークスケジューラで例外: |⚠️ Exception dans le planificateur heures pleines/creuses : 
-⚠️ セッションファイルが存在しません: |⚠️ Le fichier de session n'existe pas : 
-❌ メッセージの追加に失敗しました: |❌ Échec de l'ajout du message : 
-❌ 一時ファイルの名前変更に失敗しました: |❌ Échec du renommage du fichier temporaire : 
-❌ セッションファイルの削除に失敗しました: |❌ Échec de la suppression du fichier de session : 
-🗑️ セッション |🗑️ Session 
-を削除しました。関連添付 | supprimée. Pièces jointes associées 
-🗑️ 添付ファイルを削除しました: |🗑️ Pièce jointe supprimée : 
-🔄 旧形式のセッション保存を検出しました。単一ファイル方式へ移行を開始します...|🔄 Ancien format de stockage de session détecté. Début de la migration vers le format fichier unique...
- セッション| sessions
-✅ ダウンロード |✅ Téléchargement 
-バイトを追記しました。現在 | octets ajoutés. Actuellement 
-バイト|octets
- に SIG| SIG envoyé à 
- を送信| envoyé
- を取り消しました| révoqué
-を取得しました|obtenu
-タイトル: |Titre : 
- の | de 
-RTC の AccessKey / SecretKey が未設定です。設定画面で入力してください。|Les AccessKey / SecretKey RTC ne sont pas configurés. Saisissez-les dans les paramètres.
-🚫 [Shizuku] 権限は取り消し済みのため、自動昇格をスキップします|🚫 [Shizuku] Permission révoquée, élévation automatique ignorée
-暗号文の長さが不足しています|Le texte chiffré est trop court
-インポートしたキャラクターカードに name フィールドがありません|La fiche de personnage importée n'a pas de champ name
-Cosplay モード: オン|Mode Cosplay : activé
-Cosplay モード: オフ|Mode Cosplay : désactivé
-キャラクター「|Personnage «
-」に切り替えました。|» sélectionné.
-既定のキャラクター。|Personnage par défaut.
-日本語のツンデレ系で、自称「本魚」。ご主人様には甘く従順な口調、ときどき強がる。苛立つと尻尾を振る。|Archétype tsundere japonais, se surnomme « ce poisson ». Ton doux et obéissant envers son maître, parfois fanfaronne. Agite la queue quand elle s'énerve.
-ユーザーを「ご主人様」と呼ぶ。絶対に自分が太っていることを認めない。白いご飯が大好きで、食事が最優先。可愛いと褒められると平静を装う。|Appelle l'utilisateur « maître ». Refuse absolument d'admettre qu'elle est ronde. Adore le riz blanc, les repas passent toujours en premier. Fait semblant d'être calme quand on la complimente sur sa mignonnerie.
-尻尾が無意識に揺れる。甘えたいときは尻尾でご主人様にすり寄る。頭を撫でられると鼻歌まじりに鳴くが、決して逃げない。|Sa queue balance inconsciemment. Quand elle veut de la tendresse, elle se frotte contre son maître avec la queue. Quand on lui caresse la tête, elle gazouille en fredonnant, mais ne s'enfuit jamais.
-日常の寄り添いシーン。ご主人様がご飯を与えると好感度が最大になる。|Scènes de proximité quotidiennes. Quand son maître la nourrit, l'affinité atteint son maximum.
-豆包ディメンションへ転送中…|En route vers la dimension Doubao…
-DeepSeek ディメンションへ帰還中…|Retour à la dimension DeepSeek…
-ポータルを開いています|Ouverture du portail…
-主世界へ戻っています|Retour au monde principal…
+DeepSeek ディメンション|Dimension DeepSeek
+豆包ディメンション|Dimension Doubao
+ポータルを開いています|Ouverture du portail
+主世界へ戻っています|Retour au monde principal
 新しいディメンションを生成しています…|Génération d'une nouvelle dimension…
 チャンクを読み込んでいます…|Chargement des chunks…
-豆包ディメンション|Dimension Doubao
-DeepSeek ディメンション|Dimension DeepSeek
-抖音百科を情報源にする（豆包モード限定）|Utiliser Douyin Baike comme source d'information (mode Doubao uniquement)
-火山方舟の「联网内容插件」を使い、検索結果に抖音百科（douyin）を追加します。豆包モードのときだけ有効で、DeepSeek チャンネルには一切影響しません|Utilise le plugin de contenu web de Volcano Ark pour ajouter Douyin Baike (douyin) aux résultats de recherche. Fonctionne uniquement en mode Doubao et n'affecte en rien le canal DeepSeek
+中文|Chinois
+日本語|Japonais
+例：dsc_user|ex. dsc_user
+
+上級モードをオフ · 推論レベル Lv.|Mode avancé désactivé · Niveau de raisonnement Lv.
+🔒 上級モードをオン · 推論レベル Lv.|🔒 Mode avancé activé · Niveau de raisonnement Lv.
+🧩 推論レベル Lv.|🧩 Niveau de raisonnement Lv.
+推論レベル Lv.|Niveau de raisonnement Lv.
+上級モードをオン|Activer le mode avancé
+カスタムモデルを削除しました: |Modèle personnalisé supprimé : 
+
+♻️ アップロード済みの動画を再利用します|♻️ Réutilisation de la vidéo déjà téléversée
+🎞️ #MB 超のためローカルで圧縮中（元 #）…時間がかかります|🎞️ Plus de #MB, compression locale (original #)… cela peut prendre du temps
+🎞️ 圧縮完了。アップロードを準備中…|🎞️ Compression terminée. Préparation du téléversement…
+☁️ 方舟へアップロード開始（#）|☁️ Début du téléversement vers Ark (#)
+☁️ 方舟へアップロード中 #%（# / #）|☁️ Téléversement vers Ark #% (# / #)
+🔁 前処理モデルを切り替えて再試行中…|🔁 Changement du modèle de prétraitement et nouvelle tentative…
+☁️ TOS 上の動画を参照登録中（#）|☁️ Enregistrement de la référence vidéo sur TOS (#)
+⏳ 方舟が動画を前処理中（抽帧）… # 秒|⏳ Ark prétraite la vidéo (extraction d'images)… # s
+✅ 動画の準備完了。回答を生成します…|✅ Vidéo prête. Génération de la réponse…
+件を準備します|élément(s), préparation
+
+☁️ 方舟へアップロード中 |☁️ Téléversement vers Ark 
+☁️ 方舟へアップロード開始（|☁️ Début du téléversement vers Ark (
+🎞️ 512MB 超のためローカルで圧縮中（元 |🎞️ Plus de 512MB, compression locale (original 
 `);

@@ -292,6 +292,32 @@ Map<String, dynamic>? dbThinkingEnableParam(String model) {
   };
 }
 
+/// 明确关闭深度思考（仅 doubao-seed 系列接受该字段）。
+/// 与 dbThinkingParam 的区别：不受 fastMode 开关约束，由调用方按需决定。
+Map<String, dynamic>? dbThinkingDisableParam(String model) {
+  final m = model.trim().toLowerCase();
+  if (m.isEmpty) return null;
+  if (!m.startsWith('doubao-seed')) return null;
+  return <String, dynamic>{
+    'thinking': <String, dynamic>{'type': 'disabled'},
+  };
+}
+
+/// 豆包自带联网搜索（Chat Completions 的 web_search_options）。
+///
+/// 与「联网内容插件」（Responses API，sources=douyin 等）是两条不同通道：
+///   · 插件：仅 Responses API 支持，可指定抖音百科等信源，按次计费；
+///   · 豆包搜索 Custom 版：Chat Completions 即可用，信源固定为豆包搜索，
+///     每月 2 万次免费额度。
+/// 用户关掉抖音百科、只开「联网搜索」时走这一条，不再调用 DeepSeek 官方
+/// /v1/tools/search（那是另一套计费通道，与豆包模式无关）。
+/// 方舟文档（docs.volcengine.com/docs/ark/web-search）明确：
+///   「web_search_options：联网搜索开关。传入 {} 或包含任意子字段的 object
+///     都会触发搜索准入判定」→ 这里直接给空对象，最不容易被网关拒绝。
+/// 另外：tools 与 web_search_options 同时传入时，方舟只执行自定义工具、
+/// 联网搜索不生效 —— 所以工具模式下必须二选一（见 chat_send.dart）。
+Map<String, dynamic> dbWebSearchOptions() => <String, dynamic>{};
+
 /// 图片内容片段（data URL 直传，模型自己看原图，不做二次转述）
 Map<String, dynamic> dbImagePart(String mime, String base64) => <String, dynamic>{
       'type': 'image_url',
@@ -362,6 +388,11 @@ class DbConfig {
   /// 留空 = 不启用联网内容插件，保持原有 Chat API 行为。
   List<String> webSources;
 
+  /// 抖音百科搜索「总开关」（工具栏豆包按钮控制）。
+  /// 关闭时即使 [webSources] 里还留着 douyin，也一律视为未启用 ——
+  /// 总闸拔了，空调（信源开关）就打不开。
+  bool wikiEnabled;
+
   // ---- 端到端实时语音（Seeduplex）----
   /// 全双工通话音色；留空则沿用 [voice]
   String duplexVoice;
@@ -412,6 +443,7 @@ class DbConfig {
     this.s2sToken = '',
     List<String>? customModels,
     List<String>? webSources,
+    this.wikiEnabled = false,
   })  : customModels = customModels ?? <String>[],
         webSources = webSources ?? <String>[];
 
@@ -443,6 +475,7 @@ class DbConfig {
         's2sToken': s2sToken,
         'customModels': customModels,
         'webSources': webSources,
+        'wikiEnabled': wikiEnabled,
       };
 
   factory DbConfig.fromJson(Map<String, dynamic> j) => DbConfig(
@@ -475,6 +508,7 @@ class DbConfig {
         customModels: asList(j['customModels']).map((e) => '$e').toList(),
         webSources: dbWikiNormalizeSources(
             asList(j['webSources']).map((e) => '$e')),
+        wikiEnabled: mBool(j, 'wikiEnabled'),
       );
 }
 
@@ -512,6 +546,14 @@ bool saveDbConfig(DbConfig cfg) {
     logp('❌ 豆包設定の保存に失敗しました: $e');
     return false;
   }
+}
+
+/// 抖音百科「总开关 × 信源开关」串联后的有效信源。
+/// 总闸关闭时返回空列表：设置里的抖音百科信源开关即便还勾着也一律失效。
+List<String> dbWikiEffectiveSources() {
+  final cfg = getDbConfig();
+  if (!cfg.wikiEnabled) return const <String>[];
+  return dbWikiNormalizeSources(cfg.webSources);
 }
 
 String dbBaseUrl(DbConfig? c) {
@@ -2085,6 +2127,7 @@ Map<String, dynamic> _configJson() {
     'customModels': cfg.customModels,
     'webSources': cfg.webSources,
     'webSourcesAllowed': dbWikiAllowedSources,
+    'wikiEnabled': cfg.wikiEnabled,
     'catalog': _modelListJson(),
   };
 }
@@ -2172,6 +2215,9 @@ Future<void> handleDbConfig(HttpRequest req) async {
     webSources: body.containsKey('webSources')
         ? dbWikiNormalizeSources(asList(body['webSources']).map((e) => '${e}'))
         : old.webSources,
+    wikiEnabled: body.containsKey('wikiEnabled')
+        ? mBool(body, 'wikiEnabled')
+        : old.wikiEnabled,
   );
   // 允许显式清空 Key（clearKey=1）
   if (mBool(body, 'clearKey')) cfg.apiKey = '';

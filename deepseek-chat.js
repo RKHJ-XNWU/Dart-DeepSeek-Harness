@@ -197,6 +197,8 @@
         hasMore: false,
         loadingOlder: false,
         keepScroll: false,
+        // ★ 豆包モード：引用カードを最初から開いておくか（ヘッダで切替）
+        srcOpenAll: false,
         pendingScrollTop: 0,
         pendingScrollHeight: 0,
         scrollTick: false,
@@ -214,6 +216,21 @@
             done: false,
             lastRenderTs: 0,
             lastScrollTs: 0,
+            // ★ 思考チェーン描画用：差分書き込みの進捗とスロットル時刻
+            lastThinkTs: 0,
+            thinkDomText: '',
+            thinkDomNode: null,   // 再利用する単一テキストノード
+            lastThinkScrollTs: 0,
+            lastThinkTickTs: 0,
+            thinkCarry: 0,
+            thinkRate: 0,
+            // ★ 本文描画の自己調整間隔（renderMarkdown の実測コストから算出）
+            renderGap: 0,
+            // ★ 豆包モード限定：インタラクティブ引用カードのデータ
+            srcItems: [],
+            srcSeen: {},
+            // ★ 本文の最終描画済み文字列（同じ内容を再描画しないため）
+            lastContentDrawn: '',
         },
     };
 
@@ -2114,65 +2131,257 @@
     // ============================================================
     // ★ 高速版タイプライター：最初の文字を素早く表示 + 大きなステップ幅
     // ============================================================
+    // 豆包（方舟）通道判定：只用于打字机步长分支，DeepSeek 通道不受影响。
+    function dscTyperIsDoubao() {
+        try {
+            if (dscDimKey() === 'db') return true;
+            return dscIsDoubaoModelId(dscDimModel());
+        } catch (e) { return false; }
+    }
+
+    // ============================================================
+    // ★ 豆包モード専用：インタラクティブな引用カード
+    //   SSE 'sources' で {items:[{title,url,snippet,source}]} が届く。
+    //     ・ヘッダをタップ → カード群を折りたたみ / 展開
+    //     ・カード本体をタップ → 摘要を展開
+    //     ・タイトルをタップ → 新しいタブで元ページを開く
+    //   DeepSeek 通道ではバックエンドが 'sources' を送らないので、
+    //   この UI は豆包モードでのみ現れる（要件：豆包モード限定）。
+    // ============================================================
+    function dscBindSrcHost(host) {
+        if (!host || host.dataset.srcBound === '1') return;
+        host.dataset.srcBound = '1';
+        host.addEventListener('click', function (ev) {
+            var tn = ev.target;
+            if (!tn || !tn.closest) return;
+            if (tn.closest('.dsc-src-head')) {
+                state.srcOpenAll = !state.srcOpenAll;
+                dscRenderSrcCards(host, state.typer.srcItems);
+                return;
+            }
+            var card = tn.closest('.dsc-src-card');
+            if (!card) return;
+            if (tn.tagName === 'A') return;   // リンクはそのまま開く
+            card.classList.toggle('open');
+            var exp = card.querySelector('.dsc-src-exp');
+            if (exp) exp.textContent = card.classList.contains('open') ? '－' : '＋';
+        });
+    }
+
+    function dscSrcHost(aiMsgEl, create) {
+        if (!aiMsgEl) return null;
+        var host = aiMsgEl.querySelector('.dsc-src-cards');
+        if (!host && create) {
+            host = document.createElement('div');
+            host.className = 'dsc-src-cards';
+            var bubble = aiMsgEl.querySelector('.dsc-msg-bubble');
+            if (bubble && bubble.parentNode) {
+                bubble.parentNode.insertBefore(host, bubble.nextSibling);
+            } else {
+                (aiMsgEl.querySelector('.dsc-msg-content') || aiMsgEl).appendChild(host);
+            }
+            dscBindSrcHost(host);
+        }
+        return host;
+    }
+
+    function dscRenderSrcCards(host, items) {
+        if (!host) return;
+        items = items || [];
+        if (!items.length) { host.style.display = 'none'; return; }
+        var openAll = !!state.srcOpenAll;
+        var html = '<div class="dsc-src-head" role="button" tabindex="0">' +
+            '<span class="dsc-src-ic">🔗</span>' +
+            '<span class="dsc-src-tt">' + dscT('联网来源') + ' · ' + items.length + '</span>' +
+            '<span class="dsc-src-arrow">' + (openAll ? '▾' : '▸') + '</span>' +
+            '</div><div class="dsc-src-list">';
+        for (var i = 0; i < items.length; i++) {
+            var s = items[i] || {};
+            var dom = '';
+            try { dom = new URL(s.url).hostname.replace(/^www\./, ''); }
+            catch (e) { dom = s.source || ''; }
+            var snip = s.snippet || '';
+            html += '<div class="dsc-src-card' + (openAll && snip ? ' open' : '') + '">' +
+                '<span class="dsc-src-idx">' + (i + 1) + '</span>' +
+                '<div class="dsc-src-main">' +
+                '<a class="dsc-src-title" href="' + escapeHtml(s.url || '#') + '" target="_blank" rel="noopener noreferrer">' +
+                escapeHtml(s.title || s.url || '') + '</a>' +
+                '<span class="dsc-src-meta">' + escapeHtml(dom) + '</span>' +
+                (snip ? '<div class="dsc-src-snip">' + escapeHtml(snip) + '</div>' : '') +
+                '</div>' +
+                (snip ? '<span class="dsc-src-exp">' + (openAll ? '－' : '＋') + '</span>' : '') +
+                '</div>';
+        }
+        html += '</div>';
+        host.innerHTML = html;
+        host.style.display = '';
+        host.classList.toggle('collapsed', !openAll);
+    }
+
+    // ★ 思考チェーン本文の描画：単一のテキストノードを書き換える方式（O(1) ノード）
+    //   旧実装は増えた分を毎回 appendChild していたため、長い思考では
+    //   テキストノードが数千個に増え、1 フレームごとのレイアウト/描画コストが
+    //   線形に膨らんで「一卡一卡」になっていた。
+    //   ここでは常に 1 ノードの data を差し替えるだけにして、
+    //   思考が何万字になっても 1 回の描画コストを一定に保つ。
+    function dscFlushThinkText(t, forceScroll) {
+        var el = t.thinkBodyEl;
+        if (!el) return;
+        var txt = t.reasoningShown || '';
+        var prev = (typeof t.thinkDomText === 'string') ? t.thinkDomText : '';
+        if (txt !== prev) {
+            var node = t.thinkDomNode;
+            if (!node || node.parentNode !== el) {
+                el.textContent = '';
+                node = document.createTextNode(txt);
+                el.appendChild(node);
+                t.thinkDomNode = node;
+            } else {
+                node.data = txt;
+            }
+            t.thinkDomText = txt;
+        }
+        if (t.thinkPanelEl && t.thinkPanelEl.classList.contains('open')) {
+            var now = (window.performance && performance.now) ? performance.now() : Date.now();
+            if (forceScroll || !t.lastThinkScrollTs || now - t.lastThinkScrollTs > 120) {
+                t.lastThinkScrollTs = now;
+                // ユーザーが上へスクロールして読んでいる間は追従しない
+                var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+                if (forceScroll || gap < 48) el.scrollTop = el.scrollHeight;
+            }
+        }
+    }
+
     function startTyper() {
         var t = state.typer;
         if (t.rafId) return;
 
         function tick(ts) {
             t.rafId = null;
-            var needRender = false;
 
+            // ★ SSE が done になったら、残りは次フレームで即座に確定させる
+            if (t.done) {
+                if (t.contentShown !== t.contentBuf) t.contentShown = t.contentBuf;
+                if (t.reasoningShown !== t.reasoningBuf) t.reasoningShown = t.reasoningBuf;
+            }
+
+            // 本文：タイプライタ風に追従（チャネル別の歩幅）
             if (t.contentShown.length < t.contentBuf.length) {
                 var remain = t.contentBuf.length - t.contentShown.length;
-                // ★ 高速化：ステップ幅を 2~120 から 8~400 に拡大
-                var step = Math.max(8, Math.min(400, Math.ceil(remain / 3)));
+                var step;
+                if (dscTyperIsDoubao()) {
+                    // 1200 字を一気に飲み込むと、次の描画で 1 画面ぶん飛ぶ。
+                    // 1 フレーム 600 字までに抑えて「流れて見える」速度を保つ。
+                    step = remain <= 24
+                        ? Math.max(1, Math.ceil(remain / 4))
+                        : Math.max(10, Math.min(600, Math.ceil(remain / 3)));
+                } else {
+                    step = Math.max(8, Math.min(400, Math.ceil(remain / 3)));
+                }
                 t.contentShown = t.contentBuf.slice(0, t.contentShown.length + step);
-                needRender = true;
-            }
-            if (t.reasoningShown.length < t.reasoningBuf.length) {
-                var remainR = t.reasoningBuf.length - t.reasoningShown.length;
-                // ★ 高速化：思考チェーンのステップ幅を 4~300 から 15~800 に拡大
-                var stepR = Math.max(15, Math.min(800, Math.ceil(remainR / 2)));
-                t.reasoningShown = t.reasoningBuf.slice(0, t.reasoningShown.length + stepR);
-                needRender = true;
             }
 
-            // ★ 描画頻度：短文 40ms、長文は間引く
-            //  renderMarkdown は毎回全文を走査するため、長い応答では
-            //  描画間隔を広げないとメインスレッドを占有して「流れが遅く」見える
-            var renderInterval = 40;
-            var contentLen = t.contentBuf.length;
-            if (contentLen > 12000) renderInterval = 160;
-            else if (contentLen > 6000) renderInterval = 110;
-            else if (contentLen > 2500) renderInterval = 70;
-            if (needRender && (!t.lastRenderTs || ts - t.lastRenderTs > renderInterval)) {
-                t.lastRenderTs = ts;
-                if (t.bubbleEl) t.bubbleEl.innerHTML = renderMarkdown(t.contentShown);
-                if (t.thinkBodyEl) {
-                    t.thinkBodyEl.textContent = t.reasoningShown;
-                    if (t.thinkPanelEl && t.thinkPanelEl.classList.contains('open')) {
-                        t.thinkBodyEl.scrollTop = t.thinkBodyEl.scrollHeight;
+            // ★ 思考チェーン：時間駆動の平滑再生（「一卡一卡」の根治）
+            //   実測：SSE の reasoning は 0.01〜1.0 秒のムラでまとめて届く。
+            //   方舟（豆包）通道では 1 回で数百字まとめて来ることもある。
+            //   旧実装は積圧が 1500 字を超えた瞬間に「全部出す」だったため、
+            //     突然ドバッと飛ぶ → 次の塊が届くまで完全停止（一卡一卡）
+            //   を交互に繰り返していた。ここでは
+            //     rate = 積圧 / 0.45 秒（上限 6000 字/秒、毎フレーム 18% で慣性追従）
+            //     adv  = 1 フレーム上限 900 字
+            //   として、積圧がどれだけ大きくても「出続ける」ことを保証する。
+            var nowTs = (typeof ts === 'number' && ts > 0)
+                ? ts
+                : ((window.performance && performance.now) ? performance.now() : Date.now());
+            if (!t.lastThinkTickTs) t.lastThinkTickTs = nowTs;
+            var dtT = nowTs - t.lastThinkTickTs;
+            if (dtT < 0) dtT = 0;
+            if (dtT > 250) dtT = 250;   // タブ復帰時に一気に吐き出さない
+            t.lastThinkTickTs = nowTs;
+
+            var backlogR = t.reasoningBuf.length - t.reasoningShown.length;
+            if (backlogR > 0) {
+                if (t.done) {
+                    // ストリーム終了時だけは即確定（残って「あと少し」で止まらない）
+                    t.reasoningShown = t.reasoningBuf;
+                    t.thinkCarry = 0;
+                } else {
+                    // ★ 速度にも慣性を持たせる：目標速度へ毎フレーム最大 18% ずつ
+                    //   近づける。目標をそのまま使うと、塊が届くたびに
+                    //   「急加速 → 急停止」を繰り返し、それが一卡一卡に見える。
+                    var targetRate = backlogR / 0.45;
+                    if (targetRate < 120) targetRate = 120;
+                    if (targetRate > 6000) targetRate = 6000;
+                    var prevRate = (typeof t.thinkRate === 'number' && t.thinkRate > 0)
+                        ? t.thinkRate : targetRate;
+                    var maxDelta = Math.max(80, prevRate * 0.18);
+                    var diffRate = targetRate - prevRate;
+                    if (diffRate > maxDelta) diffRate = maxDelta;
+                    if (diffRate < -maxDelta) diffRate = -maxDelta;
+                    var rateR = prevRate + diffRate;
+                    t.thinkRate = rateR;
+                    t.thinkCarry = (t.thinkCarry || 0) + rateR * dtT / 1000;
+                    var advR = Math.floor(t.thinkCarry);
+                    if (advR > backlogR) advR = backlogR;
+                    if (advR > 900) advR = 900;   // 1 フレームの上限（瞬間移動を防ぐ）
+                    if (advR > 0) {
+                        t.thinkCarry -= advR;
+                        t.reasoningShown = t.reasoningBuf.slice(0, t.reasoningShown.length + advR);
                     }
                 }
-                // ★ スクロール頻度：120ms → 80ms
-                if (!t.lastScrollTs || ts - t.lastScrollTs > 80) {
-                    t.lastScrollTs = ts;
-                    var wrap = $('dscMessages');
-                    if (wrap && isNearBottom(wrap, NEAR_BOTTOM_THRESHOLD)) {
-                        wrap.scrollTop = wrap.scrollHeight;
-                    }
+            } else {
+                t.thinkCarry = 0;
+            }
+
+            // ★ 本文の描画：固定間隔をやめ、直前の描画実測コストから次の間隔を決める。
+            //   長文で renderMarkdown が 100ms を超えると 40ms 固定では
+            //   メインスレッドが常に埋まり、思考チェーンまで巻き添えで停止する
+            //   （これが「思考が一卡一卡」の主因）。実測コストの 2.2 倍まで空ける。
+            var nowPerf = (window.performance && performance.now) ? performance.now() : Date.now();
+            var minGap = dscTyperIsDoubao() ? 45 : 60;
+            var renderGap = t.renderGap || minGap;
+            var contentDirty = !!t.bubbleEl && t.lastContentDrawn !== t.contentShown;
+            if (contentDirty && (t.done || !t.lastRenderTs ||
+                    nowPerf - t.lastRenderTs >= renderGap)) {
+                var rc0 = nowPerf;
+                t.bubbleEl.innerHTML = renderMarkdown(t.contentShown);
+                t.lastContentDrawn = t.contentShown;
+                var rc1 = (window.performance && performance.now) ? performance.now() : Date.now();
+                var renderCost = rc1 - rc0;
+                t.lastRenderTs = rc1;
+                t.renderGap = Math.max(minGap, Math.min(600, Math.round(renderCost * 2.2) + 24));
+            }
+
+            // 思考チェーンの描画（50ms 間隔。本文の描画と競合しない程度に間引く）
+            if (t.thinkBodyEl && t.reasoningShown !== t.thinkDomText) {
+                if (t.done || !t.lastThinkTs || nowPerf - t.lastThinkTs > 50) {
+                    t.lastThinkTs = nowPerf;
+                    dscFlushThinkText(t, false);
+                }
+            }
+
+            // 画面スクロール（本文が伸びた時だけ・150ms 間隔）
+            if ((contentDirty || t.done) && (!t.lastScrollTs || nowPerf - t.lastScrollTs > 150)) {
+                t.lastScrollTs = nowPerf;
+                var wrap = $('dscMessages');
+                if (wrap && isNearBottom(wrap, NEAR_BOTTOM_THRESHOLD)) {
+                    wrap.scrollTop = wrap.scrollHeight;
                 }
             }
 
             var stillWriting =
                 t.contentShown.length < t.contentBuf.length ||
-                t.reasoningShown.length < t.reasoningBuf.length;
+                t.reasoningShown !== t.reasoningBuf ||
+                (!!t.bubbleEl && t.lastContentDrawn !== t.contentShown);
 
             if (stillWriting || !t.done) {
                 t.rafId = requestAnimationFrame(tick);
             } else {
-                if (t.bubbleEl) t.bubbleEl.innerHTML = renderMarkdown(t.contentBuf);
-                if (t.thinkBodyEl) t.thinkBodyEl.textContent = t.reasoningBuf;
+                if (t.bubbleEl) {
+                    t.bubbleEl.innerHTML = renderMarkdown(t.contentBuf);
+                    t.lastContentDrawn = t.contentBuf;
+                }
+                dscFlushThinkText(t, true);
                 if (t.msgEl) requestAnimationFrame(function () { renderMath(t.msgEl); });
             }
         }
@@ -2253,6 +2462,17 @@
         t.done = false;
         t.lastRenderTs = 0;
         t.lastScrollTs = 0;
+        t.lastThinkTs = 0;
+        t.lastThinkScrollTs = 0;
+        t.lastThinkTickTs = 0;
+        t.thinkCarry = 0;
+        t.thinkRate = 0;
+        t.thinkDomText = '';
+        t.thinkDomNode = null;
+        t.renderGap = 0;
+        t.lastContentDrawn = '';
+        t.srcItems = [];
+        t.srcSeen = {};
 
         var ctrl = new AbortController();
         state.abortCtrl = ctrl;
@@ -2296,6 +2516,14 @@
         t.thinkPanelEl = thinkPanel;
         t.thinkLabelEl = thinkLabel;
         t.msgEl = aiMsgEl;
+        // ★ 新しい思考欄 DOM に合わせて差分書き込みの基準をリセット
+        t.thinkDomText = thinkBody ? (thinkBody.textContent || '') : '';
+        t.thinkDomNode = null;   // 新しい DOM なのでノード参照を捨てる
+        t.renderGap = 0;
+        t.lastContentDrawn = '';
+        t.lastThinkTickTs = 0;
+        t.thinkCarry = 0;
+        t.lastThinkTs = 0;
 
         hideTyping();
         if (aiMsgEl) startTyper();
@@ -2392,6 +2620,7 @@
                     } else if (currentEvent === 'new_round') {
                         t.contentBuf = '';
                         t.contentShown = '';
+                        t.lastContentDrawn = '';
                         if (t.bubbleEl) t.bubbleEl.innerHTML = '';
 
                     } else if (currentEvent === 'round') {
@@ -2434,6 +2663,22 @@
                                 var resultPreview = result.length > 400 ? result.slice(0, 400) + '…' : result;
                                 t.reasoningBuf += '   ' + resultPreview.replace(/\n/g, '\n   ') + '\n';
                             }
+                        }
+
+                    } else if (currentEvent === 'sources') {
+                        // ★ 豆包モード限定：引用カード（重複 URL は捨てる）
+                        var srcList = (obj && obj.items) || [];
+                        if (srcList.length) {
+                            if (!t.srcItems) t.srcItems = [];
+                            if (!t.srcSeen) t.srcSeen = {};
+                            for (var si = 0; si < srcList.length; si++) {
+                                var oneSrc = srcList[si];
+                                if (!oneSrc || !oneSrc.url) continue;
+                                if (t.srcSeen[oneSrc.url]) continue;
+                                t.srcSeen[oneSrc.url] = 1;
+                                t.srcItems.push(oneSrc);
+                            }
+                            dscRenderSrcCards(dscSrcHost(aiMsgEl, true), t.srcItems);
                         }
 
                     } else if (currentEvent === 'error') {
@@ -3021,7 +3266,9 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: false,
                         targetChars: state.longTextTargetChars,
-                        enableTools: state.enableTools || window.__dscDeviceIntent(content),
+                        enableTools: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
+                            ? false
+                            : (state.enableTools || window.__dscDeviceIntent(content)),
                         stream: true,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents()
@@ -3081,7 +3328,9 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: state.longTextMode,
                         targetChars: state.longTextTargetChars,
-                        enableTools: state.enableTools || window.__dscDeviceIntent(content),
+                        enableTools: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
+                            ? false
+                            : (state.enableTools || window.__dscDeviceIntent(content)),
                         stream: false,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents() : [])
@@ -4590,6 +4839,18 @@
         updateSwitchBtn($('dscToolModeBtn'), state.enableTools);
     }
 
+    // 抖音百科（联网内容插件）开启期间必须强制关闭工具模式：
+    // 两者分别占用 Responses API 与 Chat Completions 的工具链，混用会相互抢占。
+    // 这里把开关暴露给 dsc-doubao.js，供总闸切换时立即生效。
+    window.dscSetToolMode = function (on) {
+        var want = !!on;
+        if (state.enableTools === want) return;
+        state.enableTools = want;
+        updateToolUI();
+        saveToolState();
+    };
+    window.dscGetToolMode = function () { return !!state.enableTools; };
+
     function cleanTextForTTS(text, lang) {
         if (!text) return '';
         lang = lang || detectTTSLang(text);
@@ -4984,6 +5245,12 @@
         });
 
         bind('dscToolModeBtn', 'click', function () {
+            // 抖音百科开启中：工具模式不允许打开（后端同样会强制关闭）
+            if (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn()) {
+                if (typeof window.dscSetToolMode === 'function') window.dscSetToolMode(false);
+                toast(T('抖音百科が開いています。閉じてから再試行してください'), 'info');
+                return;
+            }
             state.enableTools = !state.enableTools;
             updateToolUI();
             saveToolState();
