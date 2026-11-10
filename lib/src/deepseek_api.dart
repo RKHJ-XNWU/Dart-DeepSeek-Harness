@@ -717,23 +717,7 @@ Future<void> callDsChatAPIStream(
 //   · 同签名累计 8 次  → 判定无进展，硬收尾（防 A→B→A→B 交替空转）
 // ------------------------------------------------------------
 
-/// 同一轮工具调用签名（工具名 + 参数）累计出现多少次判定为「原地打转」。
-/// 取 8：给模型留出「失败后换方案重试」的空间（常见 2〜3 次），
-/// 又不至于让一次参数微调被误杀。
-const int _dsToolSigGiveUp = 8;
 
-/// 轮次预算提示的门槛。
-/// 仅当 maxIter 是「有限且规模合理」时末尾提示才有意义；
-/// 对哨兵值启用会让 `remaining <= 阈值` 退化为恒假（50 亿），
-/// 而对小上限（豆包旧档位 6/10/16/20）则恒真、每轮都注入劝退提示，两种都不对。
-const int _dsBudgetFiniteMax = 10000;
-
-/// 计算轮次预算提示的触发阈值，返回 0 表示本场景不启用预算提示。
-int _dsBudgetWarnAt(int maxIter) {
-  if (maxIter <= 0 || maxIter > _dsBudgetFiniteMax) return 0;
-  final v = maxIter ~/ 10;
-  return v < 1 ? 1 : v;
-}
 
 // ------------------------------------------------------------
 // 工具模式：流式多轮
@@ -768,13 +752,7 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
   final finalReasoning = StringBuffer();
   final toolLogs = <String>[];
   final msgs = <Map<String, dynamic>>[...messages];
-  var lastToolSig = '';
-  var repeatCount = 0;
-  final sigSeen = <String, int>{};
-  // 豆包通道：被判为「原地打转」的签名，下一轮跳过执行，只回一句换路提示
   final dbSkipSigs = <String>{};
-  var dbSkipTotal = 0;
-  final budgetWarnAt = _dsBudgetWarnAt(maxIter);
   final isDb = dsIsDbModel(model);
 
   for (var iter = 0; iter < maxIter; iter++) {
@@ -849,88 +827,10 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
     //     1) 同一签名连续 2 次 → 注入换路提示；
     //     2) 连续 5 次 / 累计 12 次 → 加入跳过表，下一轮不再真正执行；
     //     3) 累计 30 次 → 跳出循环（保护用户额度），已有日志照常回传。
-    if (isDb) {
-      final sig = roundSigs.join('\u0000');
-      if (sig.isNotEmpty) {
-        if (sig == lastToolSig) {
-          repeatCount++;
-        } else {
-          lastToolSig = sig;
-          repeatCount = 1;
-        }
-        final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
-        if (repeatCount == 2) {
-          msgs.add({
-            'role': 'user',
-            'content':
-                '【系统提示 · 换路】你刚才执行的操作和上一轮完全相同，画面没有变化。'
-                    '不要再用同样的参数重试。下一步请二选一：'
-                    '① 先用 vd_observe 或 vd_screenshot 看清当前画面；'
-                    '② 换一个工具（改坐标、滚动、返回键、重新启动应用）。'
-                    '目标不变，路径必须变。',
-          });
-        }
-        if (repeatCount >= 5 || seen >= 12) {
-          dbSkipSigs.add(sig);
-          msgs.add({
-            'role': 'user',
-            'content':
-                '【系统提示 · 已跳过该重复操作】同一操作已连续 $repeatCount 次 / 累计 $seen 次，'
-                    '画面始终没有变化。该操作已被系统跳过，必须改走别的路径：'
-                    '① 重新 vd_observe 读取画面文字与坐标；'
-                    '② 用 vd_swipe 滚动或用 vd_key 4 返回上一层；'
-                    '③ 用 vd_launch 重新启动目标应用；'
-                    '④ 文件扫描类任务改用 execute_command 一次性列出目录，不要逐个文件反复读。',
-          });
-        }
-        if (dbSkipSigs.contains(sig)) dbSkipTotal++;
-        if (dbSkipTotal >= 30) {
-          logp('\ud83d\uded1 [豆包] 同一操作が累計 30 回繰り返されました。'
-              'これ以上の空回りを防ぐため、ツール呼び出しを打ち切ります。');
-          break;
-        }
-      }
-    }
+    // 纠偏已移除
 
     // 工具调用次数不设上限，由模型自行决定何时收尾；其余通道行为不变。
-    if (!isDb) {
-      // 卡死检测 + 预算感知
-      final sig = roundSigs.join('\u0000');
-      if (sig.isNotEmpty && sig == lastToolSig) {
-        repeatCount++;
-      } else {
-        lastToolSig = sig;
-        repeatCount = 1;
-      }
-      if (repeatCount >= 4) {
-        msgs.add({
-          'role': 'user',
-          'content':
-              '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
-        });
-        repeatCount = 0;
-        lastToolSig = '';
-      }
-
-      // 累计同签名：判定原地打转则硬收尾，避免无限轮下空转烧配额
-      if (sig.isNotEmpty) {
-        final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
-        if (seen >= _dsToolSigGiveUp) {
-          logp('🛑 同一操作の累計実行が $_dsToolSigGiveUp 回に達しました。'
-              '進展なしと判定し、ツール呼び出しを打ち切ります。');
-          break;
-        }
-      }
-
-      final remaining = maxIter - 1 - iter;
-      if (budgetWarnAt > 0 && remaining <= budgetWarnAt && remaining > 0) {
-        msgs.add({
-          'role': 'user',
-          'content':
-              '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
-        });
-      }
-    }
+    // 纠偏已移除
   }
 
   return ToolStreamOutcome(
@@ -952,13 +852,7 @@ Future<ToolStreamOutcome> callDsWithTools(
   final currentMsgs = <Map<String, dynamic>>[...messages];
   final reasoningParts = <String>[];
   final toolLogs = <String>[];
-  var lastToolSig = '';
-  var repeatCount = 0;
-  final sigSeen = <String, int>{};
-  // 豆包通道：被判为「原地打转」的签名，下一轮跳过执行，只回一句换路提示
   final dbSkipSigs = <String>{};
-  var dbSkipTotal = 0;
-  final budgetWarnAt = _dsBudgetWarnAt(maxIter);
   final isDb = dsIsDbModel(model);
 
   for (var round = 0; round < maxIter; round++) {
@@ -1005,87 +899,10 @@ Future<ToolStreamOutcome> callDsWithTools(
     //     1) 同一签名连续 2 次 → 注入换路提示；
     //     2) 连续 5 次 / 累计 12 次 → 加入跳过表，下一轮不再真正执行；
     //     3) 累计 30 次 → 跳出循环（保护用户额度），已有日志照常回传。
-    if (isDb) {
-      final sig = roundSigs.join('\u0000');
-      if (sig.isNotEmpty) {
-        if (sig == lastToolSig) {
-          repeatCount++;
-        } else {
-          lastToolSig = sig;
-          repeatCount = 1;
-        }
-        final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
-        if (repeatCount == 2) {
-          currentMsgs.add({
-            'role': 'user',
-            'content':
-                '【系统提示 · 换路】你刚才执行的操作和上一轮完全相同，画面没有变化。'
-                    '不要再用同样的参数重试。下一步请二选一：'
-                    '① 先用 vd_observe 或 vd_screenshot 看清当前画面；'
-                    '② 换一个工具（改坐标、滚动、返回键、重新启动应用）。'
-                    '目标不变，路径必须变。',
-          });
-        }
-        if (repeatCount >= 5 || seen >= 12) {
-          dbSkipSigs.add(sig);
-          currentMsgs.add({
-            'role': 'user',
-            'content':
-                '【系统提示 · 已跳过该重复操作】同一操作已连续 $repeatCount 次 / 累计 $seen 次，'
-                    '画面始终没有变化。该操作已被系统跳过，必须改走别的路径：'
-                    '① 重新 vd_observe 读取画面文字与坐标；'
-                    '② 用 vd_swipe 滚动或用 vd_key 4 返回上一层；'
-                    '③ 用 vd_launch 重新启动目标应用；'
-                    '④ 文件扫描类任务改用 execute_command 一次性列出目录，不要逐个文件反复读。',
-          });
-        }
-        if (dbSkipSigs.contains(sig)) dbSkipTotal++;
-        if (dbSkipTotal >= 30) {
-          logp('\ud83d\uded1 [豆包] 同一操作が累計 30 回繰り返されました。'
-              'これ以上の空回りを防ぐため、ツール呼び出しを打ち切ります。');
-          break;
-        }
-      }
-    }
+    // 纠偏已移除
 
     // 工具调用次数不设上限，由模型自行决定何时收尾；其余通道行为不变。
-    if (!isDb) {
-      final sig = roundSigs.join('\u0000');
-      if (sig.isNotEmpty && sig == lastToolSig) {
-        repeatCount++;
-      } else {
-        lastToolSig = sig;
-        repeatCount = 1;
-      }
-      if (repeatCount >= 4) {
-        currentMsgs.add({
-          'role': 'user',
-          'content':
-              '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
-        });
-        repeatCount = 0;
-        lastToolSig = '';
-      }
-
-        // 累计同签名：判定原地打转则硬收尾
-        if (sig.isNotEmpty) {
-          final seen = (sigSeen[sig] = (sigSeen[sig] ?? 0) + 1);
-          if (seen >= _dsToolSigGiveUp) {
-            logp('🛑 同一操作の累計実行が $_dsToolSigGiveUp 回に達しました。'
-                '進展なしと判定し、ツール呼び出しを打ち切ります。');
-            break;
-          }
-        }
-
-        final remaining = maxIter - 1 - round;
-        if (budgetWarnAt > 0 && remaining <= budgetWarnAt && remaining > 0) {
-          currentMsgs.add({
-            'role': 'user',
-            'content':
-                '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
-          });
-        }
-    }
+    // 纠偏已移除
   }
   return ToolStreamOutcome('', '', toolLogs);
 }

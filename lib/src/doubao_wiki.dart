@@ -870,9 +870,7 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
   final allReasoning = StringBuffer();
   final toolLogs = <String>[];
 
-  final maxIter = maxIterations <= 0 ? 12 : maxIterations;
-  var lastSig = '';
-  var repeat = 0;
+  final maxIter = maxIterations <= 0 ? 5000000000 : maxIterations;
 
   for (var iter = 0; iter < maxIter; iter++) {
     final r = await _dbWikiStreamRound(
@@ -901,12 +899,10 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
     // 自己刚调用了什么；否则下一轮会重复调用同一个工具。
     input.addAll(r.items);
 
-    final sigs = <String>[];
     for (final c in r.calls) {
       final name = (c['name'] ?? '').toString();
       final args = (c['arguments'] ?? '').toString();
       final callId = (c['call_id'] ?? '').toString();
-      sigs.add('$name\u0000$args');
 
       await onToolCall?.call('start', name, args, '');
       final result = await dsSafeExecTool(name, args);
@@ -926,42 +922,6 @@ Future<DbWikiToolOutcome> callDbWikiWithToolsStream(
       });
     }
 
-    // 卡死检测：同一组调用连续重复 4 次即注入纠正提示
-    final sig = sigs.join('\u0000');
-    if (sig.isNotEmpty && sig == lastSig) {
-      repeat++;
-    } else {
-      lastSig = sig;
-      repeat = 1;
-    }
-    if (repeat >= 4) {
-      input.add({
-        'type': 'message',
-        'role': 'user',
-        'content': [
-          {
-            'type': 'input_text',
-            'text': '【システムからの注意】まったく同じ操作を何度も繰り返しても進展が見られません。現在の進め方は行き詰まっている可能性があります。直ちにまったく別の考え方やツールに切り替え、まず現在の状態を再観察（ui_dump / get_screen_text / current_app）してから次の一手を決めてください。',
-          }
-        ],
-      });
-      repeat = 0;
-      lastSig = '';
-    }
-    final remaining = maxIter - 1 - iter;
-    if (remaining <= 200 && remaining > 0) {
-      input.add({
-        'type': 'message',
-        'role': 'user',
-        'content': [
-          {
-            'type': 'input_text',
-            'text':
-                '【システムからの注意】実行ラウンドの残りが少なくなっています（残り約 $remaining ラウンド）。タスクがほぼ完了しているなら、直ちにツール呼び出しを止めて最終結果を文章で報告してください。未完了なら、最も重要な 1 ステップだけを実行してください。',
-          }
-        ],
-      });
-    }
   }
 
   return DbWikiToolOutcome(
