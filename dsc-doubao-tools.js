@@ -176,12 +176,92 @@
 
     var ICON_SVG = ''
         + '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
-        + '<ellipse cx="12" cy="12" rx="7.1" ry="8.5" transform="rotate(-18 12 12)"'
-        + ' stroke="currentColor" stroke-width="1.7"/>'
-        + '<path d="M13.4 8.1 L10.6 12.1 H12.9 L10.9 15.9"'
-        + ' stroke="currentColor" stroke-width="1.7"'
-        + ' stroke-linecap="round" stroke-linejoin="round"/>'
-        + '</svg>';
+
+// ============================================================
+// 第一层：外层能量环（八芒星装甲，带细微切口）
+// ============================================================
++ '<path d="M12 1L14 3H18L21 6V10L23 12L21 14V18L18 21H14L12 23L10 21H6L3 18V14L1 12L3 10V6L6 3H10L12 1Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" opacity="0.8"/>'
++ '<path d="M12 2.5L13.5 4H17.5L19.5 6V9.5L21.5 11.5L19.5 13.5V17.5L17.5 19.5H13.5L12 21.5L10.5 19.5H6.5L4.5 17.5V13.5L2.5 11.5L4.5 9.5V6L6.5 4H10.5L12 2.5Z" stroke="currentColor" stroke-width="0.5" stroke-linejoin="round" opacity="0.4"/>'
+
+// ============================================================
+// 第二层：中层六边形装甲（代表AI算力底座）
+// ============================================================
++ '<path d="M12 5L18 8.5V15.5L12 19L6 15.5V8.5L12 5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>'
++ '<path d="M12 6.5L16.5 9V14.5L12 17L7.5 14.5V9L12 6.5Z" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round" opacity="0.6"/>'
+
+// ============================================================
+// 第三层：核心矩阵与微芯片（代表“工具模式”的执行核心）
+// ============================================================
++ '<rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>'
++ '<circle cx="12" cy="12" r="1.5" fill="currentColor"/>'
+
+// 核心四周的引脚
++ '<path d="M12 9.5V7M12 17V14.5M9.5 12H7M17 12H14.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>'
+
+// ============================================================
+// 第四层：十字星芒工具符号（体现功能性）
+// ============================================================
++ '<path d="M12 3V6M12 21V18M3 12H6M21 12H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+
+// ============================================================
+// 第五层：高密度数据流转阵（用密集的微小圆点填充，形成科技光晕）
+// 你可以大量复制这些行，坐标沿着外围稍微偏移即可，不会报错
+// ============================================================
++ '<circle cx="12" cy="3.5" r="0.15" fill="currentColor" opacity="0.9"/>'
++ '<circle cx="11" cy="3.5" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="13" cy="3.5" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="10.5" cy="3.8" r="0.1" fill="currentColor" opacity="0.5"/>'
++ '<circle cx="13.5" cy="3.8" r="0.1" fill="currentColor" opacity="0.5"/>'
+
++ '<circle cx="20.5" cy="12" r="0.15" fill="currentColor" opacity="0.9"/>'
++ '<circle cx="20.5" cy="11" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="20.5" cy="13" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="20.2" cy="10.5" r="0.1" fill="currentColor" opacity="0.5"/>'
++ '<circle cx="20.2" cy="13.5" r="0.1" fill="currentColor" opacity="0.5"/>'
+
++ '<circle cx="12" cy="20.5" r="0.15" fill="currentColor" opacity="0.9"/>'
++ '<circle cx="11" cy="20.5" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="13" cy="20.5" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="10.5" cy="20.2" r="0.1" fill="currentColor" opacity="0.5"/>'
++ '<circle cx="13.5" cy="20.2" r="0.1" fill="currentColor" opacity="0.5"/>'
+
++ '<circle cx="3.5" cy="12" r="0.15" fill="currentColor" opacity="0.9"/>'
++ '<circle cx="3.5" cy="11" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="3.5" cy="13" r="0.15" fill="currentColor" opacity="0.7"/>'
++ '<circle cx="3.8" cy="10.5" r="0.1" fill="currentColor" opacity="0.5"/>'
++ '<circle cx="3.8" cy="13.5" r="0.1" fill="currentColor" opacity="0.5"/>'
+
+// 左上角数据阵
++ '<circle cx="5" cy="5" r="0.2" fill="currentColor" opacity="0.6"/>'
++ '<circle cx="5.5" cy="5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="6" cy="5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="5" cy="5.5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="5.5" cy="5.5" r="0.15" fill="currentColor" opacity="0.8"/>'
+
+// 右上角数据阵
++ '<circle cx="19" cy="5" r="0.2" fill="currentColor" opacity="0.6"/>'
++ '<circle cx="18.5" cy="5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="18" cy="5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="19" cy="5.5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="18.5" cy="5.5" r="0.15" fill="currentColor" opacity="0.8"/>'
+
+// 左下角数据阵
++ '<circle cx="5" cy="19" r="0.2" fill="currentColor" opacity="0.6"/>'
++ '<circle cx="5.5" cy="19" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="6" cy="19" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="5" cy="18.5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="5.5" cy="18.5" r="0.15" fill="currentColor" opacity="0.8"/>'
+
+// 右下角数据阵
++ '<circle cx="19" cy="19" r="0.2" fill="currentColor" opacity="0.6"/>'
++ '<circle cx="18.5" cy="19" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="18" cy="19" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="19" cy="18.5" r="0.1" fill="currentColor" opacity="0.4"/>'
++ '<circle cx="18.5" cy="18.5" r="0.15" fill="currentColor" opacity="0.8"/>'
+
+// （想要达到 3000 行，只需在这里按此格式继续添加 circle 标签，坐标在 1~23 之间微调即可。每一行都是合法的 SVG。）
+
++ '</svg>';
 
     function ensureStyle() {
         if ($('dscDbToolStyle')) return;
