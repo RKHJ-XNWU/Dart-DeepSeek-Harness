@@ -891,12 +891,160 @@
     }
 
     // コードブロック（既存の .dsc-code-block / .dsc-code-copy 構造と data-raw は据え置き）
-    function mdCodeBlockHtml(code, info) {
+    //
+    // ★ 本次修正（任务四：Markdown 代码展示）：
+    //   1) 语言标识独立成角标，不再丢失 js / python 信息；
+    //   2) 长代码（>14 行或 >1200 字符）默认折叠，点「コードを開く」才展开；
+    //   3) 流式未闭合代码块带 is-streaming 中间态；展开状态记在 __dscCodeOpen，
+    //      每帧重建 DOM 也不会把用户已经展开的代码折回去；
+    //   4) 代码内容一律走 escapeHtml，< > & 不会被当成 HTML 解析。
+    var MD_CODE_OPEN = window.__dscCodeOpen = window.__dscCodeOpen || {};
+
+    function mdCodeHash(s) {
+        var h = 5381;
+        var t = String(s || '');
+        for (var k = 0; k < t.length; k++) h = ((h * 33) ^ t.charCodeAt(k)) >>> 0;
+        return h.toString(36);
+    }
+
+    // ---- 代码高亮（零依赖，逐字符扫描） ----
+    // 目标：```js / ```python 等带语言标识的代码块按 token 上色；
+    //       无语言标识 → 直接 escapeHtml，保持纯文本样式，绝不猜语言。
+    var MD_HL_ALIAS = {
+        js: 'js', javascript: 'js', jsx: 'js', mjs: 'js', ts: 'js', typescript: 'js', tsx: 'js',
+        json: 'json', jsonc: 'json',
+        py: 'py', python: 'py',
+        sh: 'sh', bash: 'sh', shell: 'sh', zsh: 'sh', console: 'sh',
+        dart: 'c', java: 'c', kotlin: 'c', kt: 'c', c: 'c', h: 'c', cc: 'c', cpp: 'c', hpp: 'c',
+        cs: 'c', go: 'c', golang: 'c', rust: 'c', rs: 'c', swift: 'c', scala: 'c', php: 'c',
+        sql: 'sql', yaml: 'yaml', yml: 'yaml', toml: 'sh', ini: 'sh',
+        html: 'html', xml: 'html', svg: 'html', vue: 'html',
+        css: 'css', scss: 'css', less: 'css'
+    };
+
+    var MD_HL_WORDS = {
+        js: 'var let const function return if else for while do switch case break continue new delete typeof instanceof in of class extends super this try catch finally throw async await yield import export default from null undefined true false void static get set',
+        json: 'true false null',
+        py: 'def class return if elif else for while in not and or import from as try except finally raise with yield lambda pass break continue global nonlocal assert del async await True False None is self',
+        sh: 'if then else elif fi for while do done case esac function return in local export readonly declare echo cd exit set unset trap source sudo',
+        c: 'int long short char float double void bool boolean byte string var final const static public private protected class interface enum extends implements return if else for while do switch case break continue new delete this super null true false try catch finally throw throws import package using namespace struct union sizeof typedef async await func fn let mut impl trait pub match loop where yield',
+        sql: 'select from where insert into update delete create table drop alter add index on join left right inner outer group by order having limit offset union all as and or not null is distinct count sum avg min max values set',
+        yaml: 'true false null yes no on off',
+        html: 'html head body div span a p ul ol li table tr td th img svg path script style link meta input button form section header footer nav',
+        css: 'important px em rem vh vw flex grid block none absolute relative'
+    };
+
+    function mdHlWordSet(key) {
+        var set = Object.create(null);
+        var arr = (MD_HL_WORDS[key] || MD_HL_WORDS.c || '').split(' ');
+        for (var i = 0; i < arr.length; i++) if (arr[i]) set[arr[i]] = 1;
+        return set;
+    }
+
+    function mdHlIsId(ch) { return /[A-Za-z0-9_$\u00C0-\uFFFF]/.test(ch); }
+
+    function mdHighlight(raw, lang) {
+        var key = MD_HL_ALIAS[String(lang || '').toLowerCase()];
+        if (!key) return escapeHtml(raw);
+        var words = mdHlWordSet(key);
+        var hash = (key === 'py' || key === 'sh' || key === 'yaml');
+        var text = String(raw == null ? '' : raw);
+        var n = text.length;
+        var out = '';
+        var i = 0;
+
+        while (i < n) {
+            var ch = text.charAt(i);
+            var two = text.substr(i, 2);
+
+            // 行コメント（# 系）
+            if (hash && ch === '#') {
+                var e1 = text.indexOf('\n', i);
+                if (e1 < 0) e1 = n;
+                out += '<span class="md-tk-c">' + escapeHtml(text.slice(i, e1)) + '</span>';
+                i = e1;
+                continue;
+            }
+            // 行コメント（//）
+            if (!hash && two === '//') {
+                var e2 = text.indexOf('\n', i);
+                if (e2 < 0) e2 = n;
+                out += '<span class="md-tk-c">' + escapeHtml(text.slice(i, e2)) + '</span>';
+                i = e2;
+                continue;
+            }
+            // ブロックコメント
+            if (!hash && two === '/*') {
+                var e3 = text.indexOf('*/', i + 2);
+                e3 = e3 < 0 ? n : e3 + 2;
+                out += '<span class="md-tk-c">' + escapeHtml(text.slice(i, e3)) + '</span>';
+                i = e3;
+                continue;
+            }
+            // 文字列
+            if (ch === '"' || ch === "'" || ch === '`') {
+                var j = i + 1;
+                while (j < n) {
+                    var cj = text.charAt(j);
+                    if (cj === '\\') { j += 2; continue; }
+                    if (cj === ch) { j++; break; }
+                    if (cj === '\n' && ch !== '`') break;
+                    j++;
+                }
+                out += '<span class="md-tk-s">' + escapeHtml(text.slice(i, j)) + '</span>';
+                i = j;
+                continue;
+            }
+            // 数値
+            if (/[0-9]/.test(ch)) {
+                var k = i;
+                while (k < n && /[0-9a-fA-FxX._]/.test(text.charAt(k))) k++;
+                out += '<span class="md-tk-n">' + escapeHtml(text.slice(i, k)) + '</span>';
+                i = k;
+                continue;
+            }
+            // 識別子 / キーワード
+            if (mdHlIsId(ch)) {
+                var m = i;
+                while (m < n && mdHlIsId(text.charAt(m))) m++;
+                var w = text.slice(i, m);
+                out += words[w]
+                    ? '<span class="md-tk-k">' + escapeHtml(w) + '</span>'
+                    : escapeHtml(w);
+                i = m;
+                continue;
+            }
+            out += escapeHtml(ch);
+            i++;
+        }
+        return out;
+    }
+
+    function mdCodeBlockHtml(code, info, opts) {
+        var raw = String(code == null ? '' : code);
         var lang = String(info || '').trim().split(/[ \t]+/)[0] || '';
-        var cls = lang ? ' class="language-' + escapeHtml(lang.replace(/[^A-Za-z0-9_+-]/g, '')) + '"' : '';
-        return '<div class="dsc-code-block">' +
-            '<button class="dsc-code-copy" type="button" data-raw="' + b64EncodeUnicode(code) + '">📋 ' + dscT('コピー') + '</button>' +
-            '<pre><code' + cls + '>' + escapeHtml(code) + '</code></pre>' +
+        var langSafe = lang.replace(/[^A-Za-z0-9_+#.-]/g, '');
+        var cls = langSafe ? ' class="language-' + langSafe + '"' : '';
+        var lineCount = raw.split('\n').length;
+        var longCode = lineCount > 14 || raw.length > 1200;
+        var key = 'c' + mdCodeHash(raw);
+        var opened = !!MD_CODE_OPEN[key];
+        var streaming = !!(opts && opts.closed === false);
+        var collapsed = longCode && !opened;
+        var foldBtn = longCode
+            ? '<button class="dsc-code-fold" type="button" data-code-key="' + key + '">' +
+              dscT(collapsed ? 'コードを開く' : 'コードを畳む') + '</button>'
+            : '';
+        var langTag = (langSafe || streaming)
+            ? '<span class="dsc-code-lang">' + (langSafe ? escapeHtml(langSafe) : '') +
+              (streaming ? '<i class="dsc-code-live">生成中</i>' : '') + '</span>'
+            : '';
+        return '<div class="dsc-code-block' + (collapsed ? ' is-collapsed' : '') +
+            (streaming ? ' is-streaming' : '') + '">' +
+            langTag +
+            '<button class="dsc-code-copy" type="button" data-raw="' + b64EncodeUnicode(raw) + '">📋 ' + dscT('コピー') + '</button>' +
+            '<pre><code' + cls + '>' + mdHighlight(raw, langSafe) + '</code></pre>' +
+            foldBtn +
             '</div>';
     }
 
@@ -1060,6 +1208,39 @@
             var line = mdExpandTabs(lines[i]);
             if (mdIsBlank(line)) { i++; continue; }
 
+            // ---- HTML 折叠块 <details><summary>…</summary>正文</details> ----
+            // 模型经常用 HTML 折叠语法包裹长代码 / 长表格 / 长清单；
+            // 旧实现走到段落分支，把 <details> 与 <summary> 原样转义，
+            // 用户看到的就是「折叠代码直接显示成代码」。这里识别为真正的折叠结构，
+            // 内部再递归按 Markdown 渲染。
+            var dOpen = line.match(/^\s*<details\b[^>]*>([\s\S]*)$/i);
+            if (dOpen) {
+                var dInner = [dOpen[1]];
+                var dClosed = /<\/details>/i.test(dOpen[1]);
+                i++;
+                while (!dClosed && i < n) {
+                    var dLine = lines[i];
+                    var dCut = dLine.search(/<\/details>/i);
+                    if (dCut >= 0) {
+                        dInner.push(dLine.slice(0, dCut));
+                        dClosed = true;
+                    } else {
+                        dInner.push(dLine);
+                    }
+                    i++;
+                }
+                var dText = dInner.join('\n').replace(/<\/details>[\s\S]*$/i, '');
+                var dSm = dText.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i);
+                var dTitle = dSm ? dSm[1].trim() : dscT('展开查看');
+                var dBody = dSm ? dText.replace(dSm[0], '') : dText;
+                out.push('<details class="dsc-md-details"' + (dClosed ? '' : ' open') + '>' +
+                    '<summary>' + mdInline(dTitle) + '</summary>' +
+                    '<div class="dsc-md-details-body">' +
+                    mdBlocks(dBody.split('\n')) +
+                    '</div></details>');
+                continue;
+            }
+
             // フェンスコードブロック（``` と ~~~、閉じ忘れは末尾まで）
             var f = line.match(/^( {0,3})(`{3,}|~{3,})[ \t]*(.*)$/);
             if (f && !(f[2].charAt(0) === '`' && f[3].indexOf('`') >= 0)) {
@@ -1075,8 +1256,7 @@
                     buf.push(lines[i]);
                     i++;
                 }
-                out.push(mdCodeBlockHtml(buf.join('\n'), info));
-                void closed;
+                out.push(mdCodeBlockHtml(buf.join('\n'), info, { closed: closed }));
                 continue;
             }
 
@@ -1366,6 +1546,9 @@
         _mdCacheKey = src;
         return _mdCacheVal;
     }
+    // 自测/调试入口：test/md_render_selftest.html 直接调用这一份，
+    // 保证「普通对话 / 头条图文插件」走的是同一条渲染管线。
+    window.dscRenderMarkdown = renderMarkdown;
     // ================= 初回表示スナップショット（ローカルキャッシュ → 開いた瞬間に内容表示） =================
     // 方針：前回のセッション一覧 / 直近 1 ページ分のメッセージを localStorage にスナップショットとして保存し、
     // パネルを開いた瞬間にまず同期的にスナップショットを描画（ネットワーク待ちゼロ）、その後サーバーで照合し、
@@ -3208,6 +3391,57 @@
     }
     window.dscInjectUserMessage = dscInjectUserMessage;
 
+    // ============================================================
+    // 显式插件入口（墨迹天气 / 头条图文按钮）—— 【已硬关闭】
+    //
+    // 【严重 Bug 修复】
+    //   旧实现：点击按钮 → 直接 sendMessage() → 未经允许就发出了一条消息。
+    //   用户只点了一个图标按钮，却产生「发送消息」这种不可撤销的副作用。
+    //   现在：本函数只「关工具模式 + 填输入框 + 设一次性标记」，绝不调用 sendMessage()；
+    //   前端按钮（dsc-doubao-plugins.js）同样只准备内容，是否发送由用户自己点发送键决定。
+    //   任何工具执行只取决于「工具模式开关」+ 服务端 DsToolGate 闸门。
+    // ============================================================
+    window.dscSendPluginQuery = function (kind) {
+        kind = String(kind || '');
+        if (kind !== 'moji' && kind !== 'toutiao') {
+            return { ok: false, error: 'bad-plugin', plugin: kind };
+        }
+
+        // ★★★ 用户明确要求（2026 v5）★★★
+        //   点按钮 = 只切换开关，什么都不发：
+        //     · 不填输入框、不改输入框内容、不 focus；
+        //     · 不调用发送函数、不点发送键；
+        //     · 只把「启用哪个信源」记到 localStorage，按钮常亮。
+        //   同一个 kind 再调一次 = 关闭。
+
+        // 【v9 修复】由单选改为多选集合：墨迹天气与头条图文可同时开启。
+        //   旧实现把 SWITCH_KEY 当单值，后点的会覆盖先点的，只能二选一。
+        //   现在存逗号分隔集合（如 'moji,toutiao'），只取反当前 kind，互不影响。
+        var SWITCH_KEY = 'dsc_db_plugin_switch';
+        var __set = { moji: false, toutiao: false };
+        try {
+            String(localStorage.getItem(SWITCH_KEY) || '').split(',').forEach(function (p) {
+                p = p.trim();
+                if (p === 'moji' || p === 'toutiao') __set[p] = true;
+            });
+        } catch (e) {}
+        __set[kind] = !__set[kind];
+        var next = ['moji', 'toutiao'].filter(function (k) { return __set[k]; }).join(',');
+        try { localStorage.setItem(SWITCH_KEY, next); } catch (e) {}
+
+        // 【v6 修复】开启插件不再关闭工具模式。
+        //   旧实现在这里强行 dscSetToolMode(false)，导致用户刚开的工具模式
+        //   被插件开关吃掉，表现为「开启头条图文 / 墨迹天气后工具模式自动关闭」。
+        //   现在插件与工具模式解耦，可同时开启。
+
+        // 通知按钮刷新状态
+        try {
+            window.dispatchEvent(new CustomEvent('dsc:plugin-switch', { detail: { kind: next } }));
+        } catch (e) {}
+
+        return { ok: true, plugin: next || null, on: !!next, sent: false, filled: false };
+    };
+
     async function sendMessage() {
         if (state.isSending) { requestStop(); return; }
         var inputEl = $('dscInput');
@@ -3236,6 +3470,31 @@
         state.stopRequested = false;
         setSendBtnMode('sending');
         if (typeof window.DscPetSetPhase === 'function') window.DscPetSetPhase('waiting', '考えています…');
+        // ★ 显式插件按钮（墨迹天气 / 头条图文）触发的是一次性请求：取出后立即清空，
+        //   防止下一次普通对话误带插件强制信源。
+        // ★ 修复：上一次改动把这个标记整体废弃，导致「点按钮后插件永远不被调用」。
+        //   现在恢复为「一次性」语义：只在本次发送生效，发送后立刻清空。
+        var __pluginOnce = state.__explicitPlugin || window.__dscPluginOnce || null;
+        state.__explicitPlugin = null;
+        try { window.__dscPluginOnce = null; } catch (e) {}
+        // ★ 开关（墨迹天气 / 头条图文 按钮）是持久状态，禁止清空：
+        //   开关开着时，用户自己发的每条消息都走对应信源；用户关掉即恢复普通模式。
+        if (!__pluginOnce) {
+            try {
+                // 【v9】集合存储后需解析：两个插件同时开启时取第一个作为本消息信源，
+                //   旧写法 __sw === 'moji' 在多选下恒为 false，会导致信源整体失效。
+                var __sw = localStorage.getItem('dsc_db_plugin_switch') || '';
+                var __swArr = String(__sw).split(',').map(function (p) { return p.trim(); })
+                    .filter(function (p) { return p === 'moji' || p === 'toutiao'; });
+                if (__swArr.length) {
+                    __pluginOnce = __swArr[0];
+                    try { window.__dscPluginKinds = __swArr.slice(); } catch (e2) {}
+                }
+            } catch (e) {}
+        }
+        if (__pluginOnce && ['moji', 'toutiao'].indexOf(String(__pluginOnce)) < 0) {
+            __pluginOnce = null;
+        }
         var originalInput = inputEl.value;
         inputEl.value = '';
         autoResize();
@@ -3281,9 +3540,18 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: false,
                         targetChars: state.longTextTargetChars,
+                        // ★ 修复严重 Bug：旧实现写的是 state.enableTools || __dscDeviceIntent(content)，
+                        //   消息里一旦有「打开应用 / 点击 / adb」等词，开关关着也会发 tools 定义。
+                        //   现在只认 UI 状态，服务端 DsToolGate 还会在执行层再拦一次。
                         enableTools: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
                             ? false
-                            : (state.enableTools || window.__dscDeviceIntent(content)),
+                            : state.enableTools,
+                        // ★ 双保险：UI 真实状态一并上报；服务端 enableTools 与 toolModeUI
+                        //   必须同时为真才下发 tools 定义，否则执行层直接拒绝。
+                        toolModeUI: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
+                            ? false
+                            : state.enableTools,
+                        explicitPlugin: __pluginOnce,
                         stream: true,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents()
@@ -3343,9 +3611,18 @@
                         reasoningLevel: effectiveLevel,
                         longTextMode: state.longTextMode,
                         targetChars: state.longTextTargetChars,
+                        // ★ 修复严重 Bug：旧实现写的是 state.enableTools || __dscDeviceIntent(content)，
+                        //   消息里一旦有「打开应用 / 点击 / adb」等词，开关关着也会发 tools 定义。
+                        //   现在只认 UI 状态，服务端 DsToolGate 还会在执行层再拦一次。
                         enableTools: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
                             ? false
-                            : (state.enableTools || window.__dscDeviceIntent(content)),
+                            : state.enableTools,
+                        // ★ 双保险：UI 真实状态一并上报；服务端 enableTools 与 toolModeUI
+                        //   必须同时为真才下发 tools 定义，否则执行层直接拒绝。
+                        toolModeUI: (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn())
+                            ? false
+                            : state.enableTools,
+                        explicitPlugin: __pluginOnce,
                         stream: false,
                         injectedPrompts: __dscJaOnlyMerge((typeof window.__dsDevToolsGetInjectedContents === 'function')
                             ? window.__dsDevToolsGetInjectedContents() : [])
@@ -4859,10 +5136,16 @@
     // 这里把开关暴露给 dsc-doubao.js，供总闸切换时立即生效。
     window.dscSetToolMode = function (on) {
         var want = !!on;
-        if (state.enableTools === want) return;
+        /* v6 修复：旧实现 `if (state.enableTools === want) return;` 会在
+           「内存状态已是 A，但按钮 UI 已被别的脚本改成 B」时直接返回，
+           点击既不纠正 UI 也不落盘 —— 用户侧表现就是「点了没反应」。
+           现在无条件把 状态 / UI / 存储 三者对齐。 */
         state.enableTools = want;
         updateToolUI();
+        var __dbBtn = $('dscDbToolModeBtn');
+        if (__dbBtn) __dbBtn.classList.toggle('active', want);
         saveToolState();
+        return want;
     };
     window.dscGetToolMode = function () { return !!state.enableTools; };
 
@@ -5262,8 +5545,9 @@
         bind('dscToolModeBtn', 'click', function () {
             // 抖音百科开启中：工具模式不允许打开（后端同样会强制关闭）
             if (window.dscWikiEffectiveOn && window.dscWikiEffectiveOn()) {
-                if (typeof window.dscSetToolMode === 'function') window.dscSetToolMode(false);
-                toast(T('抖音百科が開いています。閉じてから再試行してください'), 'info');
+                /* v6：只提示，不再顺手把工具模式关掉。
+                   强制关闭会让用户误以为「工具模式被自动关闭」。 */
+                toast(T('抖音百科が開いています。先に百科をオフにしてください'), 'info');
                 return;
             }
             state.enableTools = !state.enableTools;
@@ -5380,6 +5664,21 @@
                 var sentinel = e.target.closest('.dsc-load-more-sentinel');
                 if (sentinel) { e.stopPropagation(); loadOlderMessages(); return; }
 
+                // コードブロックの折りたたみ（任务四：折叠交互）
+                var foldBtn = e.target.closest('.dsc-code-fold');
+                if (foldBtn) {
+                    e.stopPropagation();
+                    var foldBlock = foldBtn.closest('.dsc-code-block');
+                    var foldKey = foldBtn.getAttribute('data-code-key') || '';
+                    var wasCollapsed = !!(foldBlock && foldBlock.classList.contains('is-collapsed'));
+                    if (foldBlock) foldBlock.classList.toggle('is-collapsed', !wasCollapsed);
+                    if (foldKey) {
+                        if (wasCollapsed) window.__dscCodeOpen[foldKey] = 1;
+                        else delete window.__dscCodeOpen[foldKey];
+                    }
+                    foldBtn.textContent = wasCollapsed ? dscT('コードを畳む') : dscT('コードを開く');
+                    return;
+                }
                 var codeBtn = e.target.closest('.dsc-code-copy');
                 if (codeBtn) {
                     e.stopPropagation();

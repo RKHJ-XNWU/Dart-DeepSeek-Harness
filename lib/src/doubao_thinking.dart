@@ -119,6 +119,7 @@ const List<String> _dbEffortFamilies = <String>[
   'glm-5-3-flash',
   'glm-5-3',
   'glm-5-2',
+  'doubao-seed-translation',
   'kimi-k3',
   'deepseek-v4',
 ];

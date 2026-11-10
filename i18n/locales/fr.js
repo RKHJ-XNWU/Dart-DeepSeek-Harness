@@ -1462,7 +1462,6 @@ Doubao-Seedream-5.0-Lite（軽量画像生成）|Doubao-Seedream-5.0-Lite (gén�
 Doubao-Seedream-5.0-pro（高精度画像生成）|Doubao-Seedream-5.0-pro (génération d'image de précision)
 Doubao-Seedance-2.0-mini（動画生成）|Doubao-Seedance-2.0-mini (génération vidéo)
 Doubao-Seedance-2.0-fast（高速動画生成）|Doubao-Seedance-2.0-fast (génération vidéo rapide)
-Doubao-Seedance-2.5（次世代動画生成・4-30秒・4K対応）|Doubao-Seedance-2.5 (vidéo nouvelle génération, 4-30 s, 4K)
 Doubao-Seedance-2.0（動画生成）|Doubao-Seedance-2.0 (génération vidéo)
 GLM-5.2（コーディングモデル）|GLM-5.2 (modèle de code)
 Doubao-Seed-2.0-mini（言語モデル）|Doubao-Seed-2.0-mini (modèle linguistique)

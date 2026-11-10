@@ -24,6 +24,7 @@ import 'httpsrv.dart';
 import 'model_router.dart';
 import 'sessions.dart';
 import 'session_ref.dart';
+import 'tool_gate.dart';
 
 // ------------------------------------------------------------
 // 工具模式系统提示 / 轮次上限：按通道分流
@@ -32,6 +33,24 @@ import 'session_ref.dart';
 //   专项适配的好处：lite 档不会被灌进 85 条工具约定的长提示，
 //   首包更快；pro/evolving 档则拿到「可长程编排」的更强约束。
 // ------------------------------------------------------------
+/// 本次请求真正生效的插件信源。
+///
+/// 【为什么不能再直接调 dbResolveSources】
+///   doubao_intent.dart 已被停用，dbResolveSources 恒返回 configSources，
+///   导致「按钮强制调用某插件」的意图被丢弃。这里把显式强制源放最前，
+///   再与配置源去重合并；没有强制源时行为与旧实现完全一致。
+List<String> dbEffectiveSources(List<String> forcedSources) {
+  final cfg = dbWikiEffectiveSources();
+  if (forcedSources.isEmpty) return cfg;
+  final forced = dbWikiNormalizeSources(forcedSources);
+  if (forced.isEmpty) return cfg;
+  final out = <String>[...forced];
+  for (final s in cfg) {
+    if (!out.contains(s)) out.add(s);
+  }
+  return out;
+}
+
 String dbToolSystemPromptFor(String model, String apiUrl, String lang) {
   if (apiUrl != DS_API_URL) {
     final p = dbToolAgentPrompt(model, lang);
@@ -159,9 +178,7 @@ Future<void> handleDsChatSendStream(
     // 仅在豆包通道 + 已开信源 + 无音视频时混用，其余退回原有工具链。
     final toolWikiSources = (apiUrl != DS_API_URL &&
             (webSearch || forcedSources.isNotEmpty))
-        ? dbResolveSources(
-            forcedSources: forcedSources,
-            configSources: dbWikiEffectiveSources())
+        ? dbEffectiveSources(forcedSources)
         : const <String>[];
     final useWikiTools = toolWikiSources.isNotEmpty &&
         pendingVideoIds.isEmpty &&
@@ -364,11 +381,8 @@ Future<void> handleDsChatSendStream(
   // 方舟文档硬约束：sources=[douyin] 等属于「联网内容插件」，
   // 仅 Responses API 支持，Chat Completions 无法指定；因此这里分流。
   // 仅豆包通道 + 用户显式开启信源 + 纯文本输入时启用。
-  final wikiSources = apiUrl != DS_API_URL
-      ? dbResolveSources(
-          forcedSources: forcedSources,
-          configSources: dbWikiEffectiveSources())
-      : const <String>[];
+  final wikiSources =
+      apiUrl != DS_API_URL ? dbEffectiveSources(forcedSources) : const <String>[];
   // 图片（image_url）可随 input_image 一起提交，与 web_search 并存；
   // 音频 / 视频在插件通道不保证可用，出现时回退原生多模态。
   final canUseWiki = (webSearch || forcedSources.isNotEmpty) &&
@@ -753,6 +767,19 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   final novelStory = mStr(body, 'novelStory');
   final novelChars = intArgDefault(body, 'novelChars', 0);
   var enableTools = mBool(body, 'enableTools');
+  // ★ 双保险（严重 Bug 修复）：前端 UI 的真实开关状态随请求一起上报。
+  //   enableTools 与 toolModeUI 必须同时为 true 才算开启；
+  //   只要前端明确表示「UI 上工具模式是关的」，服务端就不下发 tools 定义，
+  //   DsToolGate 也会同步为 OFF —— 从根上避免「UI 关着但模型照跑工具」。
+  if (body.containsKey('toolModeUI') && !mBool(body, 'toolModeUI')) {
+    enableTools = false;
+  }
+  // ★ 显式按钮（墨迹天气 / 头条图文）触发的插件调用。
+  //   白名单制：只认下面这两种，其它值一律视为无效，避免变成通用绕过开关。
+  var explicitPlugin = mStr(body, 'explicitPlugin').trim().toLowerCase();
+  if (!const <String>['moji', 'toutiao'].contains(explicitPlugin)) {
+    explicitPlugin = '';
+  }
   final injectedPrompts = asList(body['injectedPrompts']).map((e) => '$e').toList();
   final stream = mBool(body, 'stream');
 
@@ -789,14 +816,40 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   logp('🚀 使用モデル: $model (リクエスト=${mStr(body, 'model')}, 設定=${cfg.model}, '
       '経路=${useDoubao ? '豆包/方舟' : 'DeepSeek'})');
 
+  // ★★ 显式插件按钮通道（墨迹天气 / 头条图文）
+  //   用户需求：
+  //     ① 点击按钮后「关闭工具模式」——function calling 全部禁用；
+  //     ② 但「必须真的调用该联网内容插件」，并把结果按 Markdown 返回。
+  //   实现要点：
+  //     · explicitPlugin 只用于「强制信源」，绝不开启工具模式；
+  //     · 本请求 enableTools 被硬性置为 false，并同步 DsToolGate 为 OFF；
+  //     · 插件走 Responses API 的 web_search(sources=[moji|toutiao])，
+  //       与 function calling 是两条完全独立的通道。
+  final List<String> explicitSources = explicitPlugin.isEmpty
+      ? const <String>[]
+      : <String>[explicitPlugin];
+  if (explicitPlugin.isNotEmpty) {
+    if (!useDoubao) {
+      await dsJSONErr(res, 400, '墨迹天气 / 头条图文插件仅支持豆包模型，请先切换到豆包模式');
+      return;
+    }
+    enableTools = false;
+    DsToolGate.syncMode(sessionID, false);
+    logp('🎯 明示プラグイン: $explicitPlugin（ツールモードは強制 OFF・該当插件のみ呼び出す）');
+  }
+
   // ★★ 前缀强制信源（doubao_intent.dart）
   //   「抖音百科：」「抖音百科搜索：」「百科：」→ 强制 douyin
   //   「墨迹天气：」「天气：」            → 强制 moji
   //   判定范围是消息任意位置；前缀本身从正文里剥掉，不进入模型与标题。
   //   DeepSeek 通道不解析（那套插件只存在于方舟），行为零变化。
   var dbIntent = useDoubao ? dbParseIntent(content) : DbIntent.none;
-  final List<String> forcedSources =
-      dbIntent.forced ? dbIntent.sources : const <String>[];
+  final List<String> forcedSources = explicitSources.isNotEmpty
+      ? explicitSources
+      : (dbIntent.forced ? dbIntent.sources : const <String>[]);
+  if (explicitSources.isNotEmpty) {
+    logp('📌 明示プラグインの強制信源: ' + explicitSources.join(','));
+  }
   if (dbIntent.forced) {
     content = dbIntent.cleaned;
     logp('📌 信源プレフィックスを検出: ${dbIntent.hits.join(' / ')} '
@@ -844,15 +897,20 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   // 抖音百科生效（含前缀强制）时工具模式必须让路：
   // 用户在豆包专属工具模式下打开百科，开关一开就自动关闭工具模式，
   // 且按钮置灰不可点——这里再做一次服务端强制，防止前端状态不同步。
-  final dbWikiActiveNow = useDoubao &&
-      dbResolveSources(
-              forcedSources: forcedSources,
-              configSources: dbWikiEffectiveSources())
-          .isNotEmpty;
+  final dbWikiActiveNow =
+      useDoubao && dbEffectiveSources(forcedSources).isNotEmpty;
   if (useDoubao && enableTools && dbWikiActiveNow) {
     enableTools = false;
+    DsToolGate.syncMode(sessionID, false);
     logp('🛑 抖音百科が有効なためツールモードを自動解除（検索とツール呼び出しの衝突を根本回避）');
   }
+  // ★ 单一可信来源：本请求最终的 enableTools 就是服务端闸门的模式状态。
+  //   之后所有工具执行（含插件混用通道）都以这里为准，前端状态不再能「带私货」。
+  DsToolGate.bind(sessionID);
+  // ★ 请求租约：只有处在正在处理的聊天请求里，工具才可能被执行。
+  //   请求外 / 租约过期后，任何残留绑定一律 fail-closed。
+  DsToolGate.beginRequest(sessionID, enableTools);
+  DsToolGate.syncMode(sessionID, enableTools);
 
   // 注入提示词（system 角色）
   // 本机开发者工具（devtools）功能，按所有者要求恢复启用。
@@ -993,12 +1051,12 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   // 图片 → image_url、音频 → input_audio、视频 → video_url，
   // 全部原样交给豆包本人理解；同时开启深度思考（thinking）。
   var useTools = enableTools;
-  // 設備操作・自動化の意図を検出したらツールモードを自動有効化する。
-  // ツールモード OFF のままでは tools 定義が送られず、モデルは「手動で操作してください」
-  // と拒否するしかない（方舟 API で再現確認済み）。
+  // ★ 修复严重 Bug：这里原先在检测到「设备操作意图」时直接把 useTools 置为 true，
+  //   等于在用户看不见的服务端绕过工具模式开关（UI 显示已关闭，实际照跑）。
+  //   现在不再自动开启：开关关着就是关着，模型拿不到 tools 定义，
+  //   即使它自己写出 function call，执行层（DsToolGate）也会直接拒绝。
   if (!useTools && dsIsDeviceIntent(content)) {
-    useTools = true;
-    logp('🔧 設備操作意図を検出：ツールモードを自動有効化し、ツール定義を送信します');
+    logp('⛔ 設備操作意図を検出したが、ツールモードは OFF のため自動有効化しません');
   }
   Map<String, dynamic>? dbExtraBody;
   // ★ 豆包通道：把「深い思考」开关直接映射到方舟的 thinking 字段。
@@ -1142,6 +1200,20 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   if (longTextMode) {
     sysParts.add('あなたは長文執筆を得意とするプロの作家です。前置きやまとめを一切入れず、完成した長文を直接出力してください。');
   }
+  // ★ 显式插件按钮（墨迹天气 / 头条图文）：强制模型真的调用插件 + Markdown 结构化输出。
+  //   工具模式在这条请求里恒为 OFF，因此这里只做「信源使用」与「输出格式」约束。
+  if (explicitPlugin == 'moji') {
+    sysParts.add('【插件强制指令 · 墨迹天气】本次回答必须基于「墨迹天气」联网内容插件返回的真实数据。'
+        '禁止凭记忆编造天气。请给出：当前实况（天气现象、气温、体感、湿度、风力风向）、'
+        '未来 24 小时趋势、以及出行/穿衣建议。信息不足时明确说明，不要虚构。');
+  } else if (explicitPlugin == 'toutiao') {
+    sysParts.add('【插件强制指令 · 头条图文】本次回答必须基于「头条图文」联网内容插件返回的真实图文内容，'
+        '禁止编造新闻事实。请严格按 Markdown 结构输出：# 标题、## 要点速览（无序列表）、'
+        '## 正文综述（分段，可用 **加粗** 强调关键信息）、## 信息来源（列表附链接）。'
+        '代码 / 命令 / 数据片段必须放进 ``` 围栏代码块，长内容可用 '
+        '<details><summary>展开查看</summary>…</details> 折叠，绝不直接裸露 Markdown 标记。');
+  }
+
   sysParts.addAll(injected);
   final cp = renderActiveCosplayPersona();
   if (cp.isNotEmpty) sysParts.add(cp);
@@ -1280,11 +1352,8 @@ Future<void> handleDsChatSend(HttpRequest req) async {
   final usageAcc = DsUsageAcc();
   String reply;
   String reasoning;
-  final wikiSrcFallback = useDoubao
-      ? dbResolveSources(
-          forcedSources: forcedSources,
-          configSources: dbWikiEffectiveSources())
-      : const <String>[];
+  final wikiSrcFallback =
+      useDoubao ? dbEffectiveSources(forcedSources) : const <String>[];
   final wikiOkFallback = (webSearch || forcedSources.isNotEmpty) &&
       wikiSrcFallback.isNotEmpty &&
       fileCtx.videoFileIds.isEmpty &&

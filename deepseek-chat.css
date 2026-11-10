@@ -379,7 +379,7 @@
 .dsc-switch-btn .lbl, .dsc-switch-btn .st, .dsc-advanced-btn .lbl, .dsc-advanced-btn .st, .dsc-longtext-btn .lbl, .dsc-longtext-btn .st, .dsc-level-btn .lbl { display: none !important; }
 .dsc-switch-btn .ic, .dsc-advanced-btn .ic, .dsc-longtext-btn .ic, .dsc-level-btn .ic, .dsc-novel-btn .ic { font-size: 1.1rem; line-height: 1; filter: grayscale(1) brightness(0.85); opacity: 0.9; transition: all 0.2s; display: block; pointer-events: none; }
 .dsc-level-btn .lvl-num { display: inline-block; font-size: 0.78rem; font-weight: 700; color: #db2777; letter-spacing: 0.02em; pointer-events: none; }
-.dsc-switch-btn.active::before, .dsc-advanced-btn.active::before, .dsc-longtext-btn.active::before, .dsc-level-btn.active::before, .dsc-novel-btn.active::before { content: ''; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #ffffff; box-shadow: 0 0 8px #10b981; z-index: 2; animation: dscDotPulse 1.8s infinite ease-in-out; }
+.dsc-switch-btn.active::before, .dsc-advanced-btn.active::before, .dsc-longtext-btn.active::before, .dsc-level-btn.active::before, .dsc-novel-btn.active::before { content: ''; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 2px solid #ffffff; box-shadow: 0 0 8px #10b981; z-index: 2; }
 @keyframes dscDotPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.85; } }
 .dsc-switch-btn.active .ic, .dsc-advanced-btn.active .ic, .dsc-longtext-btn.active .ic, .dsc-level-btn.active .ic, .dsc-novel-btn.active .ic { filter: none; opacity: 1; }
 
@@ -2750,4 +2750,157 @@ label[for],
 @media (max-width: 420px) {
     .dsc-lang-item { font-size: 0.76rem; padding: 7px 8px; }
     .dsc-lang-cur { font-size: 0.6rem; padding: 2px 6px; }
+}
+
+
+/* ============================================================
+ * 代码块增强（任务四：Markdown 代码展示）
+ *   语言角标 / 长代码折叠 / 流式未闭合中间态
+ *   折叠只切换 .is-collapsed，不改写代码文本，
+ *   避免出现「折叠后只剩裸文本」的退化表现。
+ * ============================================================ */
+.dsc-code-lang {
+    position: absolute;
+    top: 9px;
+    left: 12px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 6px;
+    border: 1px solid #e0e7ff;
+    border-radius: 6px;
+    background: rgba(238, 242, 255, 0.94);
+    color: #4f46e5;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+}
+.dsc-code-live {
+    font-style: normal;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #0d9488;
+    background: #ccfbf1;
+    border-radius: 5px;
+    padding: 0 4px;
+    animation: dscCodeLive 1.2s ease-in-out infinite;
+}
+@keyframes dscCodeLive {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+}
+.dsc-code-block.is-collapsed pre {
+    max-height: 210px;
+    overflow: hidden;
+}
+.dsc-code-block.is-collapsed::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 62px;
+    background: linear-gradient(to bottom, rgba(248, 250, 252, 0), rgba(248, 250, 252, 0.98));
+    pointer-events: none;
+    z-index: 2;
+}
+.dsc-code-fold {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    z-index: 4;
+    padding: 3px 9px;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #4f46e5;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.dsc-code-fold:hover {
+    background: #eef2ff;
+    border-color: #c7d2fe;
+}
+.dsc-code-block.is-streaming {
+    box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0.35);
+}
+
+/* 语法高亮 token —— 零依赖实现见 deepseek-chat.js 的 mdHighlight()。
+   只对带语言标识的代码块上色；无语言标识保持纯文本，不猜语言。 */
+.dsc-code-block .md-tk-k { color: #7c3aed; font-weight: 600; }
+.dsc-code-block .md-tk-s { color: #0f766e; }
+.dsc-code-block .md-tk-n { color: #b45309; }
+.dsc-code-block .md-tk-c { color: #94a3b8; font-style: italic; }
+
+@media (prefers-color-scheme: dark) {
+    .dsc-code-block .md-tk-k { color: #c4b5fd; }
+    .dsc-code-block .md-tk-s { color: #5eead4; }
+    .dsc-code-block .md-tk-n { color: #fbbf24; }
+    .dsc-code-block .md-tk-c { color: #64748b; }
+    .dsc-code-lang {
+        background: rgba(49, 46, 129, 0.55);
+        border-color: rgba(99, 102, 241, 0.35);
+        color: #c7d2fe;
+    }
+    .dsc-code-live { background: rgba(13, 148, 136, 0.35); color: #5eead4; }
+    .dsc-code-block.is-collapsed::after {
+        background: linear-gradient(to bottom, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.98));
+    }
+    .dsc-code-fold {
+        background: rgba(30, 41, 59, 0.95);
+        border-color: rgba(100, 116, 139, 0.5);
+        color: #c7d2fe;
+    }
+}
+
+/* ============================================================
+ * Markdown 折叠块 <details><summary>
+ * 修复：模型用 HTML 折叠语法包裹长代码时，旧渲染器把标签当正文转义，
+ *       用户看到的是「折叠代码直接显示成代码」。这里给出真正的折叠 UI。
+ * ============================================================ */
+.dsc-md-details {
+    margin: 0.85em 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+    overflow: hidden;
+}
+.dsc-md-details > summary {
+    cursor: pointer;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #4338ca;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-tap-highlight-color: transparent;
+}
+.dsc-md-details > summary::-webkit-details-marker { display: none; }
+.dsc-md-details > summary::before {
+    content: "▸";
+    display: inline-block;
+    color: #6366f1;
+    transition: transform 0.15s ease;
+}
+.dsc-md-details[open] > summary::before { transform: rotate(90deg); }
+.dsc-md-details-body {
+    padding: 2px 14px 12px 14px;
+    border-top: 1px dashed #e2e8f0;
+}
+.dsc-md-details-body > *:first-child { margin-top: 0.6em; }
+.dsc-md-details-body > *:last-child { margin-bottom: 0.2em; }
+.dsc-md-details .dsc-code-block { margin: 0.6em 0; }
+
+@media (prefers-color-scheme: dark) {
+    .dsc-md-details { background: rgba(30, 41, 59, 0.55); border-color: rgba(100, 116, 139, 0.45); }
+    .dsc-md-details > summary { color: #c7d2fe; }
+    .dsc-md-details > summary::before { color: #a5b4fc; }
+    .dsc-md-details-body { border-top-color: rgba(100, 116, 139, 0.45); }
 }

@@ -756,10 +756,17 @@
             k.placeholder = c.hasKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedKey) : T('ARK API Key を入力');
         }
         DB_WEB_SOURCES = Array.isArray(c.webSources) ? c.webSources.slice() : [];
-        // 总闸以后端为准（旧配置没有该字段时不动本地状态）
-        if (Object.prototype.hasOwnProperty.call(c, 'wikiEnabled')) {
-            try { localStorage.setItem(WIKI_KEY, c.wikiEnabled ? '1' : '0'); } catch (e) {}
-        }
+        /* v6 修复：总闸只做「首次初始化」，不再被后端配置反复回写。
+           旧实现每次加载配置 / 打开设置面板，都把服务端的 wikiEnabled 覆盖到本地：
+           用户明明已经关掉百科，状态又被复活 → isWikiOn() 恒为 true →
+           工具模式按钮进 locked 态、并被 600ms 的 sync 反复压回关闭，
+           外部表现就是「工具模式点不动 / 一开就灭」。 */
+        try {
+            if (localStorage.getItem(WIKI_KEY) === null &&
+                Object.prototype.hasOwnProperty.call(c, 'wikiEnabled')) {
+                localStorage.setItem(WIKI_KEY, c.wikiEnabled ? '1' : '0');
+            }
+        } catch (e) {}
         var wd = $('dscDbWikiDouyin');
         if (wd) wd.checked = isWikiOn() && DB_WEB_SOURCES.indexOf('douyin') >= 0;
         syncWikiSwitchUI();

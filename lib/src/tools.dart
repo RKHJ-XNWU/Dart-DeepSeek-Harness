@@ -17,6 +17,7 @@ import 'ds_crypto.dart';
 import 'net.dart';
 import 'deepseek_api.dart';
 import 'globals.dart';
+import 'tool_gate.dart';
 import 'virtual_display.dart';
 
 // ------------------------------------------------------------
@@ -2650,6 +2651,13 @@ Future<String> _vdBatchSwipeRoute(Map<String, dynamic> args) async {
 }
 
 Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
+  // ★ 第二道校验（防御性）：即使将来有人绕开 dsSafeExecTool 直接调用本函数，
+  //   工具模式闭着时依然跑不起来。判定口径与 dsSafeExecTool 一致，
+  //   但必须用 checkInner —— 外层已经校验并消费过一次性授权，
+  //   内层再调 check 会把同一次调用误判为「无授权」而拒绝。
+  if (!DsToolGate.checkInner(name)) {
+    return DsToolGate.denyText(name);
+  }
   // 豆包专属工具模式：UI 操作与感知一律重定向到虚拟屏幕，主屏不受影响。
   if (dsVdForce) {
     final intercepted = await dsVdIntercept(name, args);

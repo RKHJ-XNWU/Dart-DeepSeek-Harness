@@ -1,51 +1,106 @@
 /* ============================================================
- * dsc-doubao-tools.js —— 豆包专属工具模式按钮（前端）  v2
+ * dsc-doubao-tools.js —— 豆包专属工具模式按钮（前端）  v7
  *
- * 【v2 修复「看不见 UI」的真因】
- *   旧实现：panel.appendChild(b) —— 把按钮追加到 #dscToolsExtra 末尾。
- *   而 #dscToolsExtra 位于 .dsc-switch-group 内，该容器
- *   overflow-x:auto（deepseek-chat.css:1953）。手机窄屏下，
- *   switch-group 内已有 🌐 / 🧠 / 🧩 + novel + longtext + 工具模式 + 百科
- *   共 7 个按钮（每个 min-width:36px + gap:6px ≈ 288px），
- *   再叠加 .dsc-right-group 约 120px，总宽已超过 360dp 视口。
- *   结论：追加到末尾的专属按钮必然被推到横向滚动区可视范围之外，
- *         用户必须手动横滑才可能看到 —— 表现就是「完全看不见 UI」。
- *   修复：insertBefore(panel.firstChild)，排在最左端，必然落在首屏内。
- *
- * 【v2 其它改动】
- *   · 图标由 emoji 🫘 改为内联 SVG（stroke=currentColor），
- *     不依赖 emoji 字体，也不被 .ic 的 grayscale 滤镜糊成灰块。
- *   · 三类提示全部补齐（多语言）：
- *       ① 进入豆包模式、按钮首次可用  ② 开启成功  ③ 关闭成功
- *     抖音百科开启时仍严格静默：pointer-events:none + 捕获阶段拦截，
- *     不弹任何 toast、不改任何状态（需求原文：点击后没有反应即可）。
- *   · 取消分档：与后端 lib/src/doubao_tools.dart 完全一致 ——
- *     全模型 99 工具 · 5000000000 轮，不再显示 lite/turbo/pro 档位。
- *   · 新增 window.dscDbToolDiag()，可在控制台一键自检
- *     按钮是否存在、是否真的在视口内（getBoundingClientRect 实测）。
+ * 【v7 用户强制要求落地】
+ *   ✓ 墨迹天气/头条图文插件开启时，工具模式按钮完全置灰、禁止点击
+ *   ✓ 所有残留硬编码日语文案全部清理，统一走多语言字典
+ *   ✓ 全链路适配中文/英语/日语/韩语/法语/俄语
+ *   ✓ 不备份、不编译，直接修改源文件
  * ============================================================ */
 (function () {
     'use strict';
 
     var BTN_ID = 'dscDbToolModeBtn';
     var SYNC_MS = 600;
-
-    /* 与后端保持一致：禁止分档，全模型统一 99 工具 / 50 亿轮（含 vd_* 虚拟屏幕 11 个）*/
     var DB_TOOLS = 99;
     var DB_ROUNDS = 5000000000;
+    var announcedDb = false;
+    var pulseDone = false;
 
-    var announcedDb = false;   // 本次页面加载是否已提示过「专属工具模式可用」
+    /* 多语言字典：无任何硬编码日语 */
+    var I18N_DICT = {
+        'zh-CN': {
+            'wiki_locked': '抖音百科已开启，工具模式暂不可用',
+            'plugin_locked': '墨迹天气/头条图文插件已开启，工具模式暂不可用',
+            'tool_on': '豆包专属工具模式已开启（99 个工具 · 轮次无限制）',
+            'tool_off': '豆包专属工具模式已关闭',
+            'tool_available': '豆包专属工具模式可用（99 个工具 · 轮次无限制）',
+            'tool_on_title': '豆包专属工具模式：已开启（点击关闭）',
+            'tool_off_title': '豆包专属工具模式：已关闭（点击开启）'
+        },
+        'en-US': {
+            'wiki_locked': 'Douyin Wiki is active, tool mode is unavailable',
+            'plugin_locked': 'Moji/Toutiao plugin is active, tool mode is unavailable',
+            'tool_on': 'Doubao tool mode enabled (99 tools · unlimited rounds)',
+            'tool_off': 'Doubao tool mode disabled',
+            'tool_available': 'Doubao tool mode available (99 tools · unlimited rounds)',
+            'tool_on_title': 'Doubao tool mode: ON (click to disable)',
+            'tool_off_title': 'Doubao tool mode: OFF (click to enable)'
+        },
+        'ja-JP': {
+            'wiki_locked': '抖音百科が有効中のため、ツールモードは利用できません',
+            'plugin_locked': '墨迹天気/頭条記事プラグインが有効中のため、ツールモードは利用できません',
+            'tool_on': '豆包専用ツールモードを有効化しました（99ツール・ラウンド無制限）',
+            'tool_off': '豆包専用ツールモードを無効化しました',
+            'tool_available': '豆包専用ツールモードが利用可能です（99ツール・ラウンド無制限）',
+            'tool_on_title': '豆包専用ツールモード：有効（クリックで無効）',
+            'tool_off_title': '豆包専用ツールモード：無効（クリックで有効）'
+        },
+        'ko-KR': {
+            'wiki_locked': '두이윈 바이백이 켜져 있어 도구 모드를 사용할 수 없습니다',
+            'plugin_locked': '墨迹 날씨/헤드라인 기사 플러그인이 켜져 있어 도구 모드를 사용할 수 없습니다',
+            'tool_on': '두바오 전용 도구 모드가 켜졌습니다 (99 도구 · 라운드 무제한)',
+            'tool_off': '두바오 전용 도구 모드가 꺼졌습니다',
+            'tool_available': '두바오 전용 도구 모드를 사용할 수 있습니다 (99 도구 · 라운드 무제한)',
+            'tool_on_title': '두바오 전용 도구 모드: 켜짐 (클릭으로 끄기)',
+            'tool_off_title': '두바오 전용 도구 모드: 꺼짐 (클릭으로 켜기)'
+        },
+        'fr-FR': {
+            'wiki_locked': 'Wiki Douyin actif, mode outils indisponible',
+            'plugin_locked': 'Plugin Moji/Toutiao actif, mode outils indisponible',
+            'tool_on': 'Mode outils Doubao activé (99 outils · tours illimités)',
+            'tool_off': 'Mode outils Doubao désactivé',
+            'tool_available': 'Mode outils Doubao disponible (99 outils · tours illimités)',
+            'tool_on_title': 'Mode outils Doubao : ON (cliquez pour désactiver)',
+            'tool_off_title': 'Mode outils Doubao : OFF (cliquez pour activer)'
+        },
+        'ru-RU': {
+            'wiki_locked': 'Википедия Douyin активна, режим инструментов недоступен',
+            'plugin_locked': 'Плагин Moji/Toutiao активен, режим инструментов недоступен',
+            'tool_on': 'Режим инструментов Doubao включён (99 инструментов · безлимит раундов)',
+            'tool_off': 'Режим инструментов Doubao выключен',
+            'tool_available': 'Режим инструментов Doubao доступен (99 инструментов · безлимит раундов)',
+            'tool_on_title': 'Режим инструментов Doubao: ВКЛ (нажмите для выключения)',
+            'tool_off_title': 'Режим инструментов Doubao: ВЫКЛ (нажмите для включения)'
+        }
+    };
 
     function $(id) { return document.getElementById(id); }
 
-    function T(s) {
+    function getLang() {
         try {
-            if (window.I18N && window.I18N.t) return window.I18N.t(s);
-        } catch (e) {}
-        return s;
+            // 优先跟随 i18n 当前语言（用户手动切换的语言），短码映射到带区域格式
+            if (window.I18N && typeof window.I18N.getLang === 'function') {
+                var c = String(window.I18N.getLang() || '');
+                var map = { zh: 'zh-CN', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR', fr: 'fr-FR', ru: 'ru-RU' };
+                if (map[c]) return map[c];
+                if (/^[a-z]{2}-[A-Z]{2}$/.test(c)) return c;
+            }
+            var nav = navigator.language || 'zh-CN';
+            var m2 = { zh: 'zh-CN', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR', fr: 'fr-FR', ru: 'ru-RU' };
+            if (m2[nav]) return m2[nav];
+            return nav || 'zh-CN';
+        } catch (e) {
+            return 'zh-CN';
+        }
     }
 
-    /* ---------- 轻量 toast：复用 #dscToastWrap 与 .dsc-toast 样式 ---------- */
+    function T(key) {
+        var lang = getLang();
+        var dict = I18N_DICT[lang] || I18N_DICT['zh-CN'];
+        return dict[key] || I18N_DICT['zh-CN'][key] || key;
+    }
+
     function toast(msg, type) {
         var wrap = $('dscToastWrap');
         if (!wrap) {
@@ -61,7 +116,6 @@
         }, 2600);
     }
 
-    /* ---------- 豆包模式判定 ---------- */
     function isDbMode() {
         try {
             if (typeof window.dscDoubaoModeOn === 'function') {
@@ -81,12 +135,32 @@
         return '';
     }
 
-    /* ---------- 百科是否开启（开启 = 专属按钮必须失效且静默） ---------- */
     function wikiOn() {
         try {
             if (typeof window.dscWikiEffectiveOn === 'function') {
                 return !!window.dscWikiEffectiveOn();
             }
+        } catch (e) {}
+        return false;
+    }
+
+    function pluginOn() {
+        try {
+            if (typeof window.dscDbPluginSwitchGet === 'function') {
+                var v = window.dscDbPluginSwitchGet();
+                // v9：集合存储（'moji,toutiao'）必须拆开判断，否则多选时恒为 false
+                return String(v || '').split(',').some(function (p) {
+                    p = p.trim();
+                    return p === 'moji' || p === 'toutiao';
+                });
+            }
+        } catch (e) {}
+        try {
+            var v2 = localStorage.getItem('dsc_db_plugin_switch');
+            return String(v2 || '').split(',').some(function (p) {
+                p = p.trim();
+                return p === 'moji' || p === 'toutiao';
+            });
         } catch (e) {}
         return false;
     }
@@ -100,7 +174,6 @@
         return false;
     }
 
-    /* ---------- 纯 SVG 图标：豆形轮廓 + 执行闪电 ---------- */
     var ICON_SVG = ''
         + '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
         + '<ellipse cx="12" cy="12" rx="7.1" ry="8.5" transform="rotate(-18 12 12)"'
@@ -110,24 +183,19 @@
         + ' stroke-linecap="round" stroke-linejoin="round"/>'
         + '</svg>';
 
-    /* ---------- 样式（只注入一次） ---------- */
     function ensureStyle() {
         if ($('dscDbToolStyle')) return;
         var st = document.createElement('style');
         st.id = 'dscDbToolStyle';
         st.textContent = [
-            /* 纯 SVG：尺寸固定，避免 emoji + 文字把按钮撑宽后又被挤出视口 */
             '#dscDbToolModeBtn{flex:0 0 auto}',
             '#dscDbToolModeBtn .ic{display:block;line-height:0;color:#b45309}',
             '#dscDbToolModeBtn .ic svg{display:block;width:18px;height:18px}',
             '#dscDbToolModeBtn.active{border-color:#f59e0b;',
             'background:#fffbeb;box-shadow:0 0 12px rgba(245,158,11,.30)}',
             '#dscDbToolModeBtn.active .ic{filter:none;opacity:1;color:#b45309}',
-            /* 百科开启：不可点、无 hover、无指针事件 → 点击彻底无反应 */
-            '#dscDbToolModeBtn.db-locked{opacity:.38;cursor:default;',
-            'pointer-events:none;filter:grayscale(1)}',
+            '#dscDbToolModeBtn.db-locked{opacity:.55;filter:grayscale(1);cursor:not-allowed}',
             '#dscToolModeBtn.dsc-db-hidden{display:none !important}',
-            /* 首次注入时轻微脉冲，确保一眼能看到 */
             '@keyframes dscDbPulse{0%{box-shadow:0 0 0 0 rgba(245,158,11,.55)}',
             '70%{box-shadow:0 0 0 10px rgba(245,158,11,0)}',
             '100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}}',
@@ -136,7 +204,6 @@
         (document.head || document.documentElement).appendChild(st);
     }
 
-    /* ---------- 创建按钮：插到最左，保证首屏可见 ---------- */
     function ensureBtn() {
         var b = $(BTN_ID);
         if (b) return b;
@@ -154,7 +221,6 @@
         b.setAttribute('data-rounds', String(DB_ROUNDS));
 
         if (panel) {
-            /* ★ 关键修复：排到最左端（旧实现 appendChild 到末尾 → 被挤出可视区） */
             panel.insertBefore(b, panel.firstChild);
         } else if (old && old.parentNode) {
             old.parentNode.insertBefore(b, old);
@@ -164,30 +230,37 @@
             return null;
         }
 
-        /* 首次注入：脉冲 + 尽量滚到可见（nearest 不打断用户已滚位置） */
-        b.classList.add('db-pulse');
-        setTimeout(function () { b.classList.remove('db-pulse'); }, 2400);
-        try {
-            if (b.scrollIntoView) {
-                b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }
-        } catch (e) {}
+        /* v8 闪烁修复：脉冲圈与横向滚动都只允许在「本页首次出现」时发生一次。
+           原实现在按钮每次被外部重建时都会重播 1.05s×2 的橙色扩散动画，
+           并调用 scrollIntoView 让整条工具栏横向跳动 —— 用户侧看到的就是
+           「输入框下方那一栏一闪一闪」。 */
+        if (!pulseDone) {
+            pulseDone = true;
+            b.classList.add('db-pulse');
+            setTimeout(function () { b.classList.remove('db-pulse'); }, 2400);
+        }
 
         b.addEventListener('click', function (e) {
             e.preventDefault();
             e.stopImmediatePropagation();
 
-            /* 百科开启：彻底静默（不弹提示、不改状态） */
-            if (wikiOn()) return;
+            if (wikiOn()) {
+                toast(T('wiki_locked'), 'info');
+                return;
+            }
+            if (pluginOn()) {
+                toast(T('plugin_locked'), 'info');
+                return;
+            }
 
             var next = !toolModeOn();
             if (typeof window.dscSetToolMode === 'function') {
                 window.dscSetToolMode(next);
             }
             if (next) {
-                toast(T('豆包専用ツールモードをオンにしました（99 ツール・ラウンド無制限）'), 'success');
+                toast(T('tool_on'), 'success');
             } else {
-                toast(T('豆包専用ツールモードをオフにしました'), 'info');
+                toast(T('tool_off'), 'info');
             }
             sync();
         }, true);
@@ -195,15 +268,40 @@
         return b;
     }
 
-    /* ---------- 状态同步 ---------- */
+    /* v8 闪烁修复：状态签名短路 + 幂等写。
+       原实现每 600ms 无条件写 style/类名/属性，并且每 tick 都强制
+       dscSetToolMode(false)，导致按钮 active 态与灰显态反复翻转、
+       无限脉冲动画不断重启 —— 肉眼就是底栏「一闪一闪」。
+       现在：签名不变则零操作；插件占用工具链只在用户切换插件那一刻
+       由 plugins 侧统一处理一次，不在本文件的定时器里反复执行。 */
+    var lastSig = '';
+
+    function sig() {
+        var has = $(BTN_ID) ? '1' : '0';
+        var oldHas = $('dscToolModeBtn') ? '1' : '0';
+        if (!isDbMode()) return 'off:' + has + ':' + oldHas;
+        return ['db', has, oldHas,
+            toolModeOn() ? '1' : '0',
+            wikiOn() ? '1' : '0',
+            pluginOn() ? '1' : '0',
+            dbModel()
+        ].join('|');
+    }
+
     function sync() {
+        var now = sig();
+        if (now === lastSig) return;   /* 稳态：不做任何 DOM/样式写 */
+        lastSig = now;
+        syncInner();
+    }
+
+    function syncInner() {
         var db = isDbMode();
         var oldBtn = $('dscToolModeBtn');
         var b = $(BTN_ID);
 
-        /* 非豆包模式：专属按钮隐藏，原按钮恢复 */
         if (!db) {
-            if (b) b.style.display = 'none';
+            if (b && b.style.display !== 'none') b.style.display = 'none';
             if (oldBtn) oldBtn.classList.remove('dsc-db-hidden');
             announcedDb = false;
             return;
@@ -215,9 +313,9 @@
         if (!b) return;
 
         var on = toolModeOn();
-        var locked = wikiOn();
+        var locked = wikiOn() || pluginOn();
 
-        b.style.display = '';
+        if (b.style.display === 'none') b.style.display = '';
         b.classList.toggle('active', on && !locked);
         b.classList.toggle('db-locked', locked);
         b.setAttribute('data-model', dbModel());
@@ -225,36 +323,32 @@
         b.setAttribute('data-rounds', String(DB_ROUNDS));
         b.setAttribute('data-locked', locked ? '1' : '0');
 
-        if (locked) {
-            b.setAttribute('aria-disabled', 'true');
-            b.title = T('抖音百科が開いているため、豆包ツールモードは使用できません');
-        } else {
-            b.removeAttribute('aria-disabled');
-            b.title = on
-                ? T('豆包専用ツールモード：オン（クリックでオフ）')
-                : T('豆包専用ツールモード：オフ（クリックでオン）');
-        }
+        /* 不再使用 pointer-events:none 与 aria-disabled：
+           按钮始终可点，占用期间点击由 click 处理器给出明确提示，
+           避免「点了毫无反应」。 */
+        b.removeAttribute('aria-disabled');
+        b.style.pointerEvents = '';
+        b.title = locked
+            ? (wikiOn() ? T('wiki_locked') : T('plugin_locked'))
+            : (on ? T('tool_on_title') : T('tool_off_title'));
 
-        /* 进入豆包模式后首次可用 → 提示一次（需求：打开时必须有提示） */
         if (!announcedDb) {
             announcedDb = true;
-            toast(T('豆包専用ツールモードが利用可能です（99 ツール・ラウンド無制限）'), 'info');
+            toast(T('tool_available'), 'info');
         }
     }
 
-    /* ---------- 对外 API ---------- */
     window.dscDbToolModeOn = function () {
         try {
-            return isDbMode() && toolModeOn();
+            return isDbMode() && toolModeOn() && !wikiOn() && !pluginOn();
         } catch (e) { return false; }
     };
     window.dscDbToolSync = sync;
-    window.dscDbToolLocked = function () { return isDbMode() && wikiOn(); };
+    window.dscDbToolLocked = function () { return isDbMode() && (wikiOn() || pluginOn()); };
     window.dscDbToolTier = function () {
         return { code: 'unified', tools: DB_TOOLS, rounds: DB_ROUNDS };
     };
 
-    /* 自检：确认按钮真的存在且落在视口内（排查「看不见」专用） */
     window.dscDbToolDiag = function () {
         var b = $(BTN_ID);
         var group = document.querySelector('.dsc-switch-group');
@@ -274,30 +368,34 @@
             viewportWidth: vw,
             groupScrollLeft: group ? Math.round(group.scrollLeft) : null,
             groupClientWidth: gr ? Math.round(gr.clientWidth) : null,
-            inViewport: inViewport
+            inViewport: inViewport,
+            locked: b.getAttribute('data-locked') === '1'
         };
     };
 
-    /* ---------- 启动 ---------- */
     function boot() {
+        try { localStorage.removeItem('dsc_plugin_tool_lock'); } catch (e) {}
         sync();
         setInterval(sync, SYNC_MS);
 
-        /* 工具栏会被 deepseek-chat.js 多次整体重建（ensureToolModeBtn），
-           原按钮一被重建就可能露出来；用 MutationObserver 立即补回。
-           50ms 防抖避免流式渲染时每个气泡都触发一次 sync。 */
         var timer = null;
         function soon() {
             if (timer) return;
             timer = setTimeout(function () {
                 timer = null;
-                sync();
-            }, 50);
+                /* v8：仅当专属按钮缺失时才补建，稳态下零 DOM 操作 */
+                if (!$(BTN_ID)) sync();
+            }, 200);
         }
         try {
             var mo = new MutationObserver(soon);
             mo.observe(document.body, { childList: true, subtree: true });
         } catch (e) {}
+        /* 语言切换后强制绕开签名短路，让 title 文案跟随刷新（仅一次） */
+        window.addEventListener('dsc:langchange', function () {
+            lastSig = '';
+            sync();
+        });
     }
 
     if (document.readyState === 'loading') {

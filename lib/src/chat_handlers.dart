@@ -981,14 +981,16 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
     await dsJSONErr(res, 400, '翻訳するテキストが空です');
     return;
   }
-  final cfg = getDsConfig();
-  if (cfg.apiKey.isEmpty) {
-    await dsJSONErr(res, 400, '先に DeepSeek API Key を設定してください');
+  // ★ 翻訳ボタンは常に doubao-seed-2-1-lite-260915（方舟）を使う
+  const String translateModel = 'doubao-seed-2-1-lite-260915';
+  final dbCfg = getDbConfig();
+  if (dbCfg.apiKey.trim().isEmpty) {
+    await dsJSONErr(res, 400, '先に豆包 API Key を設定してください');
     return;
   }
-  var model = mStr(body, 'model').trim();
-  if (model.isEmpty) model = cfg.model;
-  if (model.isEmpty) model = DS_DEFAULT_MODEL;
+  var model = translateModel;
+  final callKey = dbCfg.apiKey;
+  final callUrl = dbChatEndpoint();
 
   // ★ Markdown を 1 文字も壊さないための厳格プロンプト
   const systemPrompt = 'あなたは Markdown に精通した優秀な翻訳者です。入力テキストを指定された言語へ翻訳します。\n'
@@ -1020,14 +1022,14 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
     String out = '';
     var streamed = false;
     try {
-      final r = await callDsChatAPI(cfg.apiKey, model, messages, 300000, 0.2, usageAcc);
+      final r = await callDsChatAPI(callKey, model, messages, 300000, 0.2, usageAcc, apiUrl: callUrl);
       out = r.content;
     } catch (e1) {
       // 非流式呼び出しが失敗した場合はストリーミングへ自動フォールバック
       logp('⚠️ 翻訳（非流式）失敗、ストリーミングで再試行: $e1');
       final buf = StringBuffer();
       await callDsChatAPIStream(
-        cfg.apiKey,
+        callKey,
         model,
         messages,
         300000,
@@ -1035,6 +1037,7 @@ Future<void> handleDsChatTranslate(HttpRequest req) async {
         null,
         (s) => buf.write(s),
         usageAcc,
+        apiUrl: callUrl,
       );
       out = buf.toString();
       streamed = true;
