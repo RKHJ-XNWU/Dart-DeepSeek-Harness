@@ -1,0 +1,480 @@
+// ============================================================
+// virtual_display.dart —— 虚拟屏幕（Virtual Display）操作引擎
+//
+// 目的：豆包专属工具模式下，把 UI 自动化放到一块独立的虚拟屏幕上执行，
+//       不抢主屏焦点。用户可以同时刷视频 / 打游戏，主屏操作不被打断，
+//       同时仍能在叠层窗口里看到 AI 的操作过程。
+//
+// 实测结论（Android 12 / SDK 31 / 720x1600，density 320）：
+//   · settings put global overlay_display_devices "720x1280/320"
+//       可创建副屏，实测 displayId 由系统分配（本机为 10），不固定。
+//   · am start --display <id> 可在副屏独立启动 Activity，落在独立 task。
+//   · input -d <id> tap/swipe/keyevent/text 可把事件注入副屏。
+//   · screencap -d <id> -p 可抓取副屏画面（该屏无活动窗口时返回 0 字节）。
+//   · uiautomator dump 的 --display 参数会被静默忽略（仍 dump 主屏），
+//     因此副屏的「感知」只能走 screencap + OCR，不能走 UI 树。
+//   · 主屏 mResumedActivity 在副屏启动应用后保持不变（实测已确认）。
+//
+// 因此本模块的感知能力以截图 + tesseract OCR 为核心，
+// 不做「副屏 UI 树」这类本平台不存在的能力承诺。
+// ============================================================
+
+import 'dart:async';
+import 'httpsrv.dart';
+import 'globals.dart';
+import 'ds_crypto.dart';
+import 'dart:io';
+
+import 'tools.dart';
+
+/// 创建副屏所用的系统设置键。
+const String vdOverlayKey = 'overlay_display_devices';
+
+/// 默认副屏尺寸与密度。取 720x1280 是为了与主流主屏 720x1600 同宽，
+/// 避免应用在副屏上因宽度突变而重新布局成平板/分栏模式。
+const int vdDefaultWidth = 720;
+const int vdDefaultHeight = 1280;
+const int vdDefaultDpi = 320;
+
+class VdState {
+  /// 系统设置里是否已写入 overlay_display_devices
+  final bool configured;
+
+  /// 副屏 displayId，-1 表示未就绪
+  final int displayId;
+
+  /// 原始规格字符串，如 "720x1280/320"
+  final String spec;
+
+  const VdState({
+    required this.configured,
+    required this.displayId,
+    required this.spec,
+  });
+
+  bool get ready => configured && displayId >= 0;
+
+  Map<String, dynamic> toJson() => {
+        'configured': configured,
+        'displayId': displayId,
+        'spec': spec,
+        'ready': ready,
+      };
+}
+
+
+// 虚拟屏幕开关配置（用户级）
+String get vdConfigPath => '$dsChatDir/vd_config.sts';
+
+class VdConfig {
+  final bool enabled;
+  const VdConfig({this.enabled = true});
+}
+
+VdConfig? _vdCfgCache;
+String _vdCfgRaw = '';
+
+VdConfig getVdConfig() {
+  try {
+    final f = File(vdConfigPath);
+    if (!f.existsSync()) return _vdCfgCache ?? const VdConfig();
+    final raw = f.readAsStringSync().trim();
+    if (_vdCfgCache != null && raw == _vdCfgRaw) return _vdCfgCache!;
+    var enabled = true;
+    final parts = raw.split('|');
+    if (parts.length >= 2) enabled = parts[1].trim() == '1';
+    _vdCfgCache = VdConfig(enabled: enabled);
+    _vdCfgRaw = raw;
+    return _vdCfgCache!;
+  } catch (_) { return _vdCfgCache ?? const VdConfig(); }
+}
+
+bool saveVdConfig({required bool enabled}) {
+  try {
+    ensureDir(dsChatDir);
+    final line = '#VD|${enabled ? 1 : 0}\n';
+    File(vdConfigPath).writeAsStringSync(line);
+    _vdCfgCache = VdConfig(enabled: enabled);
+    _vdCfgRaw = line.trim();
+    return true;
+  } catch (e) {
+    logp('❌ 虚拟屏幕配置の保存に失敗: $e');
+    return false;
+  }
+}
+
+
+class VdOpResult {
+  final bool ok;
+  final String output;
+  final int displayId;
+  const VdOpResult(this.ok, this.output, this.displayId);
+
+  @override
+  String toString() => output;
+}
+
+int _vdCachedId = -1;
+DateTime _vdCachedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+Future<String> _vdRun(String cmd, {int timeoutSec = 20}) async {
+  final r =
+      await runSmartShell('', cmd, timeout: Duration(seconds: timeoutSec));
+  return r.out;
+}
+
+/// 从 dumpsys display 的输出里解析副屏 displayId。
+///
+/// 结构形如：
+///   DisplayDeviceInfo{"叠加视图 #1": uniqueId="overlay:1", ...}
+///     mDisplayId=10
+///   mBaseDisplayInfo=DisplayInfo{..., displayId 10, ...}
+/// 取 "uniqueId=\"overlay" 之后第一个 mDisplayId= 的数字。
+/// 从 dumpsys display 的 "Display States:" 段提取全部 display id。
+///
+/// 实测（Android 12）该段形如：
+///   Display States: size=2
+///     Display Id=0
+///     Display State=ON
+///     ...
+///     Display Id=12
+///     Display State=ON
+/// 段落在 "Display Adapters:" 之前结束。
+List<int> vdDisplayIds(String dump) {
+  final out = <int>[];
+  final i = dump.indexOf('Display States:');
+  if (i < 0) return out;
+  var tail = dump.substring(i);
+  final j = tail.indexOf('Display Adapters:');
+  if (j > 0) tail = tail.substring(0, j);
+  for (final m in RegExp(r'Display Id=(\d+)').allMatches(tail)) {
+    final id = int.tryParse(m.group(1) ?? '');
+    if (id != null) out.add(id);
+  }
+  return out;
+}
+
+/// 解析副屏 displayId。
+///
+/// 实测要点：DisplayDeviceInfo{"叠加视图 #1": uniqueId="overlay:1"} 这一行
+/// **不带 displayId**，mDisplayId= 也不是它的字段（首版按 mDisplayId 解析
+/// 会取到主屏的 0，导致所有操作打到主屏）。可靠规则是：
+///   1) 必须存在 uniqueId="overlay（即 OverlayDisplayAdapter 里有实体）；
+///   2) 该屏的 id 是 "Display States:" 段内第一个非 0 的 Display Id。
+/// 主屏恒为 0（DEFAULT_DISPLAY），所以非 0 即副屏。
+int vdParseOverlayId(String dump) {
+  if (!dump.contains('uniqueId="overlay')) return -1;
+  for (final id in vdDisplayIds(dump)) {
+    if (id != 0) return id;
+  }
+  return -1;
+}
+
+/// 查询副屏当前状态。缓存 8 秒，force=true 时强制重新解析。
+Future<VdState> vdState({bool force = false}) async {
+  final spec = (await _vdRun('settings get global $vdOverlayKey')).trim();
+  final configured = spec.isNotEmpty && spec != 'null';
+  if (!configured) {
+    _vdCachedId = -1;
+    return const VdState(configured: false, displayId: -1, spec: '');
+  }
+  // 缓存只留 2 秒：实测 overlay_display_devices 会被系统静默清空
+  // （例如切后台、息屏、厂商省电策略），旧实现缓存 8 秒，
+  // 期间所有 input -d / am start --display 都会打到一个已经不存在的屏，
+  // 轻则全部失败，重则 am start 回退主屏 —— 这正是「抢主屏焦点」的根源。
+  if (!force &&
+      _vdCachedId >= 0 &&
+      DateTime.now().difference(_vdCachedAt) < const Duration(seconds: 2)) {
+    return VdState(configured: true, displayId: _vdCachedId, spec: spec);
+  }
+  final dump = await _vdRun('dumpsys display', timeoutSec: 40);
+  final id = vdParseOverlayId(dump);
+  _vdCachedId = id;
+  _vdCachedAt = DateTime.now();
+  return VdState(configured: true, displayId: id, spec: spec);
+}
+
+/// 确保副屏存在。已存在则复用，不存在则创建并等待系统就绪。
+/// 等待上限约 4.2 秒（12 × 350ms），避免无意义长等待。
+Future<VdState> vdEnsure({
+  int width = vdDefaultWidth,
+  int height = vdDefaultHeight,
+  int dpi = vdDefaultDpi,
+}) async {
+
+  // 用户关闭虚拟屏时，任何 vd_* 调用都不得自动建屏
+  if (!getVdConfig().enabled) {
+    return const VdState(configured: false, displayId: -1, spec: '');
+  }
+  // 这里必须强制刷新：不能吃缓存，否则会把「刚被系统清掉的副屏」当成可用。
+  var st = await vdState(force: true);
+  if (st.ready) return st;
+  final spec = '${width}x${height}/$dpi';
+  if (st.configured) {
+    // 残留态：设置里还写着规格，但 OverlayDisplayAdapter 已经没有实体。
+    // 直接重写同值不会触发重建，必须先清空再写入（实测有效）。
+    await _vdRun('settings put global $vdOverlayKey ""');
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  }
+  await _vdRun('settings put global $vdOverlayKey "$spec"');
+  for (var i = 0; i < 16; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    st = await vdState(force: true);
+    if (st.ready) return st;
+  }
+  return st;
+}
+
+/// 自愈：把「已配置但不可用」的副屏拉回可用态。
+/// 供上层在每次豆包工具批次开始前调用，返回修复后的状态。
+Future<VdState> vdSelfHeal() async {
+  var st = await vdState(force: true);
+  if (st.ready) return st;
+  st = await vdEnsure();
+  return st;
+}
+
+/// 关闭并移除副屏。
+Future<VdState> vdDestroy() async {
+  await _vdRun('settings put global $vdOverlayKey ""');
+  _vdCachedId = -1;
+  _vdCachedAt = DateTime.fromMillisecondsSinceEpoch(0);
+  return const VdState(configured: false, displayId: -1, spec: '');
+}
+
+String _vdNoScreen(VdState st) =>
+    '❌ 虚拟屏幕不可用（spec="${st.spec}"）。请先执行 vd_create 创建副屏。';
+
+/// 在副屏启动应用。
+///
+/// target 支持三种写法：
+///   · com.example.app                 → 走 LAUNCHER（-a MAIN -c LAUNCHER -p pkg）
+///   · com.example.app/.MainActivity   → 走显式组件（-n pkg/act）
+///   · https://example.com             → 走 VIEW intent
+Future<VdOpResult> vdLaunch(String target) async {
+  final t = target.trim();
+  if (t.isEmpty) return const VdOpResult(false, 'target 不能为空', -1);
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final id = st.displayId;
+  final String cmd;
+  if (t.contains('://')) {
+    cmd = 'am start --display $id -a android.intent.action.VIEW -d ${shellQuote(t)}';
+  } else if (t.contains('/')) {
+    cmd = 'am start --display $id -n $t';
+  } else {
+    cmd = 'am start --display $id -a android.intent.action.MAIN '
+        '-c android.intent.category.LAUNCHER -p $t';
+  }
+  final out = await _vdRun(cmd, timeoutSec: 40);
+  final low = out.toLowerCase();
+  final bad = low.contains('error') ||
+      low.contains('exception') ||
+      low.contains('does not exist');
+  if (bad) {
+    return VdOpResult(false, '❌ 副屏启动失败：${out.trim()}\n'
+        '提示：先 vd_create 确认副屏就绪，再重试 vd_launch。', id);
+  }
+  // 启动成功只是命令成功，副屏是否真的出画面要单独验证：
+  // 副屏无窗口时 screencap 会产出 0 字节，据此判断，不假装成功。
+  await Future<void>.delayed(const Duration(milliseconds: 700));
+  final has = await vdHasContent();
+  if (!has) {
+    return VdOpResult(
+        false,
+        '⚠️ 命令已发送，但副屏仍无画面（screencap 为空）。\n'
+        '可能原因：① 副屏被系统清掉（先 vd_create / vd_status 复查）；'
+        '② 目标应用不支持在多显示器上启动；③ 应用启动较慢，可稍后 vd_observe 复查。\n'
+        '输出：${out.trim()}',
+        id);
+  }
+  return VdOpResult(true, '✅ 已在副屏启动：${t}（displayId=$id，画面已出现）', id);
+}
+
+Future<VdOpResult> vdTap(int x, int y) async {
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final out = await _vdRun('input -d ${st.displayId} tap $x $y', timeoutSec: 20);
+  return VdOpResult(true, out.trim().isEmpty ? '✅ 虚拟屏点击 ($x,$y)' : out.trim(), st.displayId);
+}
+
+Future<VdOpResult> vdSwipe(int x1, int y1, int x2, int y2, {int durMs = 300}) async {
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final out = await _vdRun(
+      'input -d ${st.displayId} swipe $x1 $y1 $x2 $y2 $durMs',
+      timeoutSec: 20);
+  return VdOpResult(true,
+      out.trim().isEmpty ? '✅ 虚拟屏滑动 ($x1,$y1)->($x2,$y2)' : out.trim(),
+      st.displayId);
+}
+
+Future<VdOpResult> vdKey(int keycode) async {
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final out = await _vdRun('input -d ${st.displayId} keyevent $keycode', timeoutSec: 20);
+  return VdOpResult(true,
+      out.trim().isEmpty ? '✅ 虚拟屏按键 $keycode' : out.trim(), st.displayId);
+}
+
+/// 在副屏输入文本。
+///
+/// 纯 ASCII 直接走 input text；含非 ASCII 时优先走剪贴板 + 粘贴键
+/// （input -d N keyevent 279），因为 input text 无法可靠输入中文。
+Future<VdOpResult> vdText(String text) async {
+  if (text.isEmpty) return const VdOpResult(false, 'text 不能为空', -1);
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final id = st.displayId;
+  final hasNonAscii = text.runes.any((r) => r > 127);
+  if (!hasNonAscii) {
+    final escaped = text.replaceAll(' ', '%s');
+    final out = await _vdRun('input -d $id text ${shellQuote(escaped)}', timeoutSec: 25);
+    return VdOpResult(true,
+        out.trim().isEmpty ? '✅ 虚拟屏输入: $text' : out.trim(), id);
+  }
+  // 方案 A：剪贴板 + 粘贴
+  final clip = await runProcess('termux-clipboard-set', [text],
+      timeout: const Duration(seconds: 5));
+  if (clip.code == 0) {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await _vdRun('input -d $id keyevent 279', timeoutSec: 15);
+    return VdOpResult(true, '✅ 虚拟屏粘贴输入: $text', id);
+  }
+  // 方案 B：ADBKeyboard 广播（若副屏上该输入法已启用）
+  final pkgs = await runSmartShell(
+      '', 'pm list packages | grep com.android.adbkeyboard',
+      timeout: const Duration(seconds: 5));
+  if (pkgs.out.contains('com.android.adbkeyboard')) {
+    await _vdRun('am broadcast -a ADB_INPUT_TEXT --es msg ${shellQuote(text)}',
+        timeoutSec: 20);
+    return VdOpResult(true, '✅ 虚拟屏 ADBKeyboard 输入: $text', id);
+  }
+  final escaped = text.replaceAll(' ', '%s');
+  await _vdRun('input -d $id text ${shellQuote(escaped)}', timeoutSec: 25);
+  return VdOpResult(false,
+      '⚠️ 已尝试 input text，中文可能未生效（建议在虚拟屏启用 ADBKeyboard）', id);
+}
+
+/// 抓取副屏画面。
+///
+/// 副屏没有活动窗口时 screencap 会产出 0 字节文件，此时返回失败提示，
+/// 不假装成功。默认保存到 /sdcard/.ds_vd_shot_<ts>.png。
+Future<VdOpResult> vdScreenshot({String savePath = ''}) async {
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  final dest = savePath.trim().isEmpty ? '/sdcard/.ds_vd_shot_$ts.png' : savePath.trim();
+  final out = await _vdRun('screencap -d ${st.displayId} -p $dest', timeoutSec: 40);
+  final f = File(dest);
+  var len = 0;
+  try {
+    if (f.existsSync()) len = f.lengthSync();
+  } catch (_) {}
+  if (len <= 0) {
+    try {
+      if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+    return VdOpResult(
+        false,
+        '❌ 虚拟屏截图失败（该屏可能没有活动窗口，先用 vd_launch 启动应用）'
+        '${out.trim().isEmpty ? '' : '：${out.trim()}'}',
+        st.displayId);
+  }
+  return VdOpResult(true,
+      '✅ 虚拟屏截图已保存: $dest（$len 字节，displayId=${st.displayId}）',
+      st.displayId);
+}
+
+/// 对副屏画面做 OCR。
+///
+/// uiautomator dump 在副屏上无效（--display 被忽略），所以副屏的
+/// 「看到什么」只能通过截图 + tesseract 得到。
+Future<VdOpResult> vdOcr({String lang = 'chi_sim+eng'}) async {
+  final st = await vdEnsure();
+  if (!st.ready) return VdOpResult(false, _vdNoScreen(st), -1);
+  final which = await runProcess('sh', ['-c', 'command -v tesseract'],
+      timeout: const Duration(seconds: 8));
+  if (which.out.trim().isEmpty) {
+    return const VdOpResult(
+        false, 'tesseract 未安装。请执行: pkg install tesseract', -1);
+  }
+  final tmp = '/sdcard/.ds_vd_ocr_${DateTime.now().microsecondsSinceEpoch}.png';
+  await _vdRun('screencap -d ${st.displayId} -p $tmp', timeoutSec: 40);
+  final f = File(tmp);
+  if (!f.existsSync() || f.lengthSync() == 0) {
+    try {
+      if (f.existsSync()) f.deleteSync();
+    } catch (_) {}
+    return VdOpResult(false, '❌ 虚拟屏 OCR 失败：截图为空（该屏无活动窗口）',
+        st.displayId);
+  }
+  try {
+    final r = await runProcess('tesseract', [tmp, 'stdout', '-l', lang],
+        timeout: const Duration(seconds: 90));
+    if (r.code != 0) return VdOpResult(false, 'OCR 失败: ${r.out.trim()}', st.displayId);
+    var txt = r.out.trim();
+    if (txt.isEmpty) txt = '（副屏上没有识别到文字）';
+    if (txt.length > 24000) txt = '${txt.substring(0, 24000)}\n...[已截断]';
+    return VdOpResult(true, txt, st.displayId);
+  } finally {
+    try {
+      f.deleteSync();
+    } catch (_) {}
+  }
+}
+
+/// 汇总一次副屏感知：状态 + 截图 + OCR。
+Future<VdOpResult> vdObserve({bool withOcr = true, String lang = 'chi_sim+eng'}) async {
+  final st = await vdEnsure();
+  final sb = StringBuffer();
+  sb.writeln('虚拟屏状态: configured=${st.configured} '
+      'displayId=${st.displayId} spec="${st.spec}" ready=${st.ready}');
+  if (!st.ready) {
+    sb.writeln('提示：副屏未就绪，执行 vd_create 后再试。');
+    return VdOpResult(false, sb.toString().trim(), st.displayId);
+  }
+  final shot = await vdScreenshot();
+  sb.writeln(shot.output);
+  if (withOcr && shot.ok) {
+    final ocr = await vdOcr(lang: lang);
+    sb.writeln('--- 副屏 OCR ---');
+    sb.writeln(ocr.output);
+  }
+  return VdOpResult(true, sb.toString().trim(), st.displayId);
+}
+
+/// 检测副屏上是否已有活动窗口（用截图字节数判断）。
+/// 用于判断「AI 是否已经把应用真正启动到副屏」。
+Future<bool> vdHasContent() async {
+  final st = await vdState();
+  if (!st.ready) return false;
+  final tmp = '/sdcard/.ds_vd_probe_${DateTime.now().microsecondsSinceEpoch}.png';
+  await _vdRun('screencap -d ${st.displayId} -p $tmp', timeoutSec: 30);
+  final f = File(tmp);
+  var ok = false;
+  try {
+    ok = f.existsSync() && f.lengthSync() > 0;
+  } catch (_) {}
+  try {
+    if (f.existsSync()) f.deleteSync();
+  } catch (_) {}
+  return ok;
+}
+
+
+Future<void> handleVdConfig(HttpRequest req) async {
+  final res = req.response;
+  if (req.method == 'GET') {
+    await dsJSONOk(res, 200, {'enabled': getVdConfig().enabled});
+    return;
+  }
+  if (req.method == 'POST') {
+    Map<String, dynamic> body;
+    try { body = await readJsonBody(req); } catch (_) { await dsJSONErr(res, 400, '无效请求'); return; }
+    final ok = saveVdConfig(enabled: mBool(body, 'enabled'));
+    await dsJSONOk(res, 200, {'success': ok, 'enabled': getVdConfig().enabled});
+    return;
+  }
+  await dsJSONErr(res, 405, 'Method not allowed');
+}

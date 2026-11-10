@@ -2659,7 +2659,7 @@ Future<String> executeDsTool(String name, Map<String, dynamic> args) async {
     return DsToolGate.denyText(name);
   }
   // 豆包专属工具模式：UI 操作与感知一律重定向到虚拟屏幕，主屏不受影响。
-  if (dsVdForce) {
+  if (false) {
     final intercepted = await dsVdIntercept(name, args);
     if (intercepted != null) return intercepted;
   }

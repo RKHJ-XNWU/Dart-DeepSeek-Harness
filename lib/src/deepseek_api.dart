@@ -786,7 +786,7 @@ Future<ToolStreamOutcome> callDsWithToolsStream(
     });
 
     final roundSigs = <String>[];
-    dsVdForce = isDb;
+    dsVdForce = false;
     for (final tcm in r.toolCalls) {
       final callID = mStr(tcm, 'id');
       final fn = asMap(tcm['function']);
@@ -870,7 +870,7 @@ Future<ToolStreamOutcome> callDsWithTools(
       'tool_calls': resp.toolCalls,
     });
     final roundSigs = <String>[];
-    dsVdForce = isDb;
+    dsVdForce = false;
     for (final tc in resp.toolCalls) {
       final fn = asMap(tc['function']);
       final name = mStr(fn, 'name');
