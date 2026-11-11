@@ -19,7 +19,7 @@ String get DSFilesBlobDir => '$DSFilesDir/blob';
 String get DSFilesChunksDir => '$DSFilesDir/chunks';
 
 const int DS_MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
-const int DS_CHUNK_SIZE = 8 * 1024 * 1024; // 8MB
+const int DS_CHUNK_SIZE = 4 * 1024 * 1024 * 1024; // 4GB
 const Duration DS_UPLOAD_SESSION_TTL = Duration(hours: 1);
 const Duration DS_ORPHAN_GRACE_PERIOD = Duration(minutes: 30);
 
