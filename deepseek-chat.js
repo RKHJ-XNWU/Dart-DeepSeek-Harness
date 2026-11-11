@@ -619,15 +619,26 @@
         return state.currentModel || 'deepseek-flash';
     }
 
-    function dscHideUsage(model) {
-        // ① 豆包モード中は送信先が豆包へ差し替わるため、モデル値に関わらず必ず隠す
-        //    （モード中も state.currentModel は deepseek-flash のままなので、これが最優先）
+    // ★ 表示対象モデルの決定：
+    //   usage 自身がモデル ID を持っている（バックエンドが焼き込む）ため、
+    //   後からモデルを切り替えても過去メッセージの金額は変わらない。
+    function dscUsageModel(model, usage) {
+        var u = (usage && usage.model) ? String(usage.model).trim() : '';
+        if (u) return u;
+        var v = String(model || '').trim();
+        if (v) return v;
+        return state.currentModel || 'deepseek-flash';
+    }
+
+    function dscHideUsage(model, usage) {
+        var mid = dscUsageModel(model, usage);
+        // ① 単価表に明示登録があるモデルは必ず表示（豆包 2.1-lite を含む）
+        if (dscPriceEntry(mid)) return false;
+        // ② 単価不明の豆包系は金額を捏造しないため隠す（誠実さ優先）
+        if (dscIsDoubaoModelId(mid)) return true;
         try {
             if (window.dscDoubaoModeOn && window.dscDoubaoModeOn()) return true;
         } catch (e) {}
-        // ② そのメッセージ自身が豆包系モデルの出力なら隠す
-        var v = String(model || '').trim();
-        if (dscIsDoubaoModelId(v)) return true;
         return false;
     }
 
@@ -654,7 +665,7 @@
 
     function dsUsageChipHtml(u, model) {
         if (!u) return '';
-        if (dscHideUsage(model)) return '';
+        if (dscHideUsage(model, u)) return '';
         var t = dscNormalizeUsage(u);
         if (!t) return '';
         var hit = t.hit;
@@ -665,6 +676,7 @@
         if (total < t.total) total = t.total;
         if (!total && !prompt && !outTok) return '';
         var calls = Number(u.apiCalls) || 1;
+        var audioTok = Number(u.audioInputTokens) || 0;
 
         var html = '<span class="dsc-usage-chip" title="' + dscT('この返信の実際の token 消費量：モデル API が返す usage（課金基準）による値であり、ローカル推定ではありません') + '">';
         html += '<span class="ic">⛁</span>';
@@ -675,6 +687,10 @@
         html += '<span>' + dscT('未命中') + ' <b class="dsc-usage-miss">' + fmtTokNum(miss) + '</b></span>';
         html += '<span class="dsc-usage-sep">·</span>';
         html += '<span>' + dscT('出力') + ' <b class="dsc-usage-out">' + fmtTokNum(outTok) + '</b></span>';
+        if (audioTok > 0) {
+            html += '<span class="dsc-usage-sep">·</span>';
+            html += '<span>' + dscT('音声入力') + ' <b class="dsc-usage-audio">' + fmtTokNum(audioTok) + '</b></span>';
+        }
         html += '<span class="dsc-usage-sep">·</span>';
         html += '<span>' + dscT('合計') + ' <b>' + fmtTokNum(total) + '</b></span>';
         if (calls > 1) {
@@ -699,8 +715,45 @@
         'deepseek-v4-pro': { hit: 0.15, miss: 4.5, out: 13.5 },
         'deepseek-v4-pro-0813': { hit: 0.15, miss: 4.5, out: 13.5 },
         'deepseek-chat': { hit: 0.15, miss: 4.5, out: 13.5 },
-        'deepseek-reasoner': { hit: 0.15, miss: 4.5, out: 13.5 }
+        'deepseek-reasoner': { hit: 0.15, miss: 4.5, out: 13.5 },
+        // ★ 豆包（火山方舟）Seed-2.1-lite：終日同一単価（ピーク／アイドルの区別なし）
+        //   単位は元 / 100 万 tokens（火山方舟 公式価格ページ・通常オンライン推論）
+        //     入力（非音声・キャッシュ未命中） 0.8
+        //     入力（非音声・キャッシュ命中）   0.16  ← 入力の 20%
+        //     出力                            2.7
+        //     音声入力（キャッシュ未命中）     12
+        //     音声入力（キャッシュ命中）       2.4   ← 音声入力の 20%
+        //   hit を入力単価で計上するとキャッシュ命中分を 5 倍に過大計上するため、
+        //   必ず専用の単価を引く。
+        'doubao-seed-2-1-lite-260915': {
+            hit: 0.16, miss: 0.8, out: 2.7,
+            audio: 12, audioHit: 2.4, flat: true
+        }
     };
+
+    // バージョン接尾辞（-260915 等）が変わっても同じ単価を引けるよう前方一致で解決する
+    var DSC_PRICE_PREFIX = [
+        // ハイフン形（方舟の正式 ID）と、ドット形（一部の集約サイト表記）の両方を受ける
+        ['doubao-seed-2-1-lite', 'doubao-seed-2-1-lite-260915'],
+        ['doubao-seed-2.1-lite', 'doubao-seed-2-1-lite-260915']
+    ];
+
+    function dscPriceEntry(model) {
+        var m = String(model || '').toLowerCase().trim();
+        if (!m) return null;
+        if (DSC_PRICE[m]) return DSC_PRICE[m];
+        for (var i = 0; i < DSC_PRICE_PREFIX.length; i++) {
+            if (m.indexOf(DSC_PRICE_PREFIX[i][0]) === 0) return DSC_PRICE[DSC_PRICE_PREFIX[i][1]];
+        }
+        // DeepSeek 系だけは従来どおり pro / flash へ寄せる
+        if (m.indexOf('deepseek') === 0) {
+            if (m.indexOf('pro') >= 0) return DSC_PRICE['deepseek-v4-pro'];
+            return DSC_PRICE['deepseek-flash'];
+        }
+        // 豆包の他モデル（pro / turbo / 2.0-lite 等）は単価未登録なので null。
+        // 数字を捏造しないため、呼び出し側は金額を出さない。
+        return null;
+    }
     
     // 中国の法定祝日（振替休日を含む）——毎年メンテナンス。記載のない年は週末のみで判定
     var DSC_HOLIDAYS = {
@@ -752,33 +805,54 @@
     }
     
     function dscPriceForModel(model) {
-        var m = String(model || '').toLowerCase().trim();
-        if (DSC_PRICE[m]) return DSC_PRICE[m];
-        if (m.indexOf('pro') >= 0) return DSC_PRICE['deepseek-v4-pro'];
-        return DSC_PRICE['deepseek-flash'];
+        return dscPriceEntry(model);
     }
     
     function dscCalcCost(u, model) {
         var t = dscNormalizeUsage(u);
         if (!t) return null;
         var hit = t.hit, miss = t.miss, out = t.out;
-        if (!hit && !miss && !out) return null;
-    
-        var price = dscPriceForModel(model);
-        var peak = dscIsPeakHour();
-        var factor = peak ? 2 : 1;   // アイドル = ピーク的一半
-    
-        // 3 区分をそれぞれ単価で計算してから合算する（まとめ算すると取りこぼす）
+        var audio = Number(u.audioInputTokens) || 0;
+        if (!hit && !miss && !out && !audio) return null;
+
+        // ★ 単価は必ずモデル ID から引く（usage.model を優先）。
+        //   単価未登録のモデルは金額を出さない（推測値を表示しない）。
+        var price = dscPriceForModel(dscUsageModel(model, u));
+        if (!price) return null;
+
+        // ★ 音声入力：prompt_tokens に含まれて返るため、そのまま入力単価で
+        //   積むと二重計上になる。未命中 → 命中 の順に音声分を差し引いてから
+        //   音声単価（未登録なら未命中単価）で計上する。
+        if (audio < 0) audio = 0;
+        if (audio > t.prompt) audio = t.prompt;
+        var audioRate = (price.audio == null) ? price.miss : price.audio;
+        var audioHitRate = (price.audioHit == null) ? price.hit : price.audioHit;
+        // 音声分は「未命中 → 命中」の順に差し引く（テキスト分の単価を食い潰さない）
+        var audioMiss = Math.min(audio, miss);
+        var audioHit = Math.min(audio - audioMiss, hit);
+        var missText = miss - audioMiss;
+        var hitText = hit - audioHit;
+
+        // flat=真のモデル（豆包 2.1-lite）は終日同一単価：倍率を掛けない
+        var flat = !!price.flat;
+        var peak = flat ? false : dscIsPeakHour();
+        var factor = flat ? 1 : (peak ? 2 : 1);
+
+        // 4 区分をそれぞれ単価で計算してから合算する（まとめ算すると取りこぼす）
         // 単価は「元 / 100 万 tokens」。ナノ元の整数で累積し、浮動小数の誤差を排除する
         var nano =
-            Math.round(hit  * price.hit  * factor * 1000) +
-            Math.round(miss * price.miss * factor * 1000) +
-            Math.round(out  * price.out  * factor * 1000);
+            Math.round(hitText  * price.hit  * factor * 1000) +
+            Math.round(missText * price.miss * factor * 1000) +
+            Math.round(audioMiss * audioRate    * factor * 1000) +
+            Math.round(audioHit  * audioHitRate * factor * 1000) +
+            Math.round(out      * price.out  * factor * 1000);
         var cost = nano / 1e9;
-    
-        return { cost: cost, peak: peak, hit: hit, miss: miss, out: out, prompt: t.prompt, total: t.total };
+
+        return { cost: cost, peak: peak, flat: flat, hit: hit, miss: miss, out: out,
+                 audio: audio, audioMiss: audioMiss, audioHit: audioHit,
+                 prompt: t.prompt, total: t.total };
     }
-    
+
     function dscFmtCost(cost) {
         if (cost == null || isNaN(cost)) return '';
         if (cost === 0) return '0 元';
@@ -791,20 +865,45 @@
     }
     
     function dscCostChipHtml(u, model) {
-        if (dscHideUsage(model)) return '';
+        if (dscHideUsage(model, u)) return '';
         var r = dscCalcCost(u, model);
         if (!r) return '';
-        var tip = (r.peak ? dscT('ピーク') : dscT('アイドル')) + dscT('時間帯単価の計算（アイドル＝ピークの半額）：') +
-            dscT('命中') + ' ' + fmtTokNum(r.hit) + ' / ' + dscT('未命中') + ' ' + fmtTokNum(r.miss) +
-            ' / ' + dscT('出力') + ' ' + fmtTokNum(r.out);
+        var tagTxt = r.flat
+            ? dscT('統一単価')
+            : (r.peak ? dscT('ピーク') : dscT('アイドル'));
+        var tip;
+        if (r.flat) {
+            tip = dscT('統一単価（時間帯による変動なし）：') +
+                dscT('入力') + ' ' + fmtTokNum(r.hit + r.miss) +
+                ' / ' + dscT('出力') + ' ' + fmtTokNum(r.out);
+            // ★ 単価そのものも title に出す（金額だけでは妥当性を検算できないため）
+            var pr = dscPriceForModel(dscUsageModel(model, u));
+            if (pr && pr.miss != null) {
+                tip += ' · ' + dscT('単価（元/百万tokens）：') +
+                    dscT('未命中') + ' ' + pr.miss +
+                    ' / ' + dscT('キャッシュ命中') + ' ' + pr.hit +
+                    ' / ' + dscT('出力') + ' ' + pr.out;
+                if (pr.audio != null) {
+                    tip += ' / ' + dscT('音声入力') + ' ' + pr.audio +
+                        (pr.audioHit != null ? ' (' + dscT('キャッシュ命中') + ' ' + pr.audioHit + ')' : '');
+                }
+            }
+        } else {
+            tip = (r.peak ? dscT('ピーク') : dscT('アイドル')) + dscT('時間帯単価の計算（アイドル＝ピークの半額）：') +
+                dscT('命中') + ' ' + fmtTokNum(r.hit) + ' / ' + dscT('未命中') + ' ' + fmtTokNum(r.miss) +
+                ' / ' + dscT('出力') + ' ' + fmtTokNum(r.out);
+        }
+        if (r.audio > 0) {
+            tip += ' · ' + dscT('音声入力') + ' ' + fmtTokNum(r.audio);
+        }
         return '<span class="dsc-cost-chip" title="' + escapeHtml(tip) + '">' +
             '<span class="ic">💰</span>' +
             '<span>' + dscFmtCost(r.cost) + '</span>' +
-            '<span class="dsc-cost-tag">' + (r.peak ? dscT('ピーク') : dscT('アイドル')) + '</span>' +
+            '<span class="dsc-cost-tag">' + tagTxt + '</span>' +
             '</span>';
     }
 
-        function dsUsageBlockHtml(u, model) {
+    function dsUsageBlockHtml(u, model) {
         var chip = dsUsageChipHtml(u, model);
         if (!chip) return '';
         var costChip = dscCostChipHtml(u, model);
@@ -1231,7 +1330,7 @@
                 }
                 var dText = dInner.join('\n').replace(/<\/details>[\s\S]*$/i, '');
                 var dSm = dText.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i);
-                var dTitle = dSm ? dSm[1].trim() : dscT('展开查看');
+                var dTitle = dSm ? dSm[1].trim() : dscT('詳細を開く');
                 var dBody = dSm ? dText.replace(dSm[0], '') : dText;
                 out.push('<details class="dsc-md-details"' + (dClosed ? '' : ' open') + '>' +
                     '<summary>' + mdInline(dTitle) + '</summary>' +
@@ -2787,27 +2886,40 @@
                         if (thinkPanel && thinkPanel.style.display === 'none') thinkPanel.style.display = '';
                         if (thinkLabel) {
                             var mpStage = obj.stage || '';
-                            var mpLine = '🎬 動画を準備中…';
+                            // ★ 数値を含む進捗行は {0} プレースホルダ方式で翻訳する。
+                            //   旧版は「日本語断片 + 数値 + 日本語断片」を連結していたため、
+                            //   数字に単位（1.2 GB）が付く箇所で辞書の # 正規化が効かず、
+                            //   「…（原始 1.2 GB）…時間がかかります」のように日本語が半端に残った。
+                            var mpLine = dscT('🎬 動画を準備中…');
                             if (mpStage === 'begin') {
-                                mpLine = '🎬 動画 ' + (obj.count || 1) + ' 件を準備します';
+                                mpLine = dscT('🎬 動画 {0} 件を準備します', (obj.count || 1));
                             } else if (mpStage === 'cache_hit') {
-                                mpLine = '♻️ アップロード済みの動画を再利用します';
+                                mpLine = dscT('♻️ アップロード済みの動画を再利用します');
                             } else if (mpStage === 'compact_start') {
-                                mpLine = '🎞️ 512MB 超のためローカルで圧縮中（元 ' + dscFmtBytes(obj.size) + '）…時間がかかります';
+                                mpLine = dscT('🎞️ 512MB 超のためローカルで圧縮中（元 {0}）…時間がかかります', dscFmtBytes(obj.size));
                             } else if (mpStage === 'compact_done') {
-                                mpLine = '🎞️ 圧縮完了。アップロードを準備中…';
+                                mpLine = dscT('🎞️ 圧縮完了。アップロードを準備中…');
                             } else if (mpStage === 'upload_start') {
-                                mpLine = '☁️ 方舟へアップロード開始（' + dscFmtBytes(obj.size) + '）';
+                                mpLine = dscT('☁️ 方舟へアップロード開始（{0}）', dscFmtBytes(obj.size));
                             } else if (mpStage === 'upload') {
-                                mpLine = '☁️ 方舟へアップロード中 ' + (obj.percent || 0) + '%（' + dscFmtBytes(obj.sent) + ' / ' + dscFmtBytes(obj.total) + '）';
+                                mpLine = dscT('☁️ 方舟へアップロード中 {0}%（{1} / {2}）',
+                                    (obj.percent || 0), dscFmtBytes(obj.sent), dscFmtBytes(obj.total));
                             } else if (mpStage === 'upload_retry') {
-                                mpLine = '🔁 前処理モデルを切り替えて再試行中…';
+                                mpLine = dscT('🔁 前処理モデルを切り替えて再試行中…');
                             } else if (mpStage === 'tos_reference') {
-                                mpLine = '☁️ TOS 上の動画を参照登録中（' + dscFmtBytes(obj.size) + '）';
+                                mpLine = dscT('☁️ TOS 上の動画を参照登録中（{0}）', dscFmtBytes(obj.size));
                             } else if (mpStage === 'preprocess_wait' || mpStage === 'preprocess') {
-                                mpLine = '⏳ 方舟が動画を前処理中（抽帧）… ' + (obj.waited || 0) + ' 秒';
+                                // ★「0 秒のまま固定」表示バグ修正：
+                                //   旧版は (obj.waited || 0) で、waited 未定義でも 0 を出していた。
+                                //   バックエンド旧版は preprocess_wait に waited を付けず、
+                                //   待機中もティックを送っていなかったため、完了まで「0 秒」で固まって見えた。
+                                //   ここでは有効な秒数があるときだけ数字を出し、無いときは省略する。
+                                var mpSec = Number(obj.waited);
+                                mpLine = (isFinite(mpSec) && mpSec > 0)
+                                    ? dscT('⏳ 方舟が動画を前処理中（抽帧）… {0} 秒', mpSec)
+                                    : dscT('⏳ 方舟が動画を前処理中（抽帧）…');
                             } else if (mpStage === 'ready') {
-                                mpLine = '✅ 動画の準備完了。回答を生成します…';
+                                mpLine = dscT('✅ 動画の準備完了。回答を生成します…');
                             }
                             thinkLabel.textContent = mpLine;
                         }
@@ -3595,7 +3707,8 @@
                 decorateContinueButton();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(dataStream);
                 if (typeof window.dscDoubaoRouteToast === 'function') window.dscDoubaoRouteToast(dataStream);
-                dscStripDoubaoUsage(dataStream);
+                // ★ 旧実装はここで豆包の usage を捨てていたが、現在はバックエンドが
+                //   豆包 2.1-lite の実 usage を返すため、捨てると計費が消える。呼ばない。
                 toast(dscT('✅ 生成しました：{0} 字（{1}）', ((dataStream && dataStream.charCount) || 0).toLocaleString(), ((dataStream && dataStream.model) || state.currentModel)), 'success');
             } else {
                 var response = await fetch('/api/ds-chat/send', {
@@ -3647,7 +3760,7 @@
                 if (typeof window.dsClearAttach === 'function') window.dsClearAttach();
                 if (typeof window.dscModelRouteToast === 'function') window.dscModelRouteToast(data);
                 if (typeof window.dscDoubaoRouteToast === 'function') window.dscDoubaoRouteToast(data);
-                dscStripDoubaoUsage(data);
+                // ★ 同上：豆包 usage を保持する（計費表示のため）
                 toast('✅ 生成しました：' + (data.charCount || 0).toLocaleString() + ' 字', 'success');
             }
         } catch (e) {
@@ -5276,11 +5389,14 @@
         //   未命中は単価が最も高いため、ここが欠けると安く見えてしまう
         var t = dscNormalizeUsage(u);
         var tok = '';
+        var audioTok = (u && Number(u.audioInputTokens)) || 0;
         if (t && (t.prompt || t.out)) {
             tok = '<span class="dsc-trans-tok">' +
                 dscT('命中') + ' ' + fmtTokNum(t.hit) + ' · ' +
                 dscT('未命中') + ' ' + fmtTokNum(t.miss) + ' · ' +
-                dscT('出力') + ' ' + fmtTokNum(t.out) + ' tokens</span>';
+                dscT('出力') + ' ' + fmtTokNum(t.out) +
+                (audioTok > 0 ? ' · ' + dscT('音声入力') + ' ' + fmtTokNum(audioTok) : '') +
+                ' tokens</span>';
         }
         var r = t ? dscCalcCost(u, model) : null;
         if (!r) {
@@ -5289,7 +5405,7 @@
         }
         return '<div class="dsc-trans-cost-row" title="' + dscT('この翻訳 1 回分だけの実費（API が返す usage に単価を掛けた値）。保存はしません') + '">' +
             '<span class="dsc-trans-cost-amt">' + dscT('💰 今回の翻訳') + ' ' + dscFmtCost(r.cost) + '</span>' +
-            '<span class="dsc-trans-cost-tag">' + (r.peak ? dscT('ピーク') : dscT('アイドル')) + '</span>' +
+            '<span class="dsc-trans-cost-tag">' + (r.flat ? dscT('統一単価') : (r.peak ? dscT('ピーク') : dscT('アイドル'))) + '</span>' +
             tok +
             '</div>';
     }

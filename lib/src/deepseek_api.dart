@@ -294,7 +294,6 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
   if (apiUrl != DS_API_URL && mt > 120000) mt = 120000;
   if (temperature < 0) temperature = 0;
 
-  // 方舟（豆包）は stream_options 非対応の可能性があるため DeepSeek のみ付与
   // 豆包の「快速モード」有効時は深度思考を無効化する
   // （実測：初回本文までの待ち時間 16.83s → 0.86s）
   final thinkParam = apiUrl == DS_API_URL ? null : dbThinkingParam(model);
@@ -304,7 +303,8 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
     'stream': true,
     'max_tokens': mt,
     'temperature': temperature,
-    if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
+    // ★ 豆包（方舟）も usage を返させる（理由は callDsChatAPIStream 側のコメント参照）
+    'stream_options': dsUsageStreamOptions(),
     if (thinkParam != null) 'thinking': thinkParam,
   };
   if (tools != null && tools.isNotEmpty) {
@@ -332,16 +332,32 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
   }
 
   var resp = await sendOnce(thinkParam != null);
-  if (resp.statusCode == 400 && thinkParam != null) {
+  // ★ 400 は「パラメータ非対応」の典型。本文を見て原因のパラメータだけを外して
+  //   再試行する（stream_options / thinking の 2 種類のみ、各 1 回まで）。
+  //   本文は 1 度しか読めないため、ここで読み切ってから判定する。
+  var droppedStreamOpts = false;
+  var droppedThinking = false;
+  for (var attempt = 0; resp.statusCode == 400 && attempt < 3; attempt++) {
     final txt = utf8.decode(
         await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
         allowMalformed: true);
-    if (txt.toLowerCase().contains('thinking')) {
-      logp('⚠️ 方舟が thinking パラメータを拒否しました。パラメータを外して再試行します');
-      resp = await sendOnce(false);
-    } else {
-      throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
+    final low = txt.toLowerCase();
+    if (!droppedStreamOpts &&
+        body.containsKey('stream_options') &&
+        (low.contains('stream_options') || low.contains('include_usage'))) {
+      logp('⚠️ 方舟が stream_options を拒否しました。外して再試行します');
+      body.remove('stream_options');
+      droppedStreamOpts = true;
+      resp = await sendOnce(thinkParam != null && !droppedThinking);
+      continue;
     }
+    if (!droppedThinking && thinkParam != null && low.contains('thinking')) {
+      logp('⚠️ 方舟が thinking パラメータを拒否しました。パラメータを外して再試行します');
+      droppedThinking = true;
+      resp = await sendOnce(false);
+      continue;
+    }
+    throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
   }
 
   if (resp.statusCode != 200) {
@@ -357,7 +373,10 @@ Future<({String content, String reasoning, List<Map<String, dynamic>> toolCalls}
 
   await for (final chunk in sseData(resp)) {
     final usage = RawDsUsage.fromJson(chunk['usage']);
-    if (usage != null) usageAcc?.addRaw(usage);
+    if (usage != null) {
+      usageAcc?.model = model;
+      usageAcc?.addRaw(usage);
+    }
     final choices = asList(chunk['choices']);
     if (choices.isEmpty) continue;
     final delta = asMap(asMap(choices[0])['delta']);
@@ -474,6 +493,7 @@ Future<({String content, String reasoning})> callDsChatAPI(
   final result = asMap(jsonDecode(txt));
   final choices = asList(result['choices']);
   if (choices.isEmpty) throw Exception('API 未返回内容');
+  usageAcc?.model = model;
   usageAcc?.addRaw(RawDsUsage.fromJson(result['usage']));
   final msg = asMap(asMap(choices[0])['message']);
   return (content: mStr(msg, 'content'), reasoning: mStr(msg, 'reasoning_content'));
@@ -529,6 +549,7 @@ Future<DsRawResponse> callDsChatAPIRaw(
   final result = asMap(jsonDecode(txt));
   final choices = asList(result['choices']);
   if (choices.isEmpty) throw Exception('API 未返回内容');
+  usageAcc?.model = model;
   usageAcc?.addRaw(RawDsUsage.fromJson(result['usage']));
   final c = asMap(choices[0]);
   final msg = asMap(c['message']);
@@ -585,7 +606,10 @@ Future<void> callDsChatAPIStream(
     'stream': true,
     'max_tokens': mt,
     'temperature': temp,
-    if (apiUrl == DS_API_URL) 'stream_options': dsUsageStreamOptions(),
+    // ★ 豆包（方舟）も usage を返させる。OpenAI 互換の仕様どおり
+    //   stream_options.include_usage を付けないとストリームでは usage が
+    //   一切返らず、token 数も料金も永久に取得できない（＝計費不能）。
+    'stream_options': dsUsageStreamOptions(),
     // 方舟专用附加字段（如 thinking）。DeepSeek 通道不传，避免 400。
     if (extraBody != null && extraBody.isNotEmpty) ...extraBody,
     if (arkThink != null) 'thinking': arkThink,
@@ -599,26 +623,46 @@ Future<void> callDsChatAPIStream(
   req.headers.set('Accept-Encoding', 'identity');
   req.add(utf8.encode(jsonEncode(body)));
   var resp = await req.close();
-  // ★ 豆包自带联网搜索的兼容降级：个别模型/版本不接受 web_search_options，
-  //   方舟会直接 400。此时去掉该字段重试一次，绝不让「联网搜索开关」变成
-  //   「一开就报错」的新 bug（本次任务明确要求不得引入其它故障）。
-  if (resp.statusCode == 400 && body.containsKey('web_search_options')) {
+  // ★ 400 は「パラメータ非対応」の典型（web_search_options / stream_options）。
+  //   本文は 1 度しか読めないため、ここで読み切ってから原因を判定し、
+  //   該当パラメータだけを外して再試行する（各 1 回まで）。
+  //   絶対に「一開就報錯」の新バグを作らないための保険。
+  var droppedStreamOpts = false;
+  var droppedWebSearch = false;
+  for (var attempt = 0; resp.statusCode == 400 && attempt < 3; attempt++) {
     final txt = utf8.decode(
         await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
         allowMalformed: true);
-    if (txt.toLowerCase().contains('web_search')) {
+    final low = txt.toLowerCase();
+    Future<HttpClientResponse> resend() async {
+      final r = await client.postUrl(Uri.parse(apiUrl));
+      r.headers.set('Content-Type', 'application/json');
+      r.headers.set('Authorization', 'Bearer $apiKey');
+      r.headers.set('Accept', 'text/event-stream');
+      r.headers.set('Accept-Encoding', 'identity');
+      r.add(utf8.encode(jsonEncode(body)));
+      return r.close();
+    }
+
+    if (!droppedStreamOpts &&
+        body.containsKey('stream_options') &&
+        (low.contains('stream_options') || low.contains('include_usage'))) {
+      logp('⚠️ 方舟が stream_options を拒否しました。外して再試行します');
+      body.remove('stream_options');
+      droppedStreamOpts = true;
+      resp = await resend();
+      continue;
+    }
+    if (!droppedWebSearch &&
+        body.containsKey('web_search_options') &&
+        low.contains('web_search')) {
       logp('⚠️ 方舟が web_search_options を拒否しました。外して再試行します');
       body.remove('web_search_options');
-      final req2 = await client.postUrl(Uri.parse(apiUrl));
-      req2.headers.set('Content-Type', 'application/json');
-      req2.headers.set('Authorization', 'Bearer $apiKey');
-      req2.headers.set('Accept', 'text/event-stream');
-      req2.headers.set('Accept-Encoding', 'identity');
-      req2.add(utf8.encode(jsonEncode(body)));
-      resp = await req2.close();
-    } else {
-      throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
+      droppedWebSearch = true;
+      resp = await resend();
+      continue;
     }
+    throw Exception('HTTP 400: ${truncateBytes(txt, 400)}');
   }
   if (resp.statusCode != 200) {
     final txt = utf8.decode(await resp.fold<List<int>>([], (a, b) => a..addAll(b)),
@@ -636,7 +680,10 @@ Future<void> callDsChatAPIStream(
   await for (final chunk in sseData(resp)) {
     if (sw != null && firstFrameMs < 0) firstFrameMs = sw.elapsedMilliseconds;
     final usage = RawDsUsage.fromJson(chunk['usage']);
-    if (usage != null) usageAcc?.addRaw(usage);
+    if (usage != null) {
+      usageAcc?.model = model;
+      usageAcc?.addRaw(usage);
+    }
     // ★ 豆包自带联网搜索的实际检索次数（方舟 usage.tool_usage.web_search）
     if (apiUrl != DS_API_URL) {
       final tu = asMap(asMap(chunk['usage'])['tool_usage']);

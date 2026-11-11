@@ -330,7 +330,7 @@ Future<void> handleDsChatSendStream(
       createdAt: rfc3339(DateTime.now()),
       reasoning: outcome.reasoning,
       // 豆包経由では usage を保存しない（方舟の消費量を正確に取得できないため）
-      usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
+      usage: usageAcc.snapshot(),
     );
     aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(aiMsg);
@@ -498,7 +498,7 @@ Future<void> handleDsChatSendStream(
     content: contentBuf.toString(),
     createdAt: rfc3339(DateTime.now()),
     reasoning: reasoningBuf.toString(),
-    usage: apiUrl == DS_API_URL ? usageAcc.snapshot() : null,
+    usage: usageAcc.snapshot(),
   );
   aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);
@@ -1311,7 +1311,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       createdAt: rfc3339(DateTime.now()),
       reasoning: fullReasoning,
       // 豆包额度无法从方舟精确取得，故不落库 usage，避免误导
-      usage: useDoubao ? null : usageAcc.snapshot(),
+      usage: usageAcc.snapshot(),
     );
     aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
     appendDsMessage(aiMsg);
@@ -1408,7 +1408,7 @@ Future<void> handleDsChatSend(HttpRequest req) async {
     content: reply,
     createdAt: rfc3339(DateTime.now()),
     reasoning: reasoning,
-    usage: useDoubao ? null : usageAcc.snapshot(),
+    usage: usageAcc.snapshot(),
   );
   aiMsg.dim = dbIsChatModel(model) ? DS_DIM_DB : DS_DIM_DS;
   appendDsMessage(aiMsg);

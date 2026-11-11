@@ -111,6 +111,12 @@ class DbVideoArkConfig {
   /// 默认留空（实测未绑定 project 的 Key 传了会 400）
   String preprocessModel;
 
+  /// 视频抽帧上限(透传 preprocess_configs[video][max_tokens];0=不传)
+  int maxVideoTokens;
+
+  /// 最少抽帧数(透传 preprocess_configs[video][min_frames];0=不传)
+  int minFrames;
+
   DbVideoArkConfig({
     this.maxBytes = dbVideoMaxBytes,
     this.fps = 1.0,
@@ -120,6 +126,8 @@ class DbVideoArkConfig {
     this.tosPrefix = '',
     this.autoCompact = true,
     this.preprocessModel = '',
+    this.maxVideoTokens = 0,
+    this.minFrames = 0,
   });
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -136,6 +144,8 @@ class DbVideoArkConfig {
         'tosPrefix': tosPrefix,
         'autoCompact': autoCompact,
         'preprocessModel': preprocessModel,
+        'maxVideoTokens': maxVideoTokens,
+        'minFrames': minFrames,
       };
 
   static DbVideoArkConfig fromJson(Map<String, dynamic> j) {
@@ -168,6 +178,8 @@ class DbVideoArkConfig {
       tosPrefix: mStr(j, 'tosPrefix').trim(),
       autoCompact: mBool(j, 'autoCompact', true),
       preprocessModel: mStr(j, 'preprocessModel').trim(),
+      maxVideoTokens: intArgDefault(j, 'maxVideoTokens', 0),
+      minFrames: intArgDefault(j, 'minFrames', 0),
     );
   }
 }
@@ -656,42 +668,20 @@ Future<({List<Map<String, dynamic>> parts, String text})>
       'fileName': meta.name,
     };
 
-    // ---------- 小视频：直接作为 video_url 片段随主请求发送 ----------
-    if (size <= cfg.segmentMaxBytes) {
-      onProgress?.call({...tag, 'stage': 'direct', 'size': size});
-      final bytes = await f.readAsBytes();
-      parts.add(<String, dynamic>{
-        'type': 'video_url',
-        'video_url': {
-          'url': 'data:$mime;base64,${base64Encode(bytes)}',
-          'fps': cfg.fps,
-        },
-      });
-      logp('🎬 動画を豆包へ直接送信: ${meta.name} '
-          '(${dbFmtSize(size)}, fps=${_dbFpsStr(cfg.fps)})');
+    // ---------- 强制 TOS:所有视频都走 TOS 引用(不回退) ----------
+    if (cfg.useFilesApi && cfg.tosBucket.trim().isNotEmpty) {
+      onProgress?.call({...tag, 'stage': 'tos_reference', 'size': size});
+      final part = await dbArkVideoPartForLocalFile(
+        absPath: absPath,
+        fileName: meta.name,
+        model: model,
+        apiKey: apiKey,
+        onProgress: (info) => onProgress?.call({...tag, ...info}),
+      );
+      parts.add(part);
+      logp('🎬 TOS 経由で送信: ${meta.name}');
       index++;
       continue;
-    }
-
-    // ---------- 大视频：可选 Files API，否则分段理解 + 汇总 ----------
-    if (cfg.useFilesApi) {
-      try {
-        onProgress?.call({...tag, 'stage': 'files_api', 'size': size});
-        final part = await dbArkVideoPartForLocalFile(
-          absPath: absPath,
-          fileName: meta.name,
-          model: model,
-          apiKey: apiKey,
-          onProgress: (info) => onProgress?.call({...tag, ...info}),
-        );
-        parts.add(part);
-        logp('🎬 Files API の file_id で送信: ${meta.name}');
-        index++;
-        continue;
-      } catch (e) {
-        logp('⚠️ Files API 経路に失敗しました。分段理解へ切り替えます: $e');
-        onProgress?.call({...tag, 'stage': 'filesapi_failed', 'error': '$e'});
-      }
     }
     logp('🎬 大容量動画を分割理解します: ${meta.name} (${dbFmtSize(size)})');
     final desc = await _dbDescribeLargeVideo(
@@ -997,6 +987,8 @@ Future<String> _dbArkUploadFromTos({
   required String model,
   required String apiKey,
   required double fps,
+  int maxVideoTokens = 0,
+  int minFrames = 0,
 }) async {
   final boundary =
       '----ddshTos${DateTime.now().microsecondsSinceEpoch}${randomHex(8)}';
@@ -1015,6 +1007,12 @@ Future<String> _dbArkUploadFromTos({
     field('preprocess_configs[video][model]', model.trim());
   }
   field('preprocess_configs[video][fps]', _dbFpsStr(fps));
+  if (maxVideoTokens > 0) {
+    field('preprocess_configs[video][max_tokens]', '$maxVideoTokens');
+  }
+  if (minFrames > 0) {
+    field('preprocess_configs[video][min_frames]', '$minFrames');
+  }
   sb.write('--$boundary--\r\n');
   final body = utf8.encode(sb.toString());
 
@@ -1142,7 +1140,8 @@ Future<Map<String, dynamic>> dbArkVideoPartForLocalFile({
   var arkId = '';
   try {
     final tosKey = _dbArkTosKey(cfg, fileName);
-    if (size > dbArkStorageMaxBytes && tosKey != null) {
+    // 强制 TOS:只要配了 tosBucket,任何大小都走 TOS 引用
+    if (tosKey != null) {
       onProgress?.call({'stage': 'tos_reference', 'size': size});
       arkId = await _dbArkUploadFromTos(
         bucket: cfg.tosBucket,
@@ -1151,6 +1150,8 @@ Future<Map<String, dynamic>> dbArkVideoPartForLocalFile({
         model: cfg.preprocessModel,
         apiKey: apiKey,
         fps: cfg.fps,
+        maxVideoTokens: cfg.maxVideoTokens,
+        minFrames: cfg.minFrames,
       );
     } else {
       if (size > dbArkStorageMaxBytes) {
@@ -1187,8 +1188,28 @@ Future<Map<String, dynamic>> dbArkVideoPartForLocalFile({
         },
       );
     }
-    onProgress?.call({'stage': 'preprocess_wait', 'arkFileId': arkId});
-    await dbArkWaitFileActive(apiKey: apiKey, fileId: arkId);
+    // ★ 修复「方舟前処理が 0 秒のまま」表示バグ（2026-11）
+    //   旧実装は 2 点で壊れていた：
+    //     1) preprocess_wait を waited 無しで送っていた → 前端は (obj.waited || 0) で常に 0
+    //     2) dbArkWaitFileActive に onTick を渡していなかった → ポーリング中は
+    //        一切の進捗が流れず、完了するまで「0 秒」で固定表示されていた
+    //   ここで待機開始時刻を起点に、ティックごとに実経過秒を配信する。
+    onProgress?.call({'stage': 'preprocess_wait', 'arkFileId': arkId, 'waited': 0});
+    final waitStartedAt = DateTime.now();
+    await dbArkWaitFileActive(
+      apiKey: apiKey,
+      fileId: arkId,
+      onTick: (status, waitedSec) {
+        // 初回ティックは waitedSec が 0 になり得るため、ローカル経過時間で底上げする
+        final local = DateTime.now().difference(waitStartedAt).inSeconds;
+        onProgress?.call({
+          'stage': 'preprocess',
+          'arkFileId': arkId,
+          'status': status,
+          'waited': waitedSec > local ? waitedSec : local,
+        });
+      },
+    );
     _dbArkCacheStore(key, arkId, cfg.preprocessModel, cfg.fps);
     return dbArkVideoPartByFileId(arkId, fps: cfg.fps);
   } finally {

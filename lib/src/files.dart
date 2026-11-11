@@ -19,7 +19,7 @@ String get DSFilesBlobDir => '$DSFilesDir/blob';
 String get DSFilesChunksDir => '$DSFilesDir/chunks';
 
 const int DS_MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
-const int DS_CHUNK_SIZE = 4 * 1024 * 1024 * 1024; // 4GB
+const int DS_CHUNK_SIZE = 64 * 1024 * 1024; // 64MB (OOM fix)
 const Duration DS_UPLOAD_SESSION_TTL = Duration(hours: 1);
 const Duration DS_ORPHAN_GRACE_PERIOD = Duration(minutes: 30);
 
@@ -456,27 +456,40 @@ Future<void> handleDsFileUploadChunk(HttpRequest req) async {
 }
 
 bool mergeChunks(String absPath, String chunkDir, int totalChunks) {
+  // OOM fix: 1MB/chunk streaming copy instead of readAsBytesSync whole file
+  RandomAccessFile? outRaf;
   try {
     ensureDir(absPath.substring(0, absPath.lastIndexOf('/')));
     final out = File(absPath).openSync(mode: FileMode.write);
-    try {
-      for (var i = 0; i < totalChunks; i++) {
-        final partPath = '$chunkDir/${i.toString().padLeft(6, '0')}.part';
-        final pf = File(partPath);
-        if (!pf.existsSync()) {
-          logp('❌ 分片 $i 缺失');
-          return false;
-        }
-        out.writeFromSync(pf.readAsBytesSync());
+    outRaf = out;
+    const blockSize = 1024 * 1024;
+    for (var i = 0; i < totalChunks; i++) {
+      final partPath = '$chunkDir/${i.toString().padLeft(6, '0')}.part';
+      final pf = File(partPath);
+      if (!pf.existsSync()) {
+        logp('❌ 分片 $i 缺失');
+        return false;
       }
-      out.flushSync();
-    } finally {
-      out.closeSync();
+      final input = pf.openSync();
+      try {
+        while (true) {
+          final buf = input.readSync(blockSize);
+          if (buf.isEmpty) break;
+          out.writeFromSync(buf);
+        }
+      } finally {
+        input.closeSync();
+      }
     }
+    out.flushSync();
     return true;
   } catch (e) {
     logp('❌ チャンクの結合に失敗しました: $e');
     return false;
+  } finally {
+    try {
+      outRaf?.closeSync();
+    } catch (_) {}
   }
 }
 

@@ -225,7 +225,7 @@ DeepSeek ピーク時間帯が開始|Les heures pleines DeepSeek ont commencé
 送信中…|Envoi…
 ❌ 送信失敗：|❌ Échec de l'envoi : 
 不明なエラー|Erreur inconnue
-Server酱|Server酱
+Server酱|ServerChan
 発火に失敗：|Échec du déclenchement : 
 6. 出力の冒頭で「日本語で答えます」等の宣言や前置きを書く必要はありません。自然に日本語で応答してください。|6. Inutile d'ajouter une préface comme « Je répondrai en japonais » ; répondez simplement et naturellement en japonais.
 設定済み|Configuré
@@ -1387,10 +1387,10 @@ I18N.add('fr', `
 /* 豆包モード（左上の＋の左のトグル） */
 I18N.add('fr', `
 豆包モード：オン（送信は豆包モデル）|Mode Doubao : activé (envoi via un modèle Doubao)
-豆包モード：オフ（送信は DeepSeek）|Mode 豆包 : désactivé (envoi via DeepSeek)
-⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください|⚠️ La clé API 豆包 n'est pas définie. Saisissez-la dans Réglages → 豆包
+豆包モード：オフ（送信は DeepSeek）|Mode Doubao : désactivé (envoi via DeepSeek)
+⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください|⚠️ La clé API Doubao n'est pas définie. Saisissez-la dans Réglages → Doubao
 豆包モードをオンにしました（モデル：{0}）|Mode Doubao activé (modèle : {0})
-豆包モードをオフにしました（DeepSeek に戻ります）|Mode 豆包 désactivé (retour à DeepSeek)
+豆包モードをオフにしました（DeepSeek に戻ります）|Mode Doubao désactivé (retour à DeepSeek)
 豆包|Doubao
 豆包モデルが未開通です：{0}|Modèle Doubao non activé : {0}
 火山方舟コンソールの「開通管理」でこのモデルを開通してください。|Activez ce modèle dans la console Ark, rubrique « Gestion des activations ».
@@ -1564,4 +1564,8 @@ I18N.add('fr', `
 豆包画像生成|image Doubao
 豆包動画生成|vidéo Doubao
 ネット検索ソース|Source réseau
+音声入力|Entrée audio
+統一単価|Tarif unique
+単価（元/百万tokens）：|Prix unitaire (yuans par million de tokens) :
+統一単価（時間帯による変動なし）：|Tarif unique (sans variation selon l'heure) :
 `);

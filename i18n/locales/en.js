@@ -1563,4 +1563,8 @@ I18N.add('en', `
 豆包音声生成|Doubao voice generation
 豆包画像生成|Doubao image generation
 豆包動画生成|Doubao video generation
+音声入力|Audio input
+統一単価|Flat rate
+単価（元/百万tokens）：|Unit price (CNY per 1M tokens):
+統一単価（時間帯による変動なし）：|Flat rate (no time-of-day variation):
 `);

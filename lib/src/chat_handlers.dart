@@ -880,7 +880,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
   DsMessage? aiMsg;
   if (messageID.isNotEmpty) {
     final upd = updateDsMessageContent(sessionID, messageID, merged,
-        finalReasoning, useDoubao ? null : usageAcc.snapshot(),
+        finalReasoning, usageAcc.snapshot(),
         dim: useDoubao ? DS_DIM_DB : DS_DIM_DS);
     if (upd != null) {
       aiMsg = upd;
@@ -897,7 +897,7 @@ Future<void> handleDsChatContinue(HttpRequest req) async {
       content: merged,
       createdAt: rfc3339(DateTime.now()),
       reasoning: finalReasoning,
-      usage: useDoubao ? null : usageAcc.snapshot(),
+      usage: usageAcc.snapshot(),
       dim: useDoubao ? DS_DIM_DB : DS_DIM_DS,
     );
     appendDsMessage(a);

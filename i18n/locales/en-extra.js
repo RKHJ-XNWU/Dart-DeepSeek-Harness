@@ -377,3 +377,45 @@ DeepSeek ディメンション|DeepSeek Dimension
 ☁️ 方舟へアップロード開始（|☁️ Starting upload to Ark (
 🎞️ 512MB 超のためローカルで圧縮中（元 |🎞️ Over 512MB, compressing locally (original 
 `);
+
+/* ============================================================
+ * 追加补全（2026-11 全局语言残留扫描 · 前端硬编码 UI 文案）
+ * 这 4 条原本无词典条目，切到非日语时会原样显示日语。
+ * ============================================================ */
+I18N.add('en', `
+コードを畳む|Collapse code
+コードを開く|Expand code
+詳細を開く|Show details
+抖音百科が開いています。先に百科をオフにしてください|Douyin Wiki is open. Turn the wiki off first
+`);
+
+/* 追加：動画前処理の待機表示（秒数なし版）—— 0 秒固着バグ修正に伴う新規文言 */
+I18N.add('en', `
+⏳ 方舟が動画を前処理中（抽帧）…|⏳ Ark is preprocessing the video (frame extraction)…
+`);
+
+/* 追加：動画アップロード進捗の {0} プレースホルダ版（数値+単位でも日本語が残らないように） */
+I18N.add('en', `
+🎬 動画を準備中…|🎬 Preparing video…
+🎬 動画 {0} 件を準備します|🎬 Preparing {0} video(s)
+🎞️ 512MB 超のためローカルで圧縮中（元 {0}）…時間がかかります|🎞️ Over 512MB, compressing locally (original {0})… this takes a while
+☁️ 方舟へアップロード開始（{0}）|☁️ Upload to Ark started ({0})
+☁️ 方舟へアップロード中 {0}%（{1} / {2}）|☁️ Uploading to Ark {0}% ({1} / {2})
+☁️ TOS 上の動画を参照登録中（{0}）|☁️ Registering TOS video reference ({0})
+⏳ 方舟が動画を前処理中（抽帧）… {0} 秒|⏳ Ark is preprocessing the video (frame extraction)… {0}s
+`);
+
+/* 追加：バックエンド（Dart）のエラー/状態メッセージで、非日本語 UI に残っていた分 */
+I18N.add('en', `
+AES-256 には 32 バイトの鍵が必要です（実際は |AES-256 requires a 32-byte key (actual: 
+暗号文の長さが不足しています|Ciphertext length is insufficient
+GCM タグの検証に失敗しました|GCM tag verification failed
+❌ 動画の準備に失敗（ストリーミング・想定外）: |❌ Video preparation failed (streaming, unexpected): 
+暗号文の base64 デコードに失敗しました: |Base64 decoding of the ciphertext failed: 
+id または ids パラメータを指定してください|Specify the id or ids parameter
+screen_name パラメータを指定してください|Specify the screen_name parameter
+🎬 TOS 経由で送信: |🎬 Sending via TOS: 
+🖼️ 联网内容插件：附帯画像 |🖼️ Web-content plugin: attached image(s) 
+🖼️ 工具混用：附帯画像 |🖼️ Tool mixing: attached image(s) 
+ 枚を input_image として送信| sent as input_image
+`);

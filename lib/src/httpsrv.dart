@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'globals.dart';
 
@@ -49,14 +50,15 @@ String qp(HttpRequest req, String key) =>
 // Body 读取
 // ------------------------------------------------------------
 Future<List<int>> readBodyBytes(HttpRequest req, {int? limit}) async {
-  final b = <int>[];
+  // OOM fix: BytesBuilder(copy:false) instead of List<int> (8x memory)
+  final builder = BytesBuilder(copy: false);
   await for (final chunk in req) {
-    b.addAll(chunk);
-    if (limit != null && b.length > limit) {
+    builder.add(chunk);
+    if (limit != null && builder.length > limit) {
       throw const FormatException('リクエストボディがサイズ上限を超えています');
     }
   }
-  return b;
+  return builder.takeBytes();
 }
 
 Future<String> readBodyText(HttpRequest req, {int? limit}) async {

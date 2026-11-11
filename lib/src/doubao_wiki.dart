@@ -390,13 +390,23 @@ Future<void> callDbWikiResponsesStream(
           final outTok = _asInt(u['output_tokens']);
           final total = _asInt(u['total_tokens']);
           var cached = 0;
+          var audioIn = 0;
           final det = u['input_tokens_details'];
-          if (det is Map) cached = _asInt(det['cached_tokens']);
+          if (det is Map) {
+            cached = _asInt(det['cached_tokens']);
+            // ★ 音声入力 token（Responses 形式）。豆包 2.1-lite の音声単価は
+            //   入力と別建てなので、ここで拾わないと過少計上になる。
+            audioIn = _asInt(det['audio_tokens']);
+            if (audioIn == 0) audioIn = _asInt(det['input_audio_tokens']);
+          }
+          // 料金表はモデル毎に違うため、usage 自身にモデルを焼き込んで永続化する
+          usageAcc.model = model;
           usageAcc.addRaw(RawDsUsage(
             promptTokens: inTok,
             completionTokens: outTok,
             totalTokens: total < inTok + outTok ? inTok + outTok : total,
             cachedTokens: cached,
+            audioTokens: audioIn,
           ));
         }
       }
@@ -757,13 +767,22 @@ Future<DbWikiRound> _dbWikiStreamRound({
             final outTok = _asInt(u['output_tokens']);
             final total = _asInt(u['total_tokens']);
             var cached = 0;
+            var audioIn = 0;
             final det = u['input_tokens_details'];
-            if (det is Map) cached = _asInt(det['cached_tokens']);
+            if (det is Map) {
+              cached = _asInt(det['cached_tokens']);
+              // ★ 音声入力 token（Responses 形式・入力単価と別建て）
+              audioIn = _asInt(det['audio_tokens']);
+              if (audioIn == 0) audioIn = _asInt(det['input_audio_tokens']);
+            }
+            // 料金表はモデル毎に違うため usage にモデルを焼き込む
+            usageAcc.model = model;
             usageAcc.addRaw(RawDsUsage(
               promptTokens: inTok,
               completionTokens: outTok,
               totalTokens: total < inTok + outTok ? inTok + outTok : total,
               cachedTokens: cached,
+              audioTokens: audioIn,
             ));
           }
         }

@@ -320,7 +320,7 @@ I18N.add('fr', `
 ❌ 豆包音声通話エラー:|❌ Erreur d'appel vocal Doubao :
 ❌ 豆包チャットエラー:|❌ Erreur de chat Doubao :
 🧹 期限切れのアップロードセッションを|🧹 Sessions de téléversement expirées nettoyées : 
-件クリーンアップしました| 
+件クリーンアップしました| éléments nettoyés
 を検出しましたが、dart:io は独自の SOCKS ダイヤルに対応していないため、直接接続します|détecté, mais dart:io ne prend pas en charge un dial SOCKS personnalisé ; connexion directe
 ⚠️ セッションは既に存在します:|⚠️ La session existe déjà :
 ✅ 移行完了: 全|✅ Migration terminée : au total 
@@ -376,4 +376,46 @@ DeepSeek ディメンション|Dimension DeepSeek
 ☁️ 方舟へアップロード中 |☁️ Téléversement vers Ark 
 ☁️ 方舟へアップロード開始（|☁️ Début du téléversement vers Ark (
 🎞️ 512MB 超のためローカルで圧縮中（元 |🎞️ Plus de 512MB, compression locale (original 
+`);
+
+/* ============================================================
+ * 追加补全（2026-11 全局语言残留扫描 · 前端硬编码 UI 文案）
+ * 这 4 条原本无词典条目，切到非日语时会原样显示日语。
+ * ============================================================ */
+I18N.add('fr', `
+コードを畳む|Réduire le code
+コードを開く|Développer le code
+詳細を開く|Afficher les détails
+抖音百科が開いています。先に百科をオフにしてください|Le wiki Douyin est ouvert. Désactivez d'abord le wiki
+`);
+
+/* 追加：動画前処理の待機表示（秒数なし版）—— 0 秒固着バグ修正に伴う新規文言 */
+I18N.add('fr', `
+⏳ 方舟が動画を前処理中（抽帧）…|⏳ Ark prétraite la vidéo (extraction d'images)…
+`);
+
+/* 追加：動画アップロード進捗の {0} プレースホルダ版（数値+単位でも日本語が残らないように） */
+I18N.add('fr', `
+🎬 動画を準備中…|🎬 Préparation de la vidéo…
+🎬 動画 {0} 件を準備します|🎬 Préparation de {0} vidéo(s)
+🎞️ 512MB 超のためローカルで圧縮中（元 {0}）…時間がかかります|🎞️ Plus de 512 Mo, compression locale (original {0})… cela peut prendre du temps
+☁️ 方舟へアップロード開始（{0}）|☁️ Envoi vers Ark lancé ({0})
+☁️ 方舟へアップロード中 {0}%（{1} / {2}）|☁️ Envoi vers Ark {0}% ({1} / {2})
+☁️ TOS 上の動画を参照登録中（{0}）|☁️ Enregistrement de la référence vidéo TOS ({0})
+⏳ 方舟が動画を前処理中（抽帧）… {0} 秒|⏳ Ark prétraite la vidéo (extraction d'images)… {0} s
+`);
+
+/* 追加：バックエンド（Dart）のエラー/状態メッセージで、非日本語 UI に残っていた分 */
+I18N.add('fr', `
+AES-256 には 32 バイトの鍵が必要です（実際は |AES-256 nécessite une clé de 32 octets (réel : 
+暗号文の長さが不足しています|La longueur du chiffré est insuffisante
+GCM タグの検証に失敗しました|La vérification du tag GCM a échoué
+❌ 動画の準備に失敗（ストリーミング・想定外）: |❌ Échec de la préparation vidéo (flux, inattendu) : 
+暗号文の base64 デコードに失敗しました: |Échec du décodage base64 du chiffré : 
+id または ids パラメータを指定してください|Indiquez le paramètre id ou ids
+screen_name パラメータを指定してください|Indiquez le paramètre screen_name
+🎬 TOS 経由で送信: |🎬 Envoi via TOS : 
+🖼️ 联网内容插件：附帯画像 |🖼️ Plugin de contenu web : image(s) jointe(s) 
+🖼️ 工具混用：附帯画像 |🖼️ Mode mixte : image(s) jointe(s) 
+ 枚を input_image として送信| envoyée(s) comme input_image
 `);

@@ -16,6 +16,15 @@ class DsTokenUsage {
   int totalTokens;
   int apiCalls;
 
+  /// ★ 音声入力 token（豆包 2.1-lite の音声単価 12 元/百万 tokens の対象）
+  ///   方舟の usage.prompt_tokens_details.audio_tokens をそのまま積む。
+  int audioInputTokens;
+
+  /// ★ この usage を生成したモデル ID。
+  ///   料金表はモデルごとに違うため、後から別モデルへ切り替えても
+  ///   過去メッセージの金額が変わらないよう、usage 自身に持たせて永続化する。
+  String model;
+
   DsTokenUsage({
     this.promptTokens = 0,
     this.promptCacheHitTokens = 0,
@@ -24,6 +33,8 @@ class DsTokenUsage {
     this.reasoningTokens = 0,
     this.totalTokens = 0,
     this.apiCalls = 0,
+    this.audioInputTokens = 0,
+    this.model = '',
   });
 
   DsTokenUsage clone() => DsTokenUsage(
@@ -34,6 +45,8 @@ class DsTokenUsage {
         reasoningTokens: reasoningTokens,
         totalTokens: totalTokens,
         apiCalls: apiCalls,
+        audioInputTokens: audioInputTokens,
+        model: model,
       );
 
   Map<String, dynamic> toJson() {
@@ -46,6 +59,8 @@ class DsTokenUsage {
       'apiCalls': apiCalls,
     };
     if (reasoningTokens != 0) m['reasoningTokens'] = reasoningTokens;
+    if (audioInputTokens != 0) m['audioInputTokens'] = audioInputTokens;
+    if (model.isNotEmpty) m['model'] = model;
     return m;
   }
 
@@ -57,6 +72,8 @@ class DsTokenUsage {
         reasoningTokens: intArgDefault(m, 'reasoningTokens', 0),
         totalTokens: intArgDefault(m, 'totalTokens', 0),
         apiCalls: intArgDefault(m, 'apiCalls', 0),
+        audioInputTokens: intArgDefault(m, 'audioInputTokens', 0),
+        model: mStr(m, 'model'),
       );
 }
 
@@ -69,6 +86,7 @@ class RawDsUsage {
   final int promptCacheMissTokens;
   final int cachedTokens; // prompt_tokens_details.cached_tokens
   final int reasoningTokens; // completion_tokens_details.reasoning_tokens
+  final int audioTokens;     // prompt_tokens_details.audio_tokens（音声入力）
 
   const RawDsUsage({
     this.promptTokens = 0,
@@ -78,6 +96,7 @@ class RawDsUsage {
     this.promptCacheMissTokens = 0,
     this.cachedTokens = 0,
     this.reasoningTokens = 0,
+    this.audioTokens = 0,
   });
 
   static RawDsUsage? fromJson(dynamic v) {
@@ -93,6 +112,15 @@ class RawDsUsage {
       promptCacheMissTokens: intArgDefault(m, 'prompt_cache_miss_tokens', 0),
       cachedTokens: intArgDefault(pd, 'cached_tokens', 0),
       reasoningTokens: intArgDefault(cd, 'reasoning_tokens', 0),
+      // 方舟は prompt_tokens_details.audio_tokens、OpenAI 系は prompt_tokens_details
+      // 配下に input_audio_tokens を置く実装もあるため両方を拾う
+      audioTokens: () {
+        final a = intArgDefault(pd, 'audio_tokens', 0);
+        if (a > 0) return a;
+        final b = intArgDefault(pd, 'input_audio_tokens', 0);
+        if (b > 0) return b;
+        return intArgDefault(m, 'audio_tokens', 0);
+      }(),
     );
   }
 }
@@ -100,6 +128,9 @@ class RawDsUsage {
 class DsUsageAcc {
   bool _used = false;
   final DsTokenUsage _total = DsTokenUsage();
+
+  /// 直近に積んだモデル ID（snapshot に焼き込んで永続化する）
+  String model = '';
 
   bool get used => _used;
 
@@ -137,6 +168,7 @@ class DsUsageAcc {
     _total.completionTokens += outTok;
     _total.reasoningTokens += r.reasoningTokens;
     _total.totalTokens += total;
+    if (r.audioTokens > 0) _total.audioInputTokens += r.audioTokens;
     _total.apiCalls += 1;
   }
 
@@ -151,6 +183,8 @@ class DsUsageAcc {
     _total.totalTokens += u.totalTokens;
     final calls = u.apiCalls <= 0 ? 1 : u.apiCalls;
     _total.apiCalls += calls;
+    _total.audioInputTokens += u.audioInputTokens;
+    if (u.model.isNotEmpty) model = u.model;
   }
 
   /// 一次 API 调用都没发生（或都没拿到 usage）时返回 null —— 宁可不显示，绝不编造
@@ -158,6 +192,7 @@ class DsUsageAcc {
     if (!_used) return null;
     final u = _total.clone();
     if (u.totalTokens == 0) u.totalTokens = u.promptTokens + u.completionTokens;
+    if (u.model.isEmpty) u.model = model;
     return u;
   }
 }
