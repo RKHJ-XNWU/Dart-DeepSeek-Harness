@@ -368,6 +368,7 @@ String get dbVideoTasksFile => '$dsChatDir/doubao_video_tasks.sts';
 
 class DbConfig {
   String apiKey;
+  String audioGenApiKey;
   String baseUrl;
   String chatModel;
   String imageModel;
@@ -420,6 +421,7 @@ class DbConfig {
 
   DbConfig({
     this.apiKey = '',
+    this.audioGenApiKey = '',
     this.baseUrl = DB_DEFAULT_BASE,
     this.chatModel = DB_DEFAULT_CHAT_MODEL,
     this.imageModel = DB_DEFAULT_IMAGE_MODEL,
@@ -452,6 +454,7 @@ class DbConfig {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'apiKey': apiKey,
+        'audioGenApiKey': audioGenApiKey,
         'baseUrl': baseUrl,
         'chatModel': chatModel,
         'imageModel': imageModel,
@@ -483,6 +486,7 @@ class DbConfig {
 
   factory DbConfig.fromJson(Map<String, dynamic> j) => DbConfig(
         apiKey: mStr(j, 'apiKey'),
+        audioGenApiKey: mStr(j, 'audioGenApiKey'),
         baseUrl: trimOr(mStr(j, 'baseUrl'), DB_DEFAULT_BASE),
         chatModel: trimOr(mStr(j, 'chatModel'), DB_DEFAULT_CHAT_MODEL),
         imageModel: trimOr(mStr(j, 'imageModel'), DB_DEFAULT_IMAGE_MODEL),
@@ -2124,9 +2128,20 @@ Map<String, dynamic> _configJson() {
   } else if (k.isNotEmpty) {
     masked = '••••••••';
   }
+
+  var audioGenMasked = '';
+  final agk = cfg.audioGenApiKey.trim();
+  if (agk.length > 8) {
+    audioGenMasked = '${agk.substring(0, 4)}••••${agk.substring(agk.length - 4)}';
+  } else if (agk.isNotEmpty) {
+    audioGenMasked = '••••••••';
+  }
   return {
     'hasKey': k.isNotEmpty,
     'maskedKey': masked,
+    'hasAudioGenKey': agk.isNotEmpty,
+    'maskedAudioGenKey': audioGenMasked,
+
     'baseUrl': cfg.baseUrl,
     'chatModel': cfg.chatModel,
     'imageModel': cfg.imageModel,
@@ -2181,6 +2196,9 @@ Future<void> handleDbConfig(HttpRequest req) async {
     apiKey: mStr(body, 'apiKey').trim().isEmpty
         ? old.apiKey
         : mStr(body, 'apiKey').trim(),
+    audioGenApiKey: mStr(body, 'audioGenApiKey').trim().isEmpty
+        ? old.audioGenApiKey
+        : mStr(body, 'audioGenApiKey').trim(),
     baseUrl: trimOr(mStr(body, 'baseUrl'), old.baseUrl),
     chatModel: trimOr(mStr(body, 'chatModel'), old.chatModel),
     imageModel: trimOr(mStr(body, 'imageModel'), old.imageModel),
@@ -2738,4 +2756,131 @@ Future<void> handleDbAudioAnalyze(HttpRequest req) async {
   } catch (e) {
     await dsJSONErr(res, 500, dbErrText(e));
   }
+}
+
+// ==================== Seed-Audio 音频生成能力 ====================
+
+Future<void> handleDbAudioGenerate(HttpRequest req) async {
+  final res = req.response;
+  if (req.method != "POST") {
+    await dsJSONErr(res, 405, "Method not allowed");
+    return;
+  }
+  Map<String, dynamic> body;
+  try {
+    body = await readJsonBody(req);
+  } catch (_) {
+    await dsJSONErr(res, 400, "无效的请求体");
+    return;
+  }
+  try {
+    final prompt = mStr(body, "text_prompt");
+    final duration = intArgDefault(body, 'duration', 0);
+    final bytes = await dbGenerateAudio(
+      prompt,
+      model: mStr(body, "model"),
+      duration: duration,
+      audioConfig: body["audio_config"] is Map ? asMap(body["audio_config"]) : null,
+    );
+    final name = trimOr(mStr(body, "name"), "seed_audio_${fmtStamp14(DateTime.now())}");
+    final meta = saveDbBlob(bytes, name, "audio/mpeg", "audio",
+        source: "seed-audio", prompt: prompt);
+    await dsJSONOk(res, 200, {
+      "success": true,
+      "file": _fileJson(meta),
+      "audioUrl": meta == null ? "" : "/api/ds-files/download?id=${meta.id}",
+    });
+  } catch (e) {
+    logp("❌ Seed-Audio 生成错误: $e");
+    await dsJSONErr(res, 500, dbErrText(e));
+  }
+}
+
+Future<List<int>> dbGenerateAudio(
+  String textPrompt, {
+  String? model,
+  int duration = 0,
+  Map<String, dynamic>? audioConfig,
+}) async {
+  final cfg = getDbConfig();
+  
+  var genKey = cfg.audioGenApiKey.trim();
+  if (genKey.isEmpty) genKey = cfg.apiKey.trim();
+  if (genKey.isEmpty) throw Exception("请先在设置中填写音频生成 API Key");
+
+  final prompt = textPrompt.trim();
+  if (prompt.isEmpty) throw Exception("音频生成描述为空");
+
+  // 通道 1：方舟原生 Key
+  if (genKey.startsWith('ark-')) {
+    final body = <String, dynamic>{
+      'model': (model != null && model.trim().isNotEmpty) ? model.trim() : 'doubao-tts',
+      'input': prompt,
+      'voice': 'zh_female_xiaohe_uranus_bigtts',
+      'response_format': 'mp3',
+    };
+    final r = await _httpRaw(
+      "POST", "${dbBaseUrl(cfg)}/audio/speech",
+      headers: _jsonHeaders(cfg.apiKey),
+      body: utf8.encode(jsonEncode(body)),
+      timeout: const Duration(seconds: 120),
+    );
+    if (r.code != 200) throw Exception("方舟音频生成失败（HTTP ${r.code}）：${_errFromBytes(r.bytes)}");
+    return r.bytes;
+  }
+
+  // 通道 2：OpenSpeech 专用通道 (Seed-Audio)
+  final body = <String, dynamic>{
+    "model": (model != null && model.trim().isNotEmpty) ? model.trim() : "seed-audio-1.0",
+    "text_prompt": prompt,
+  };
+  
+  // ★ 修复：同时放在顶层和 audio_config 里，确保接口一定能读到
+  if (duration > 0) {
+    body["duration"] = duration;
+  }
+  
+  final finalAudioConfig = <String, dynamic>{};
+  if (audioConfig != null && audioConfig.isNotEmpty) {
+    finalAudioConfig.addAll(audioConfig);
+  }
+  if (duration > 0) {
+    finalAudioConfig["duration"] = duration; 
+  }
+  if (finalAudioConfig.isNotEmpty) {
+    body["audio_config"] = finalAudioConfig;
+  }
+
+  final r = await _httpRaw(
+    "POST", "https://openspeech.bytedance.com/api/v3/tts/create",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": genKey, 
+    },
+    body: utf8.encode(jsonEncode(body)),
+    timeout: const Duration(seconds: 120),
+  );
+
+  if (r.code != 200) {
+    final errStr = _errFromBytes(r.bytes);
+    if (r.code == 403) throw Exception("【控制台未开通服务】请前往火山引擎语音控制台开通服务。");
+    throw Exception("Seed-Audio 生成失败（HTTP ${r.code}）：$errStr");
+  }
+  
+  if (r.bytes.length > 4 && r.bytes[0] == 0x7B) {
+    try {
+      final jsonStr = utf8.decode(r.bytes, allowMalformed: true);
+      final j = asMap(jsonDecode(jsonStr));
+      final b64Audio = mStr(j, 'audio');
+      if (b64Audio.isNotEmpty) {
+        return base64.decode(b64Audio);
+      }
+      throw Exception("接口返回了未知的 JSON：$jsonStr");
+    } catch (e) {
+      throw Exception("解析音频数据失败：$e");
+    }
+  }
+  
+  if (r.bytes.length < 128) throw Exception("返回的音频数据过短");
+  return r.bytes;
 }

@@ -125,6 +125,7 @@ void registerRoutes() {
   _register('/api/doubao/video/status', handleDbVideoStatus);
   _register('/api/doubao/video/tasks', handleDbVideoTasks);
   _register('/api/doubao/tts', handleDbTts);
+  _register("/api/doubao/audio-generate", handleDbAudioGenerate);
   _register('/api/doubao/podcast', handleDbPodcast);
   _register('/api/doubao/asr', handleDbAsr);
   _register('/api/doubao/voice/turn', handleDbVoiceTurn);

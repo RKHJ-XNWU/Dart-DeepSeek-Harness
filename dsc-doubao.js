@@ -382,6 +382,7 @@
     // 再読込なしで言語を変えても、以前の言語の文言が残らないようにするため。
     var MENU_ITEMS = [
         { id: 'dscDbTtsBtn', ic: '🔊', label: T('豆包で音声生成'), tip: T('豆包音声生成'), open: function () { openTtsModal(); } },
+        { id: 'dscDbAudioGenBtn', ic: '🎬', label: T('豆包音频生成'), tip: T('豆包音频生成'), open: function () { openAudioGenModal(); } },
         { id: 'dscDbImageBtn', ic: '🎨', label: T('豆包で画像生成'), tip: T('豆包画像生成'), open: function () { openImageModal(); } },
         { id: 'dscDbVideoBtn', ic: '🎬', label: T('豆包で動画生成'), tip: T('豆包動画生成'), open: function () { openVideoModal(); } },
         { id: 'dscDbPodcastBtn', ic: '🎧', label: T('豆包ポッドキャスト'), tip: T('豆包ポッドキャスト'), open: function () { openPodcastModal(); } },
@@ -568,6 +569,8 @@
 
         var keyInput = input('dscDbApiKey', 'password', 'ARK API Key を入力');
         card.appendChild(field('豆包 API Key', keyInput, '保存済みの場合、空欄なら変更しません'));
+        var agkInput = input('dscDbAudioGenKey', 'password', 'OpenSpeech API Key を入力');
+        card.appendChild(field('豆包音频生成 Key (OpenSpeech)', agkInput, '仅用于 Seed-Audio 音频生成，与 ARK Key 分开配置'));
         card.appendChild(field('ベース URL', input('dscDbBaseUrl', 'text', DB_BASE_PH(), ''), '既定：https://ark.cn-beijing.volces.com/api/v3'));
 
         var grid = el('div', 'dsc-db-grid');
@@ -755,6 +758,11 @@
             k.value = '';
             k.placeholder = c.hasKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedKey) : T('ARK API Key を入力');
         }
+        var agk = $('dscDbAudioGenKey');
+        if (agk) {
+            agk.value = '';
+            agk.placeholder = c.hasAudioGenKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedAudioGenKey) : T('音频生成 API Key を入力');
+        }
         DB_WEB_SOURCES = Array.isArray(c.webSources) ? c.webSources.slice() : [];
         /* v6 修复：总闸只做「首次初始化」，不再被后端配置反复回写。
            旧实现每次加载配置 / 打开设置面板，都把服务端的 wikiEnabled 覆盖到本地：
@@ -791,6 +799,7 @@
         var btn = $('dscDbSaveCfg');
         var body = {
             apiKey: ($('dscDbApiKey') || {}).value || '',
+            audioGenApiKey: ($('dscDbAudioGenKey') || {}).value || '',
             baseUrl: ($('dscDbBaseUrl') || {}).value || '',
             chatModel: ($('dscDbChatModel') || {}).value || '',
             imageModel: ($('dscDbImageModel') || {}).value || '',
@@ -884,6 +893,95 @@
     // ------------------------------------------------------------
     // 音声生成（TTS）
     // ------------------------------------------------------------
+
+    function openAudioGenModal() {
+        ensureModal('dscDbAudioGenOverlay', buildAudioGenModal, false);
+        loadConfig().catch(function (e) {
+            setStatus($('dscDbAudioGenStatus'), '❌ ' + T('設定の読み込みに失敗：{0}', e.message), 'err');
+        });
+        openModal('dscDbAudioGenOverlay');
+    }
+
+    function buildAudioGenModal() {
+        var md = buildModal('dscDbAudioGenOverlay', '🎬', '豆包音频生成 (Seed-Audio)', '通过场景描述，端到端生成包含对白、音效、配乐的完整音频（最长 2 分钟）。');
+        
+        md.appendChild(field('音频场景描述（text_prompt）', textarea('dscDbAudioGenPrompt', '例：一个温柔的女生在夜里轻轻讲述一个童话故事，背景有微弱的虫鸣声')));
+        md.appendChild(field('音频文件名（可选）', input('dscDbAudioGenName', 'text', '例：童话故事')));
+        md.appendChild(field('生成时长', select('dscDbAudioGenDuration', [
+            { value: '0', label: '自动（由模型决定）' },
+            { value: '5', label: '5 秒' },
+            { value: '10', label: '10 秒' },
+            { value: '15', label: '15 秒' },
+            { value: '30', label: '30 秒' },
+            { value: '60', label: '60 秒（1 分钟）' },
+            { value: '80', label: '80 秒' },
+            { value: '120', label: '120 秒（2 分钟）' }
+        ], '0')));
+
+        var st = el('div', 'dsc-db-status');
+        st.id = 'dscDbAudioGenStatus';
+        md.appendChild(st);
+        
+        var res = el('div', 'dsc-db-result');
+        res.id = 'dscDbAudioGenResult';
+        md.appendChild(res);
+
+        var foot = el('div', 'dsc-db-footer');
+        var close = el('button', 'dsc-db-btn', T('关闭'));
+        close.type = 'button';
+        var go = el('button', 'dsc-db-btn primary', T('开始生成'));
+        go.type = 'button';
+        go.id = 'dscDbAudioGenGo';
+        foot.appendChild(close);
+        foot.appendChild(go);
+        md.appendChild(foot);
+
+        close.addEventListener('click', function () { closeModal('dscDbAudioGenOverlay'); });
+        go.addEventListener('click', async function () {
+            var prompt = ($('dscDbAudioGenPrompt') || {}).value || '';
+            if (!prompt.trim()) { setStatus(st, '⚠️ ' + T('请填写音频场景描述'), 'err'); return; }
+            
+            go.disabled = true;
+            setStatus(st, T('生成中…（最长可能需要 2 分钟）'), 'busy');
+            
+            try {
+                var d = await api('/audio-generate', {
+                    method: 'POST',
+                    body: {
+                        text_prompt: prompt.trim(),
+                        name: (($('dscDbAudioGenName') || {}).value || '').trim(),
+                        duration: parseInt((($('dscDbAudioGenDuration') || {}).value || '0'), 10)
+                    }
+                });
+                var f = d.file || {};
+                res.innerHTML = '';
+                var au = document.createElement('audio');
+                au.src = fileUrl(f) + '&_t=' + Date.now();
+                au.controls = true;
+                au.style.width = '100%';
+                res.appendChild(au);
+                res.appendChild(el('div', 'dsc-db-filename', T('文件名：{0}', f.name || '')));
+                
+                var row = el('div', 'dsc-db-row');
+                row.style.marginTop = '10px';
+                var dl = el('button', 'dsc-db-btn primary', T('下载音频'));
+                dl.type = 'button';
+                dl.addEventListener('click', function () { openExternal(downloadUrl(f)); });
+                row.appendChild(dl);
+                res.appendChild(row);
+                
+                setStatus(st, T('✅ 生成成功：{0}', f.name || ''), 'ok');
+                toast(T('✅ 音频生成成功'), 'success');
+                refreshFiles();
+            } catch (e) {
+                setStatus(st, '❌ ' + T('生成失败：{0}', e.message), 'err');
+                toast(T('生成失败：{0}', e.message), 'error');
+            } finally {
+                go.disabled = false;
+            }
+        });
+    }
+
     function openTtsModal() {
         ensureModal('dscDbTtsOverlay', buildTtsModal, S.ttsBusy);
         loadConfig().then(function (c) {
@@ -2798,3 +2896,4 @@
         boot();
     }
 })();
+
