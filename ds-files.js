@@ -346,7 +346,12 @@
                 try {
                     var res = await fetch('/api/ds-files/clear-all', { method: 'DELETE' });
                     if (!res.ok) throw new Error('清空失败');
-                    dsToast('已清空所有文件', 'success');
+                    var j = {};
+                    try { j = await res.json(); } catch (e) {}
+                    // 后端现在会回传实际删除的数量，前端同步显示，避免「点了没反应」的错觉
+                    dsToast(typeof j.removed === 'number'
+                        ? ('已清空 ' + j.removed + ' 个文件')
+                        : '已清空所有文件', 'success');
                     dsFiles = [];
                     attachedFileIds = [];
                     renderDsFiles();

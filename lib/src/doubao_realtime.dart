@@ -91,6 +91,7 @@ String dbPrepareUpstream(
   String lang = 'zh',
   String voice = '',
   String instructions = '',
+  bool skipVoice = false,
 }) {
   Object? decoded;
   try {
@@ -121,7 +122,11 @@ String dbPrepareUpstream(
   if (_str(outFmt['type']).isEmpty) outFmt['type'] = 'pcm_s16le';
   outFmt['rate'] = 24000;
   output['format'] = outFmt;
-  if (_str(output['voice']).isEmpty) {
+  if (skipVoice) {
+    // ★ 前端由 Edge TTS 负责出声时，不向服务端索要豆包音色：
+    //   账号没有该音色权限时，硬塞音色 id 会让 session.create 直接被拒。
+    output.remove('voice');
+  } else if (_str(output['voice']).isEmpty) {
     final v = _str(voice).isNotEmpty
         ? _str(voice)
         : (_str(cfg.duplexVoice).isNotEmpty ? _str(cfg.duplexVoice) : cfg.voice);
@@ -179,6 +184,8 @@ Future<void> handleDbRealtime(HttpRequest req) async {
   final lang = trimOr(qp(req, 'lang'), 'zh');
   final voice = trimOr(qp(req, 'voice'), '');
   final instructions = trimOr(qp(req, 'instructions'), '');
+  // edge=1：前端用 Edge TTS 出声，服务端不必也不该指定豆包音色
+  final skipVoice = qp(req, 'edge') == '1';
 
   WebSocket client;
   try {
@@ -264,6 +271,7 @@ Future<void> handleDbRealtime(HttpRequest req) async {
               lang: lang,
               voice: voice,
               instructions: instructions,
+              skipVoice: skipVoice,
             )
           : data;
       try {

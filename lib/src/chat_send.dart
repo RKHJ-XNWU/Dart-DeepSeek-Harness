@@ -1002,6 +1002,11 @@ Future<void> handleDsChatSend(HttpRequest req) async {
       final ctx = await buildWebSearchContext(content);
       if (ctx.isNotEmpty) userPrompt += ctx;
     }
+    // ★ 硬性隔离：豆包通道（方舟）任何情况下都不允许落到 DeepSeek 官方搜索。
+    //   上面的分支已经保证这一点，这里再加一道断言，防止后续改动回退。
+    if (useDoubao && dbNativeSearch) {
+      logp('✅ 検索経路確定：豆包／方舟ネイティブ検索のみ（DeepSeek 検索は未使用）');
+    }
   }
   if (userPrompt.trim().isEmpty) userPrompt = 'アップロードしたファイルを確認してください。';
 

@@ -684,15 +684,35 @@ Future<void> handleDsFileClearAll(HttpRequest req) async {
     await errJson(req.response, 405, 'Method not allowed');
     return;
   }
+  // ★ 修复：原先清空接口完全没有日志，前端点了「清空」后端一片沉默，
+  //   用户无法判断到底有没有真的清掉。现在清空前统计、清空后逐项回显。
+  final sw = Stopwatch()..start();
+  final beforeFiles = getAllDsFiles().length;
+  logp('🗑️ 受信：清空全部文件（清空前 $beforeFiles 个文件）');
+  var removedDirs = 0;
   for (final d in [DSFilesMetaDir, DSFilesBlobDir, DSFilesChunksDir]) {
     try {
       final dir = Directory(d);
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-    } catch (_) {}
+      if (dir.existsSync()) {
+        dir.deleteSync(recursive: true);
+        removedDirs++;
+        logp('   ✅ 已删除目録: $d');
+      } else {
+        logp('   · 目録不存在、跳过: $d');
+      }
+    } catch (e) {
+      logp('   ❌ 删除失败: $d（$e）');
+    }
   }
   initDsFilesDir();
   invalidateDsFileMetaCache();
-  await jsonResponse(req.response, 200, {'success': true});
+  final afterFiles = getAllDsFiles().length;
+  logp('✅ 清空完成：删除 $removedDirs 个目録、$beforeFiles → $afterFiles 个文件、耗时 ${sw.elapsedMilliseconds}ms');
+  await jsonResponse(req.response, 200, {
+    'success': true,
+    'removed': beforeFiles,
+    'remaining': afterFiles,
+  });
 }
 
 // ------------------------------------------------------------

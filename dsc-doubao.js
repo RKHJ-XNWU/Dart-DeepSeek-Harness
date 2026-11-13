@@ -196,7 +196,7 @@
     // 已收录的豆包音色 → 各自对应的 Edge 音色（互不相同）
     var DB_TO_EDGE = {
         'zh_female_xiaohe_uranus_bigtts': 'zh-CN-XiaoxiaoNeural',
-        'zh_female_shuangkuaisisi_moon_bigtts': 'zh-CN-XiaoyiNeural',
+        'zh_female_shuangkuaisisi_moon_bigtts': 'zh-CN-XiaoxiaoNeural',
         'zh_female_wanwanxiaohe_moon_bigtts': 'zh-CN-XiaoxiaoNeural',
         'zh_female_gaolengyujie_moon_bigtts': 'zh-CN-XiaoyiNeural',
         'zh_female_qingxinnvsheng_mars_bigtts': 'zh-CN-XiaoxiaoNeural',
@@ -2214,6 +2214,7 @@
             silenceMs: 0,
             loopTimer: null,
             audio: null,
+            audioEl: null,      // 复用同一个音频元素，避免自动播放被拦截
             playing: false,
             thinking: false,
             micOn: true,
@@ -2224,12 +2225,18 @@
     async function startCall() {
         if (S.call && S.call.active) return;
         
+        S.call = newCallState();
+
+        // 预解锁音频元素：用户刚点下「开始通话」的这一下就是可用手势，
+        // 此时先让同一个 <audio> 播一段静音，后面所有语音都复用它，
+        // 就不会被浏览器的自动播放策略拦住（那种情况的表现就是完全没声音）。
         try {
             var unlock = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
-            unlock.play().catch(function(){});
-        } catch(e) {}
-
-        S.call = newCallState();
+            unlock.preload = 'auto';
+            S.call.audioEl = unlock;
+            var up = unlock.play();
+            if (up && up.catch) up.catch(function () {});
+        } catch (e) {}
         S.call.active = true;
         S.call.micOn = true;
         S.call.duplex = true; 
@@ -2243,40 +2250,12 @@
             return;
         }
 
-        // ★ 拦截后端发来的文字，强制走 Edge TTS
+        // ★ 全双工通话人声：豆包侧没有可用的通话音色，统一交给 Edge TTS 渲染。
+        //   先合成落盘再播放，稳定可靠；同一句重复、先半句后整句的去重
+        //   全部由 dscSpeakCallText() 内部处理，这里只负责转交文本。
         window.dscDuplex.onText = function (text) {
-            if (!S.call || !S.call.active || !text.trim()) return;
-            addBubble('ai', text);
-            setCallStatus(T('読み上げ中…'), 'speaking');
-
-            // 直接请求后端的 Edge TTS 接口发声
-            api('/tts', {
-                method: 'POST',
-                body: {
-                    text: text,
-                    voice: (S.cfg && S.cfg.voice) || 'zh-CN-XiaoxiaoNeural',
-                    lang: (S.cfg && S.cfg.duplexLang) || 'zh'
-                }
-            }).then(function(d) {
-                if (d.audioUrl && S.call && S.call.active) {
-                    if (S.call.audio) S.call.audio.pause();
-                    S.call.audio = new Audio(d.audioUrl);
-                    S.call.playing = true;
-                    S.call.audio.onended = function() {
-                        S.call.playing = false;
-                        setCallStatus(T('聞き取り中…'), 'listening');
-                    };
-                    S.call.audio.play().catch(function(e){
-                        console.error('播放被拦截:', e);
-                        setCallStatus(T('聞き取り中…'), 'listening');
-                    });
-                } else {
-                    setCallStatus(T('聞き取り中…'), 'listening');
-                }
-            }).catch(function(e) {
-                console.error('[DB] Edge TTS 失败:', e);
-                setCallStatus(T('聞き取り中…'), 'listening');
-            });
+            if (!S.call || !S.call.active) return;
+            dscSpeakCallText(text);
         };
 
         try {
@@ -2297,7 +2276,12 @@
         }
         c.active = false;
         c.duplex = false;
+        stopCallAudio();              // 停掉正在播放的人声
+        CALL_SAY.lastText = '';       // 清空去重记录，下次通话重新开始
+        CALL_SAY.lastAt = 0;
+        CALL_SAY.recent = {};
         if (c.audio) { c.audio.pause(); c.audio = null; }
+        c.audioEl = null;             // 释放复用的音频元素
         setCallStatus('待機中', '');
         addBubble('sys', '通话已结束。');
     }
@@ -2423,7 +2407,7 @@
         var body = {
             fileName: 'audio.webm',
             lang: lang(),
-            voice: (S.cfg && S.cfg.voice) || '',
+            voice: callVoice(),
             model: (S.cfg && S.cfg.chatModel) || '',
             history: c.history.slice(-12)
         };
@@ -2441,7 +2425,10 @@
             if (d.reply) addBubble('ai', d.reply);
             c.history.push({ role: 'user', content: d.userText || text || '' });
             c.history.push({ role: 'assistant', content: d.reply || '' });
-            if (d.audioUrl) {
+            if (d.ttsEngine === 'edge' && d.reply) {
+                // 后端只回文字，声音由前端走 /api/tts 合成落盘后播放
+                dscSpeakCallText(d.reply);
+            } else if (d.audioUrl) {
                 playCallAudio(d.audioUrl);
             } else {
                 setCallStatus(T('聞き取り中…'), 'listening');
@@ -2454,41 +2441,98 @@
         }
     }
 
+    /// 播放通话回复音频（落盘后的 audioUrl）
+    //   复用同一个 <audio> 元素：它已在通话开始时被用户手势解锁过。
+    //   每段语音都新建元素，更容易被浏览器自动播放策略拦截（表现就是完全没声音）。
     function playCallAudio(url) {
         var c = S.call;
-        if (!c) return;
-        try {
-            if (c.audio) { c.audio.pause(); }
-            c.audio = new Audio(url);
-            c.playing = true;
-            setCallStatus(T('読み上げ中…'), 'speaking');
-            c.audio.onended = function () {
+        if (!c || !url) return;
+
+        if (!c.audioEl) {
+            c.audioEl = new Audio();
+            c.audioEl.preload = 'auto';
+        }
+        var audio = c.audioEl;
+        c.audio = audio;
+        try { audio.pause(); } catch (e) {}
+        audio.onended = null;
+        audio.onerror = null;
+
+        c.playing = true;
+        setCallStatus(T('読み上げ中…'), 'speaking');
+
+        // 播放或下载失败时统一收敛到这里，只报一次真实原因
+        var failed = false;
+        function fail(msg) {
+            if (failed) return;
+            failed = true;
+            c.playing = false;
+            addBubble('sys', msg);
+            if (c.active) setCallStatus(T('聞き取り中…'), 'listening');
+        }
+
+        // ★ 先整段下载到内存，再用本地 blob: 地址播放。
+        //   直接 audio.src 指向 /api/ds-files/download 时，媒体元素依赖服务端
+        //   支持 Range 分段请求，一旦服务端不支持就会立刻触发 onerror，
+        //   界面只会显示「音频加载失败」，看不出真正原因。
+        //   改成完整下载再播放后：不依赖 Range、不产生两段竞态，稳定可预期。
+        fetch(url, { cache: 'no-store' }).then(function (res) {
+            if (!res.ok) throw new Error('下载音频失败（HTTP ' + res.status + '）');
+            return res.blob();
+        }).then(function (blob) {
+            if (!c.active) return;
+            var size = blob ? blob.size : 0;
+            if (!size || size < 200) {
+                throw new Error('下载到的音频为空（' + size + ' 字节）');
+            }
+            // 释放上一段语音的临时地址，避免内存一直涨
+            if (c.lastObjUrl) {
+                try { URL.revokeObjectURL(c.lastObjUrl); } catch (e) {}
+                c.lastObjUrl = '';
+            }
+            c.lastObjUrl = URL.createObjectURL(blob);
+            audio.src = c.lastObjUrl;
+
+            audio.onended = function () {
                 c.playing = false;
                 if (c.active) setCallStatus(T('聞き取り中…'), 'listening');
             };
-            c.audio.onerror = function () {
-                c.playing = false;
-                addBubble('sys', T('音声の再生に失敗しました'));
-                if (c.active) setCallStatus(T('聞き取り中…'), 'listening');
+            audio.onerror = function () {
+                fail('音频解码失败（已下载 ' + size + ' 字节，可能不是有效的音频）');
             };
-            var p = c.audio.play();
+
+            var p = audio.play();
             if (p && p.catch) {
                 p.catch(function (e) {
-                    c.playing = false;
-                    addBubble('sys', T('自動再生がブロックされました：{0}', e.message || e));
-                    setCallStatus(T('聞き取り中…'), 'listening');
-                    // 二次兜底：部分浏览器需用户点击才能播放
-                    if (window.confirm("浏览器拦截了音频播放，是否尝试手动点击播放？")) {
-                        var manualAudio = new Audio(url);
-                        manualAudio.play();
-                        c.audio = manualAudio;
+                    var nm = (e && e.name) || '';
+                    // 自动播放被拦截：换数据源也没用，必须让用户点一下面板
+                    if (nm === 'NotAllowedError') {
+                        fail('自动播放被拦截：请先点一下通话面板再试');
+                        return;
+                    }
+                    // 其他情况（个别 WebView 不认 blob: 音频地址）：
+                    // 兜底改成 data: 地址再播一次，这条路径几乎所有内核都支持。
+                    try {
+                        var fr = new FileReader();
+                        fr.onload = function () {
+                            audio.src = String(fr.result || '');
+                            var p2 = audio.play();
+                            if (p2 && p2.catch) {
+                                p2.catch(function (e2) {
+                                    fail('播放失败：' + ((e2 && e2.message) || e2));
+                                });
+                            }
+                        };
+                        fr.onerror = function () { fail('音频读取失败'); };
+                        fr.readAsDataURL(blob);
+                    } catch (e3) {
+                        fail('播放失败：' + ((e3 && e3.message) || e3));
                     }
                 });
             }
-        } catch (e) {
-            c.playing = false;
-            setCallStatus(T('聞き取り中…'), 'listening');
-        }
+        }).catch(function (e) {
+            fail('音频加载失败：' + ((e && e.message) || e));
+        });
     }
 
     // ------------------------------------------------------------
@@ -2990,59 +3034,170 @@
     }
 
     
-    window.dscCopyText = function(btn, text) {
-        navigator.clipboard.writeText(text).then(function() {
-            var orig = btn.innerHTML;
-            btn.innerHTML = '✅ 已复制';
-            btn.classList.add('is-copied');
-            setTimeout(function() {
-                btn.innerHTML = orig;
-                btn.classList.remove('is-copied');
-            }, 1500);
-        }).catch(function(e) {
-            toast('复制失败：' + e.message, 'error');
-        });
-    };
 
-    window.dscSpeakTrans = function(btn, text, lang) {
+    // ------------------------------------------------------------
+    // 语音朗读（下载落盘播放版）
+    //   流程：POST /api/tts → 后端用 Edge TTS 合成完整音频并落成文件
+    //        → 返回 audioUrl → 前端 <audio> 下载后播放。
+    //   说明：之前试过「边合成边播」的流式方案，在部分 WebView 里不稳定
+    //        （音频被自动播放策略静默拦截、mp3 分片追加失败导致无声），
+    //        现按要求回退到最稳妥的落盘播放，行为可预期、出错能看见。
+    // ------------------------------------------------------------
+    var TRANS_AUDIO = { audio: null };
+
+    /// 停掉通话中正在播放的人声（换新语音前必须先停，避免两段叠在一起）
+    function stopCallAudio() {
+        var c = S.call;
+        try {
+            if (c && c.audio) {
+                c.audio.pause();
+                c.audio.removeAttribute('src');
+                try { c.audio.load(); } catch (e2) {}
+            }
+        } catch (e) {}
+        if (c) {
+            // 释放上一段下载到内存的音频，避免长时间通话内存持续增长
+            if (c.lastObjUrl) {
+                try { URL.revokeObjectURL(c.lastObjUrl); } catch (e3) {}
+                c.lastObjUrl = '';
+            }
+            c.audio = null;
+            c.playing = false;
+        }
+    }
+
+    /// 停掉翻译朗读正在播放的音频
+    function stopTransAudio() {
+        try {
+            if (TRANS_AUDIO.audio) {
+                TRANS_AUDIO.audio.pause();
+                TRANS_AUDIO.audio.src = '';
+            }
+        } catch (e) {}
+        TRANS_AUDIO.audio = null;
+    }
+
+    /// 朗读翻译结果：合成落盘 → 下载播放（回退到稳定方案）
+    window.dscSpeakTrans = function (btn, text, lang) {
         var orig = btn.innerHTML;
         btn.innerHTML = '⏳ 播放中...';
         btn.classList.add('is-playing');
         btn.disabled = true;
-        
-        api('/tts', { method: 'POST', body: { text: text, voice: getTTSVoiceForLang(lang), lang: lang } }).then(function(d){
-            if(d.audioUrl) {
-                var audio = new Audio(d.audioUrl);
-                audio.onended = function() {
-                    btn.innerHTML = orig;
-                    btn.classList.remove('is-playing');
-                    btn.disabled = false;
-                };
-                audio.onerror = function() {
-                    btn.innerHTML = orig;
-                    btn.classList.remove('is-playing');
-                    btn.disabled = false;
-                };
-                audio.play().catch(function(e){ 
-                    toast('播放失败，请点击屏幕后再试', 'error'); 
-                    btn.innerHTML = orig;
-                    btn.classList.remove('is-playing');
-                    btn.disabled = false;
-                });
-            } else {
-                toast('合成失败', 'error');
-                btn.innerHTML = orig;
-                btn.classList.remove('is-playing');
-                btn.disabled = false;
-            }
-        }).catch(function(e){ 
-            toast('语音服务错误：' + e.message, 'error'); 
+        function restore() {
             btn.innerHTML = orig;
             btn.classList.remove('is-playing');
             btn.disabled = false;
+        }
+
+        api('/tts', {
+            method: 'POST',
+            body: { text: text, voice: getTTSVoiceForLang(lang), lang: lang }
+        }).then(function (d) {
+            if (!d.audioUrl) {
+                toast('合成失败：后端没有返回音频地址', 'error');
+                restore();
+                return;
+            }
+            stopTransAudio();
+            var audio = new Audio(d.audioUrl);
+            TRANS_AUDIO.audio = audio;
+            audio.onended = restore;
+            audio.onerror = function () { toast('音频加载失败，请稍后重试', 'error'); restore(); };
+            audio.play().catch(function () {
+                toast('播放被浏览器拦截，请先点一下页面再重试', 'error');
+                restore();
+            });
+        }).catch(function (e) {
+            toast('语音服务错误：' + e.message, 'error');
+            restore();
         });
     };
-            
+
+    // ------------------------------------------------------------
+    // 全双工通话的人声朗读（下载落盘播放版）
+    //   豆包账号没有可用的对话音色，声音统一交给 Edge TTS 渲染：
+    //   先请求 /api/tts 合成落盘拿到 audioUrl，再用 <audio> 播放。
+    //   音色必须经过 dscEdgeVoiceOf() 转换：直接把豆包音色 ID 丢给
+    //   Edge 合成会失败，表现就是「完全没有声音」，这正是之前的病根。
+    //   每段新语音开始前先停掉上一段，杜绝两段声音重叠、同一句读两遍。
+    // ------------------------------------------------------------
+    // 通话人声固定音色：爽快思思（豆包音色 ID）→ Edge 清晰女声。
+    //   豆包账号没有开通对话音色，voice 直接传豆包 ID 给 Edge 会合成失败（表现为完全没声音），
+    //   所以这里先按映射表转成合法的 Edge 女声名再发请求。
+    var CALL_VOICE_ID = 'zh_female_shuangkuaisisi_moon_bigtts';
+    function callVoice() { return dscEdgeVoiceOf(CALL_VOICE_ID, 'zh') || 'zh-CN-XiaoxiaoNeural'; }
+
+    // 去重表：记录最近朗读过的句子与时间，挡住「同一句读两遍」
+    var CALL_SAY = { lastText: '', lastAt: 0, recent: {} };
+
+    /// 归一化：去掉空白与标点，只留文字，用于重复判定
+    function normalizeSayText(s) {
+        return String(s == null ? '' : s)
+            .replace(/[\s\u3000]/g, '')
+            .replace(/[，。！？、；：,.!?;:"'“”‘’（）()【】\[\]—…·~～]/g, '');
+    }
+
+    /// 全双工通话中朗读一句回复
+    function dscSpeakCallText(text) {
+        var c = S.call;
+        if (!c || !c.active) return;
+        var t = String(text == null ? '' : text).trim();
+        if (!t) return;
+
+        var key = normalizeSayText(t);
+        if (!key) return;
+        var now = Date.now();
+
+        // 去重一：完全相同的句子，8 秒内只读一次。
+        //   服务端在一轮里可能连发两次 response.done，或把同一句重复推送，
+        //   只读一次就不会出现「一句话说两次」。
+        var seen = CALL_SAY.recent[key];
+        if (seen && now - seen < 8000) {
+            console.log('[CALL] 跳过重复语音：' + t.slice(0, 24));
+            return;
+        }
+        // 去重二：先发半句、再发整句时，整句已包含刚读过的半句，迟到的半句丢掉
+        if (CALL_SAY.lastText && key.length < CALL_SAY.lastText.length &&
+            CALL_SAY.lastText.indexOf(key) === 0 && now - CALL_SAY.lastAt < 4000) {
+            return;
+        }
+        CALL_SAY.lastText = key;
+        CALL_SAY.lastAt = now;
+        CALL_SAY.recent[key] = now;
+        // 清理超过 8 秒的记录，防止表无限增长
+        Object.keys(CALL_SAY.recent).forEach(function (k) {
+            if (now - CALL_SAY.recent[k] > 8000) delete CALL_SAY.recent[k];
+        });
+
+        stopCallAudio();
+        c.playing = true;
+        setCallStatus(T('読み上げ中…'), 'speaking');
+
+        var sayLang = 'zh';
+        api('/tts', {
+            method: 'POST',
+            body: {
+                text: t,
+                // 固定使用爽快思思对应的 Edge 女声，不再跟随设置里的豆包音色
+                //（账号没有该音色权限，跟随后会合成失败）
+                voice: callVoice(),
+                lang: sayLang
+            }
+        }).then(function (d) {
+            if (!S.call || !S.call.active) return;
+            if (!d.audioUrl) {
+                addBubble('sys', '语音合成失败：后端没有返回音频地址');
+                S.call.playing = false;
+                setCallStatus(T('聞き取り中…'), 'listening');
+                return;
+            }
+            playCallAudio(d.audioUrl);
+        }).catch(function (e) {
+            addBubble('sys', '语音合成出错：' + e.message);
+            if (S.call) S.call.playing = false;
+            setCallStatus(T('聞き取り中…'), 'listening');
+        });
+    }
 
     function openGlossaryModal() {
         ensureModal('dscDbGlossaryOverlay', buildGlossaryModal, false);

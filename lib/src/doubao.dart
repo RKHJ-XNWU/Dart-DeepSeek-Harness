@@ -320,7 +320,18 @@ Map<String, dynamic>? dbThinkingDisableParam(String model) {
 ///     都会触发搜索准入判定」→ 这里直接给空对象，最不容易被网关拒绝。
 /// 另外：tools 与 web_search_options 同时传入时，方舟只执行自定义工具、
 /// 联网搜索不生效 —— 所以工具模式下必须二选一（见 chat_send.dart）。
-Map<String, dynamic> dbWebSearchOptions() => <String, dynamic>{};
+/// ★ 修复：这里原先返回空 Map，等于「豆包联网搜索」根本没打开，
+/// 豆包模式被迫退回 DeepSeek 搜索（用 DeepSeek Key 计费、还慢）。
+/// 方舟 Chat Completions 的豆包自带搜索（月 2 万次免费额度）长这样：
+///   "web_search_options": { "search_type": "auto" }
+/// search_type 取值：auto（模型自行决定是否搜索）/ mandatory（强制搜索）
+/// / disabled（关闭）。
+Map<String, dynamic> dbWebSearchOptions({String searchType = 'auto'}) {
+  var st = searchType.trim().toLowerCase();
+  if (st != 'auto' && st != 'mandatory' && st != 'disabled') st = 'auto';
+  logp('🌐 豆包ネイティブ検索オプション: search_type=$st');
+  return <String, dynamic>{'search_type': st};
+}
 
 /// 图片内容片段（data URL 直传，模型自己看原图，不做二次转述）
 Map<String, dynamic> dbImagePart(String mime, String base64) => <String, dynamic>{
@@ -2060,9 +2071,11 @@ Future<Map<String, dynamic>> dbVoiceTurn({
   String text = '',
 }) async {
   final cfg = getDbConfig();
+  final __asrUsed = cfg.asrModel.trim().isEmpty ? DB_DEFAULT_ASR_MODEL : cfg.asrModel.trim();
+  final __chatUsed = model.isEmpty ? cfg.chatModel : model;
   final heard = text.trim().isNotEmpty
       ? text.trim()
-      : await dbTranscribeBytes(audio, fileName, model: cfg.asrModel);
+      : await dbTranscribeBytes(audio, fileName, model: __asrUsed);
   final langRule = dsLangSystemPrompt(lang);
   final sys = '''あなたは音声通話の相手です。$langRule
 音声で読み上げられるため、次の制約を厳守してください：
@@ -2079,29 +2092,24 @@ Future<Map<String, dynamic>> dbVoiceTurn({
   }
   msgs.add({'role': 'user', 'content': heard});
   final reply = await dbChatText(sys, msgs,
-      model: model.isEmpty ? cfg.chatModel : model,
+      model: __chatUsed,
       maxTokens: 800,
       temperature: 0.8);
-  List<int> audioBytes = [];
-  try {
-    audioBytes = await dbSpeech(reply, voice: voice, model: cfg.ttsModel);
-  } catch (e) {
-    logp('⚠️ 语音通话 TTS 合成失败: $e');
-  }
-  
-  if (audioBytes.isEmpty) {
-    logp('❌ 语音通话 TTS 返回为空，无法播放声音');
-  }
-  
-  final meta = saveDbBlob(audioBytes,
-      'doubao_voice_${fmtStamp14(DateTime.now())}', 'audio/mpeg', 'audio',
-      source: 'doubao-voice', prompt: heard);
+  // ★ 修复：语音通话不再「先合成成文件再让浏览器下载播放」。
+  //   豆包侧没有可用的对话音色，因此音频渲染统一交给 Edge TTS 的流式接口
+  //   /api/ds-chat/tts（边合成边推流，前端边收边播，零落地、零下载）。
+  //   这里只负责识别与生成文字，直接把文本交回前端即时朗读，延迟最低。
+  logp('🗣️ 语音通话：识别=$__asrUsed / 对话模型=$__chatUsed / 音色=Edge TTS 流式');
   return {
     'success': true,
     'userText': heard,
     'reply': reply,
-    'file': _fileJson(meta),
-    'audioUrl': meta == null ? '' : '/api/ds-files/download?id=${meta.id}',
+    'ttsEngine': 'edge',
+    'ttsVoice': '',
+    'asrModel': __asrUsed,
+    'chatModel': __chatUsed,
+    'ttsModel': cfg.ttsModel,
+    'audioUrl': '',
   };
 }
 

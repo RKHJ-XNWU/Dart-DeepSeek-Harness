@@ -32,6 +32,10 @@
         active: false,
         connecting: false,
         micOn: true,
+        // ★ 音色渲染开关：豆包侧没有可用的对话音色，默认由 Edge TTS 流式接管，
+        //   此时不再播放方舟回传的原生 PCM，避免「双声叠在一起」。
+        //   浏览器端如需原生气声，把 edgeVoice 设成 false 即可。
+        edgeVoice: true,
         stream: null,
         ctx: null,
         src: null,
@@ -43,6 +47,16 @@
         sources: [],
         lang: 'zh',
         voice: '',
+        // 待朗读文本：一轮回复可能分多段返回，先攒起来，等 response.done
+        // 一次性朗读，避免同一句话被读两遍。
+        pendingSay: '',
+        // 兜底朗读定时器：个别情况下服务端不发 response.done，
+        // 只发 output_text.done。没有这个兜底，文本攒住了却永远不出声
+        //（表现就是「通话一直不说话」）。攒到文本后 2.5 秒仍未收到
+        // response.done，就自己读一次。
+        sayTimer: null,
+        // 上一条已显示的气泡文本：服务端偶尔把同一句发两遍，界面上也要去重
+        lastBubbleText: '',
         instructions: '',
         sending: 0,
         reopened: 0
@@ -211,6 +225,30 @@
     }
 
     // ------------------------------------------------------------
+    // 朗读调度
+    // ------------------------------------------------------------
+    /// 把攒好的文本交给上层朗读，并清空队列（保证同一句只读一次）
+    function sayNow() {
+        if (D.sayTimer) { clearTimeout(D.sayTimer); D.sayTimer = null; }
+        var sayText = String(D.pendingSay || '').trim();
+        D.pendingSay = '';
+        if (sayText && D.edgeVoice && window.dscDuplex &&
+            typeof window.dscDuplex.onText === 'function') {
+            try { window.dscDuplex.onText(sayText); } catch (e) {}
+        }
+    }
+
+    /// 延时兜底：2.5 秒内没等到 response.done，就自己读一次
+    function saySoon() {
+        if (!D.edgeVoice) return;
+        if (D.sayTimer) clearTimeout(D.sayTimer);
+        D.sayTimer = setTimeout(function () {
+            D.sayTimer = null;
+            if (D.pendingSay) sayNow();
+        }, 2500);
+    }
+
+    // ------------------------------------------------------------
     // 下行事件
     // ------------------------------------------------------------
     function onMessage(ev) {
@@ -256,7 +294,30 @@
         if (t === 'response.output_text.done') {
             var tx = m.text || D.curText || '';
             D.curText = '';
-            if (tx) uiBubble('ai', tx);
+            if (tx) {
+                // 同一句重复到达时不再重复画气泡
+                if (tx !== D.lastBubbleText) {
+                    uiBubble('ai', tx);
+                    D.lastBubbleText = tx;
+                }
+                // ★ 这里只把文字攒进待朗读队列，不立刻回调朗读。
+                //   原先在本事件里直接朗读，一轮回复若分多段返回，
+                //   就会被读两遍（用户反馈的「一句话说两次」）。
+                //   现在统一等 response.done 再读一次，干净利落。
+                // 拼装待朗读文本，三种情况分别处理，确保同一句不会读两遍：
+                //   1) 还没有内容          → 直接作为第一段
+                //   2) 新文本包含已有内容  → 用新文本替换（服务端重复发整句）
+                //   3) 已有内容不含新片段  → 追加（正常的后续分段）
+                var prevSay = D.pendingSay;
+                if (!prevSay) {
+                    D.pendingSay = tx;
+                } else if (tx.indexOf(prevSay) === 0) {
+                    D.pendingSay = tx;
+                } else if (prevSay.indexOf(tx) < 0) {
+                    D.pendingSay = prevSay + tx;
+                }
+                saySoon();
+            }
             return;
         }
         if (t === 'response.output_audio.started') {
@@ -264,7 +325,8 @@
             return;
         }
         if (t === 'response.output_audio.delta') {
-            if (m.audio) playPcm(m.audio);
+            // Edge 接管音色时不播原生 PCM，否则会出现两路声音重叠
+            if (m.audio && !D.edgeVoice) playPcm(m.audio);
             return;
         }
         if (t === 'response.output_audio.done') {
@@ -273,6 +335,8 @@
         }
         if (t === 'response.done') {
             uiStatus(T('聞き取り中…'), 'listening');
+            // 一轮回复彻底结束，把攒好的整段文本交出去朗读（只读一次）。
+            sayNow();
             return;
         }
         if (t === 'response.function_call_arguments.done') {
@@ -364,6 +428,8 @@
         if (D.lang) q.push('lang=' + encodeURIComponent(D.lang));
         if (D.voice) q.push('voice=' + encodeURIComponent(D.voice));
         if (D.instructions) q.push('instructions=' + encodeURIComponent(D.instructions));
+        // Edge 接管音色：告诉后端不要指定豆包音色（账号无该音色权限时会直接被拒）
+        if (D.edgeVoice) q.push('edge=1');
         var url = proto + '//' + location.host + WS_PATH + (q.length ? ('?' + q.join('&')) : '');
 
         var ws;
@@ -393,7 +459,9 @@
                         input: { format: { type: 'pcm', rate: IN_RATE } },
                         output: {
                             format: { type: 'pcm_s16le', rate: OUT_RATE },
-                            voice: D.voice || undefined
+                            // Edge 接管音色时不再指定豆包音色（账号没有该音色权限，
+                            // 带上去反而会让 session.create 被拒），留空由服务端给默认值。
+                            voice: (D.edgeVoice ? undefined : (D.voice || undefined))
                         }
                     },
                     instructions: D.instructions || undefined
@@ -438,6 +506,8 @@
     }
 
     function stop() {
+        D.pendingSay = '';   // 断开连接：丢弃未朗读的旧句子
+        if (D.sayTimer) { clearTimeout(D.sayTimer); D.sayTimer = null; }
         if (D.ws) {
             try { send({ type: 'session.close' }); } catch (e) {}
             try { D.ws.close(1000, 'client close'); } catch (e) {}
@@ -461,6 +531,8 @@
     }
 
     function cancel() {
+        D.pendingSay = '';   // 打断：未朗读的旧句子一并作废
+        if (D.sayTimer) { clearTimeout(D.sayTimer); D.sayTimer = null; }
         stopPlayback();
         send({ type: 'response.cancel', event_id: newId() });
         uiStatus(T('聞き取り中…'), 'listening');
@@ -480,6 +552,8 @@
     }
 
     window.dscDuplex = {
+        // 由 dsc-doubao.js 覆盖：整句确定后回调，用于 Edge TTS 流式朗读
+        onText: null,
         start: start,
         stop: stop,
         cancel: cancel,
