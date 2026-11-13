@@ -418,4 +418,32 @@ screen_name パラメータを指定してください|Specify the screen_name p
 🖼️ 联网内容插件：附帯画像 |🖼️ Web-content plugin: attached image(s) 
 🖼️ 工具混用：附帯画像 |🖼️ Tool mixing: attached image(s) 
  枚を input_image として送信| sent as input_image
+ Seed-Audioの音声生成専用、ARK键とは別に设置します|For Seed-Audio audio generation only, configured separately from the ARK Key
+豆包オーディオ生成键（OpenSpeech）|Doubao Audio Generation Key (OpenSpeech)
+❌|❌
+生成失敗：{0}|Generation failed: {0}
+✅ 音声生成成功|✅ Audio generated successfully
+音声をダウンロード|Download audio
+オーディオシーンの説明（テキストプロンプト）|Audio scene description (text prompt)
+豆包オーディオ生成|Doubao audio generation
+豆包オーディオ生成キー（OpenSpeech）|Doubao audio generation key (OpenSpeech)
+Seed-Audioの音声生成専用。ARKキーとは別に設定します。|For Seed-Audio audio generation only. Configure separately from the ARK Key.
+豆包オーディオ生成（Seed-Audio）|Doubao audio generation (Seed-Audio)
+確定された|Confirmed
+シーン描写から、セリフ・効果音・BGMを含む完全な音声をエンドツーエンドで生成（最長2分）|Generate complete audio including dialogue, sound effects, and background music end-to-end from a scene description (up to 2 minutes)
+例：優しい女性が夜に童話をそっと語り、背景にかすかな虫の声が聞こえる|Example: A gentle woman softly tells a fairy tale at night, with faint insect sounds in the background
+例：童話|Example: fairy tale
+音声ファイル名（任意）|Audio file name (optional)
+生成時間|Generation duration
+自動（モデルが決定）|Auto (determined by the model)
+5秒|5 seconds
+10秒|10 seconds
+60秒（1分）|60 seconds (1 minute)
+120秒（2分）|120 seconds (2 minutes)
+オフ|Off
+生成開始|Start generation
+✅ 生成成功：{0}|✅ Generated successfully: {0}
+音声シーン描写を入力してください|Please enter an audio scene description
+生成中…（最大2分ほどかかる場合があります）|Generating… (may take up to 2 minutes)
+ファイル名：{0}|File name: {0}
 `);

@@ -418,4 +418,32 @@ screen_name パラメータを指定してください|Indiquez le paramètre sc
 🖼️ 联网内容插件：附帯画像 |🖼️ Plugin de contenu web : image(s) jointe(s) 
 🖼️ 工具混用：附帯画像 |🖼️ Mode mixte : image(s) jointe(s) 
  枚を input_image として送信| envoyée(s) comme input_image
+ Seed-Audioの音声生成専用、ARK键とは別に设置します|Uniquement pour la génération audio Seed-Audio, configurée séparément de la clé ARK
+豆包オーディオ生成键（OpenSpeech）|Clé de génération audio Doubao (OpenSpeech)
+❌|❌
+生成失敗：{0}|Échec de la génération : {0}
+✅ 音声生成成功|✅ Audio généré avec succès
+音声をダウンロード|Télécharger l'audio
+オーディオシーンの説明（テキストプロンプト）|Description de la scène audio (invite textuelle)
+豆包オーディオ生成|Génération audio Doubao
+豆包オーディオ生成キー（OpenSpeech）|Clé de génération audio Doubao (OpenSpeech)
+Seed-Audioの音声生成専用。ARKキーとは別に設定します。|Uniquement pour la génération audio Seed-Audio. À configurer séparément de la clé ARK.
+豆包オーディオ生成（Seed-Audio）|Génération audio Doubao (Seed-Audio)
+確定された|Confirmé
+シーン描写から、セリフ・効果音・BGMを含む完全な音声をエンドツーエンドで生成（最長2分）|Générer un audio complet incluant dialogues, effets sonores et musique de fond de bout en bout à partir d'une description de scène (jusqu'à 2 minutes)
+例：優しい女性が夜に童話をそっと語り、背景にかすかな虫の声が聞こえる|Exemple : une femme douce raconte doucement un conte la nuit, avec de faibles bruits d'insectes en arrière-plan
+例：童話|Exemple : conte de fées
+音声ファイル名（任意）|Nom du fichier audio (facultatif)
+生成時間|Durée de génération
+自動（モデルが決定）|Auto (déterminé par le modèle)
+5秒|5 secondes
+10秒|10 secondes
+60秒（1分）|60 secondes (1 minute)
+120秒（2分）|120 secondes (2 minutes)
+オフ|Désactivé
+生成開始|Démarrer la génération
+✅ 生成成功：{0}|✅ Généré avec succès : {0}
+音声シーン描写を入力してください|Veuillez saisir une description de scène audio
+生成中…（最大2分ほどかかる場合があります）|Génération en cours… (peut prendre jusqu'à 2 minutes)
+ファイル名：{0}|Nom du fichier : {0}
 `);

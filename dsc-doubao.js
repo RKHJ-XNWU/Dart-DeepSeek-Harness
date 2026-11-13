@@ -382,7 +382,7 @@
     // 再読込なしで言語を変えても、以前の言語の文言が残らないようにするため。
     var MENU_ITEMS = [
         { id: 'dscDbTtsBtn', ic: '🔊', label: T('豆包で音声生成'), tip: T('豆包音声生成'), open: function () { openTtsModal(); } },
-        { id: 'dscDbAudioGenBtn', ic: '🎬', label: T('豆包音频生成'), tip: T('豆包音频生成'), open: function () { openAudioGenModal(); } },
+        { id: 'dscDbAudioGenBtn', ic: '🎬', label: T('豆包オーディオ生成'), tip: T('豆包オーディオ生成'), open: function () { openAudioGenModal(); } },
         { id: 'dscDbImageBtn', ic: '🎨', label: T('豆包で画像生成'), tip: T('豆包画像生成'), open: function () { openImageModal(); } },
         { id: 'dscDbVideoBtn', ic: '🎬', label: T('豆包で動画生成'), tip: T('豆包動画生成'), open: function () { openVideoModal(); } },
         { id: 'dscDbPodcastBtn', ic: '🎧', label: T('豆包ポッドキャスト'), tip: T('豆包ポッドキャスト'), open: function () { openPodcastModal(); } },
@@ -570,8 +570,8 @@
         var keyInput = input('dscDbApiKey', 'password', 'ARK API Key を入力');
         card.appendChild(field('豆包 API Key', keyInput, '保存済みの場合、空欄なら変更しません'));
         var agkInput = input('dscDbAudioGenKey', 'password', 'OpenSpeech API Key を入力');
-        card.appendChild(field('豆包音频生成 Key (OpenSpeech)', agkInput, '仅用于 Seed-Audio 音频生成，与 ARK Key 分开配置'));
-        card.appendChild(field('ベース URL', input('dscDbBaseUrl', 'text', DB_BASE_PH(), ''), '既定：https://ark.cn-beijing.volces.com/api/v3'));
+        card.appendChild(field('豆包オーディオ生成キー（OpenSpeech）', agkInput, 'Seed-Audioの音声生成専用、ARKキーとは別に設定します'));
+        card.appendChild(field('ベース URL', input('dscDbBaseUrl', 'text', DB_BASE_PH(), ''), '確定された：https://ark.cn-beijing.volces.com/api/v3'));
 
         var grid = el('div', 'dsc-db-grid');
         grid.appendChild(field('対話モデル', select('dscDbChatModel', modelsByCat('chat'))));
@@ -903,19 +903,19 @@
     }
 
     function buildAudioGenModal() {
-        var md = buildModal('dscDbAudioGenOverlay', '🎬', '豆包音频生成 (Seed-Audio)', '通过场景描述，端到端生成包含对白、音效、配乐的完整音频（最长 2 分钟）。');
+        var md = buildModal('dscDbAudioGenOverlay', '🎬', '豆包オーディオ生成（Seed-Audio）', 'シーン描写から、セリフ・効果音・BGMを含む完全な音声をエンドツーエンドで生成（最長2分）');
         
-        md.appendChild(field('音频场景描述（text_prompt）', textarea('dscDbAudioGenPrompt', '例：一个温柔的女生在夜里轻轻讲述一个童话故事，背景有微弱的虫鸣声')));
-        md.appendChild(field('音频文件名（可选）', input('dscDbAudioGenName', 'text', '例：童话故事')));
-        md.appendChild(field('生成时长', select('dscDbAudioGenDuration', [
-            { value: '0', label: '自动（由模型决定）' },
-            { value: '5', label: '5 秒' },
-            { value: '10', label: '10 秒' },
-            { value: '15', label: '15 秒' },
-            { value: '30', label: '30 秒' },
-            { value: '60', label: '60 秒（1 分钟）' },
-            { value: '80', label: '80 秒' },
-            { value: '120', label: '120 秒（2 分钟）' }
+        md.appendChild(field('オーディオシーンの説明（テキストプロンプト）', textarea('dscDbAudioGenPrompt', '例：優しい女性が夜に童話をそっと語り、背景にかすかな虫の声が聞こえる')));
+        md.appendChild(field('音声ファイル名（任意）', input('dscDbAudioGenName', 'text', '例：童話')));
+        md.appendChild(field('生成時間', select('dscDbAudioGenDuration', [
+            { value: '0', label: '自動（モデルが決定）' },
+            { value: '5', label: '5秒' },
+            { value: '10', label: '10秒' },
+            { value: '15', label: '15秒' },
+            { value: '30', label: '30秒' },
+            { value: '60', label: '60秒（1分）' },
+            { value: '80', label: '80秒' },
+            { value: '120', label: '120秒（2分）' }
         ], '0')));
 
         var st = el('div', 'dsc-db-status');
@@ -927,9 +927,9 @@
         md.appendChild(res);
 
         var foot = el('div', 'dsc-db-footer');
-        var close = el('button', 'dsc-db-btn', T('关闭'));
+        var close = el('button', 'dsc-db-btn', T('オフ'));
         close.type = 'button';
-        var go = el('button', 'dsc-db-btn primary', T('开始生成'));
+        var go = el('button', 'dsc-db-btn primary', T('生成開始'));
         go.type = 'button';
         go.id = 'dscDbAudioGenGo';
         foot.appendChild(close);
@@ -939,10 +939,10 @@
         close.addEventListener('click', function () { closeModal('dscDbAudioGenOverlay'); });
         go.addEventListener('click', async function () {
             var prompt = ($('dscDbAudioGenPrompt') || {}).value || '';
-            if (!prompt.trim()) { setStatus(st, '⚠️ ' + T('请填写音频场景描述'), 'err'); return; }
+            if (!prompt.trim()) { setStatus(st, '⚠️ ' + T('音声シーン描写を入力してください'), 'err'); return; }
             
             go.disabled = true;
-            setStatus(st, T('生成中…（最长可能需要 2 分钟）'), 'busy');
+            setStatus(st, T('生成中…（最大2分ほどかかる場合があります）'), 'busy');
             
             try {
                 var d = await api('/audio-generate', {
@@ -960,22 +960,22 @@
                 au.controls = true;
                 au.style.width = '100%';
                 res.appendChild(au);
-                res.appendChild(el('div', 'dsc-db-filename', T('文件名：{0}', f.name || '')));
+                res.appendChild(el('div', 'dsc-db-filename', T('ファイル名：{0}', f.name || '')));
                 
                 var row = el('div', 'dsc-db-row');
                 row.style.marginTop = '10px';
-                var dl = el('button', 'dsc-db-btn primary', T('下载音频'));
+                var dl = el('button', 'dsc-db-btn primary', T('音声をダウンロード'));
                 dl.type = 'button';
                 dl.addEventListener('click', function () { openExternal(downloadUrl(f)); });
                 row.appendChild(dl);
                 res.appendChild(row);
                 
                 setStatus(st, T('✅ 生成成功：{0}', f.name || ''), 'ok');
-                toast(T('✅ 音频生成成功'), 'success');
+                toast(T('✅ 音声生成成功'), 'success');
                 refreshFiles();
             } catch (e) {
-                setStatus(st, '❌ ' + T('生成失败：{0}', e.message), 'err');
-                toast(T('生成失败：{0}', e.message), 'error');
+                setStatus(st, '❌ ' + T('生成失敗：{0}', e.message), 'err');
+                toast(T('生成失敗：{0}', e.message), 'error');
             } finally {
                 go.disabled = false;
             }
