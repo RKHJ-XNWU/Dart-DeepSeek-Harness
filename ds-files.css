@@ -476,3 +476,25 @@
     .dsc-upload-zone { padding: 14px 10px; }
     .dsc-upload-zone .icon { font-size: 1.5rem; }
 }
+/* 修复文件管理头部布局，让清空按钮紧贴标题，关闭按钮靠最右 */
+.dsc-files-header {
+    justify-content: flex-start !important;
+    gap: 10px !important;
+}
+.dsc-files-title {
+    margin-right: auto; /* 将后续按钮推向右侧 */
+}
+/* 清空按钮专属样式 */
+#dscFilesClearAllBtn {
+    width: auto !important;
+    padding: 0 12px !important;
+    height: 30px;
+    margin: 0 !important;
+    color: #ef4444 !important;
+    border-color: #fecaca !important;
+    background: #fef2f2 !important;
+}
+#dscFilesClearAllBtn:hover {
+    background: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+}

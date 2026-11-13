@@ -65,6 +65,7 @@ const List<DbModelSpec> dbModelCatalog = <DbModelSpec>[
   DbModelSpec('doubao-seed-2-1-pro-260628', 'Doubao-Seed-2.1-pro', 'chat'),
   DbModelSpec('doubao-seed-2-1-turbo-260628', 'Doubao-Seed-2.1-turbo', 'chat'),
   DbModelSpec('doubao-seed-2-0-lite-260428', 'Doubao-Seed-2.0-lite', 'chat'),
+  DbModelSpec('doubao-seedream-5-5-261028', '生图5.5升级版', 'image'),
 ];
 
 /// 图片风格预置（前端展示，选中后拼进提示词；也允许自定义）
@@ -376,6 +377,8 @@ class DbConfig {
   String ttsModel;
   String podcastModel;
   String asrModel;
+  String translateModel;
+  String translateApiKey;
   String realtimeModel;
   String voice;
   String voiceB;
@@ -429,6 +432,8 @@ class DbConfig {
     this.ttsModel = DB_DEFAULT_TTS_MODEL,
     this.podcastModel = DB_DEFAULT_PODCAST_MODEL,
     this.asrModel = DB_DEFAULT_ASR_MODEL,
+    this.translateModel = 'Doubao-Seed-Translation',
+    this.translateApiKey = '',
     this.realtimeModel = DB_DEFAULT_REALTIME_MODEL,
     this.voice = DB_DEFAULT_VOICE,
     this.voiceB = DB_DEFAULT_VOICE_B,
@@ -462,6 +467,8 @@ class DbConfig {
         'ttsModel': ttsModel,
         'podcastModel': podcastModel,
         'asrModel': asrModel,
+        'translateModel': translateModel,
+        'translateApiKey': translateApiKey,
         'realtimeModel': realtimeModel,
         'voice': voice,
         'voiceB': voiceB,
@@ -494,6 +501,8 @@ class DbConfig {
         ttsModel: trimOr(mStr(j, 'ttsModel'), DB_DEFAULT_TTS_MODEL),
         podcastModel: trimOr(mStr(j, 'podcastModel'), DB_DEFAULT_PODCAST_MODEL),
         asrModel: trimOr(mStr(j, 'asrModel'), DB_DEFAULT_ASR_MODEL),
+        translateModel: trimOr(mStr(j, 'translateModel'), 'Doubao-Seed-Translation'),
+        translateApiKey: mStr(j, 'translateApiKey'),
         realtimeModel:
             trimOr(mStr(j, 'realtimeModel'), DB_DEFAULT_REALTIME_MODEL),
         voice: trimOr(mStr(j, 'voice'), DB_DEFAULT_VOICE),
@@ -2073,7 +2082,17 @@ Future<Map<String, dynamic>> dbVoiceTurn({
       model: model.isEmpty ? cfg.chatModel : model,
       maxTokens: 800,
       temperature: 0.8);
-  final audioBytes = await dbSpeech(reply, voice: voice, model: cfg.ttsModel);
+  List<int> audioBytes = [];
+  try {
+    audioBytes = await dbSpeech(reply, voice: voice, model: cfg.ttsModel);
+  } catch (e) {
+    logp('⚠️ 语音通话 TTS 合成失败: $e');
+  }
+  
+  if (audioBytes.isEmpty) {
+    logp('❌ 语音通话 TTS 返回为空，无法播放声音');
+  }
+  
   final meta = saveDbBlob(audioBytes,
       'doubao_voice_${fmtStamp14(DateTime.now())}', 'audio/mpeg', 'audio',
       source: 'doubao-voice', prompt: heard);
@@ -2149,6 +2168,9 @@ Map<String, dynamic> _configJson() {
     'ttsModel': cfg.ttsModel,
     'podcastModel': cfg.podcastModel,
     'asrModel': cfg.asrModel,
+    'translateModel': cfg.translateModel,
+    'hasTranslateKey': cfg.translateApiKey.trim().isNotEmpty,
+    'maskedTranslateKey': cfg.translateApiKey.length > 8 ? '${cfg.translateApiKey.substring(0, 4)}••••${cfg.translateApiKey.substring(cfg.translateApiKey.length - 4)}' : (cfg.translateApiKey.isNotEmpty ? '••••••••' : ''),
     'realtimeModel': cfg.realtimeModel,
     'voice': cfg.voice,
     'voiceB': cfg.voiceB,
@@ -2206,6 +2228,10 @@ Future<void> handleDbConfig(HttpRequest req) async {
     ttsModel: trimOr(mStr(body, 'ttsModel'), old.ttsModel),
     podcastModel: trimOr(mStr(body, 'podcastModel'), old.podcastModel),
     asrModel: trimOr(mStr(body, 'asrModel'), old.asrModel),
+    translateModel: trimOr(mStr(body, 'translateModel'), old.translateModel),
+    translateApiKey: (body.containsKey('translateApiKey') && mStr(body, 'translateApiKey').trim().isNotEmpty) 
+        ? mStr(body, 'translateApiKey').trim() 
+        : old.translateApiKey,
     realtimeModel: trimOr(mStr(body, 'realtimeModel'), old.realtimeModel),
     voice: trimOr(mStr(body, 'voice'), old.voice),
     voiceB: trimOr(mStr(body, 'voiceB'), old.voiceB),

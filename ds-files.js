@@ -337,6 +337,29 @@
         }
         if (closeBtn) closeBtn.addEventListener('click', function () { panel.classList.remove('open'); });
 
+        var clearBtn = $('dscFilesClearAllBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', async function () {
+                if (!confirm('确定要清空所有文件吗？此操作不可恢复！')) return;
+                clearBtn.disabled = true;
+                clearBtn.textContent = '清空中...';
+                try {
+                    var res = await fetch('/api/ds-files/clear-all', { method: 'DELETE' });
+                    if (!res.ok) throw new Error('清空失败');
+                    dsToast('已清空所有文件', 'success');
+                    dsFiles = [];
+                    attachedFileIds = [];
+                    renderDsFiles();
+                    renderAttachBar();
+                } catch (e) {
+                    dsToast('清空失败: ' + e.message, 'error');
+                } finally {
+                    clearBtn.disabled = false;
+                    clearBtn.textContent = '🗑️ 清空';
+                }
+            });
+        }
+
         var zone = $('dscUploadZone');
         var fileInput = $('dscFileInput');
         if (zone && fileInput) {

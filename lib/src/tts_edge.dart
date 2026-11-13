@@ -72,8 +72,37 @@ String _xmlEscape(String s) => s
     .replaceAll("'", '&apos;');
 
 /// 合成单块文本，音频字节通过 onAudio 回调流出。
+/// 带有最多 3 次自动重试机制，防止网络波动导致无声。
 /// 返回是否成功收到音频。
 Future<bool> synthesizeEdgeTts(
+  String text,
+  String voice,
+  Future<void> Function(List<int> audio) onAudio, {
+  Duration timeout = const Duration(seconds: 60),
+  String pitch = '+0Hz',
+  String rate = '+0%',
+  String volume = '+0%',
+}) async {
+  for (var attempt = 0; attempt < 3; attempt++) {
+    final ok = await _synthesizeEdgeTtsOnce(
+      text,
+      voice,
+      onAudio,
+      timeout: timeout,
+      pitch: pitch,
+      rate: rate,
+      volume: volume,
+    );
+    if (ok) return true;
+    if (attempt < 2) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+  return false;
+}
+
+/// 实际的单次 WebSocket 合成逻辑
+Future<bool> _synthesizeEdgeTtsOnce(
   String text,
   String voice,
   Future<void> Function(List<int> audio) onAudio, {

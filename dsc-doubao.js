@@ -388,6 +388,8 @@
         { id: 'dscDbPodcastBtn', ic: '🎧', label: T('豆包ポッドキャスト'), tip: T('豆包ポッドキャスト'), open: function () { openPodcastModal(); } },
         { id: 'dscDbCallBtn', ic: '📞', label: T('豆包音声通話'), tip: T('豆包音声通話'), open: function () { openCallModal(); } },
         { id: 'dscDbAsrBtn', ic: '🎤', label: T('録音ファイルを豆包で認識'), tip: T('豆包録音ファイル認識'), open: function () { openAsrModal(); } },
+        { id: 'dscDbTranslateBtn', ic: '🌐', label: T('豆包机器翻译'), tip: T('豆包机器翻译'), open: function () { openTranslateModal(); } },
+        // 术语表隐藏
         { id: 'dscDbEditBtn', ic: '🖌️', label: T('豆包P图'), tip: T('豆包P图'), open: function () { openEditModal(); } }
     ];
 
@@ -582,6 +584,7 @@
         grid.appendChild(field('音声合成モデル', select('dscDbTtsModel', modelsByCat('tts'))));
         grid.appendChild(field('ポッドキャストモデル', select('dscDbPodcastModel', modelsByCat('podcast'))));
         grid.appendChild(field('音声認識モデル', select('dscDbAsrModel', modelsByCat('asr'))));
+        grid.appendChild(field('翻译模型（文本输入）', input('dscDbTranslateModel', 'text', 'Doubao-Seed-Translation')));
         grid.appendChild(field('リアルタイム音声モデル', select('dscDbRealtimeModel', modelsByCat('realtime'))));
         grid.appendChild(field('TTS リソース ID（任意）', input('dscDbTtsRes', 'text', '例：seed-tts-2.0', '')));
         card.appendChild(grid);
@@ -738,6 +741,7 @@
             dscDbTtsModel: c.ttsModel,
             dscDbPodcastModel: c.podcastModel,
             dscDbAsrModel: c.asrModel,
+            dscDbTranslateModel: c.translateModel,
             dscDbRealtimeModel: c.realtimeModel,
             dscDbTtsRes: c.ttsResourceId,
             dscDbVoiceA: c.voice,
@@ -762,6 +766,8 @@
         if (agk) {
             agk.value = '';
             agk.placeholder = c.hasAudioGenKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedAudioGenKey) : T('音频生成 API Key を入力');
+        var tk = $('dscDbTranslateApiKey');
+        if (tk) { tk.value = ''; tk.placeholder = c.hasTranslateKey ? T('保存済み（{0}）。空欄なら変更しません', c.maskedTranslateKey) : T('翻译专用 API Key を入力'); }
         }
         DB_WEB_SOURCES = Array.isArray(c.webSources) ? c.webSources.slice() : [];
         /* v6 修复：总闸只做「首次初始化」，不再被后端配置反复回写。
@@ -807,6 +813,7 @@
             ttsModel: ($('dscDbTtsModel') || {}).value || '',
             podcastModel: ($('dscDbPodcastModel') || {}).value || '',
             asrModel: ($('dscDbAsrModel') || {}).value || '',
+            translateModel: ($('dscDbTranslateModel') || {}).value || '',
             realtimeModel: ($('dscDbRealtimeModel') || {}).value || '',
             ttsResourceId: ($('dscDbTtsRes') || {}).value || '',
             voice: ($('dscDbVoiceA') || {}).value || '',
@@ -2097,19 +2104,7 @@
 
         // 弹窗每次打开都会重建 DOM，因此用事件委托挂在 bodyEl 上，
         // 并以 select 的当前值为准渲染，避免监听器随重建丢失。
-        bodyEl.addEventListener('change', function (ev) {
-            var t = ev.target;
-            if (!t || t.id !== 'dscDbCallMode') return;
-            writeCallMode(t.value);
-            renderCallExtra(t.value);
-            if (t.value === 'duplex') {
-                addBubble('sys', T('全双工モードに切り替えました。開始を押すとそのまま繋がります。'));
-            } else if (t.value === 'rtc') {
-                addBubble('sys', T('RTC モードに切り替えました。ルーム ID を入れて起動してください。'));
-            } else {
-                addBubble('sys', T('ターン制モードに切り替えました。'));
-            }
-        });
+        
 
         var actions = el('div', 'dsc-db-call-actions');
         var start = el('button', 'dsc-db-btn primary', T('通話を開始'));
@@ -2228,94 +2223,83 @@
 
     async function startCall() {
         if (S.call && S.call.active) return;
-        var modeNow = (($('dscDbCallMode') || {}).value) || readCallMode();
-        if (modeNow === 'rtc') {
-            if (!window.dscRtc) {
-                addBubble('sys', T('RTC モジュールが読み込まれていません'));
-                return;
-            }
-            var room0 = (($('dscDbRtcRoom') || {}).value || '').trim();
-            if (!room0) {
-                addBubble('sys', T('ルーム ID を入力してください'));
-                return;
-            }
-            S.call = newCallState();
-            S.call.active = true;
-            S.call.rtc = true;
-            window.dscRtc.bind(addBubble, setCallStatus);
-            var r0 = await window.dscRtc.start({
-                roomId: room0,
-                userId: (($('dscDbRtcUser') || {}).value || 'dsc_user').trim(),
-                mixedMode: !!((($('dscDbRtcMixed') || {}).checked)),
-                voice: (($('dscDbRtcVoice') || {}).value || '').trim(),
-                lang: ((S.cfg || {}).duplexLang || 'zh'),
-                llmModel: ((S.cfg || {}).chatModel || '')
-            });
-            var out0 = $('dscDbRtcOut');
-            if (out0) out0.textContent = (r0 && r0.ok) ? ('TaskId: ' + r0.taskId) : T('起動失敗');
-            return;
-        }
-        if (modeNow === 'duplex') {
-            if (!window.dscDuplex) {
-                toast(T('全双工モジュールが読み込まれていません'), 'error');
-                return;
-            }
-            S.call = newCallState();
-            S.call.active = true;
-            S.call.duplex = true;
-            S.call.micOn = true;
-            S.call.history = [];
-            await window.dscDuplex.start();
-            return;
-        }
+        
+        try {
+            var unlock = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+            unlock.play().catch(function(){});
+        } catch(e) {}
+
         S.call = newCallState();
-        var c = S.call;
-        addBubble('sys', T('マイクへのアクセスを要求しています…'));
-        try {
-            c.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-            addBubble('sys', T('マイクを使用できません：{0}。下の入力欄から送信できます。', e.message || e));
-            setCallStatus(T('マイク使用不可'), '');
-            c.active = true;
+        S.call.active = true;
+        S.call.micOn = true;
+        S.call.duplex = true; 
+        
+        var logBox = $('dscDbCallLog');
+        if (logBox) logBox.innerHTML = '';
+        addBubble('sys', '正在连接全双工服务...');
+
+        if (!window.dscDuplex) {
+            addBubble('sys', '全双工模块未加载');
             return;
         }
+
+        // ★ 拦截后端发来的文字，强制走 Edge TTS
+        window.dscDuplex.onText = function (text) {
+            if (!S.call || !S.call.active || !text.trim()) return;
+            addBubble('ai', text);
+            setCallStatus(T('読み上げ中…'), 'speaking');
+
+            // 直接请求后端的 Edge TTS 接口发声
+            api('/tts', {
+                method: 'POST',
+                body: {
+                    text: text,
+                    voice: (S.cfg && S.cfg.voice) || 'zh-CN-XiaoxiaoNeural',
+                    lang: (S.cfg && S.cfg.duplexLang) || 'zh'
+                }
+            }).then(function(d) {
+                if (d.audioUrl && S.call && S.call.active) {
+                    if (S.call.audio) S.call.audio.pause();
+                    S.call.audio = new Audio(d.audioUrl);
+                    S.call.playing = true;
+                    S.call.audio.onended = function() {
+                        S.call.playing = false;
+                        setCallStatus(T('聞き取り中…'), 'listening');
+                    };
+                    S.call.audio.play().catch(function(e){
+                        console.error('播放被拦截:', e);
+                        setCallStatus(T('聞き取り中…'), 'listening');
+                    });
+                } else {
+                    setCallStatus(T('聞き取り中…'), 'listening');
+                }
+            }).catch(function(e) {
+                console.error('[DB] Edge TTS 失败:', e);
+                setCallStatus(T('聞き取り中…'), 'listening');
+            });
+        };
+
         try {
-            var AC = window.AudioContext || window.webkitAudioContext;
-            c.ctx = new AC();
-            var src = c.ctx.createMediaStreamSource(c.stream);
-            c.analyser = c.ctx.createAnalyser();
-            c.analyser.fftSize = 1024;
-            src.connect(c.analyser);
-        } catch (e) { /* VAD なしでも録音は可能 */ }
-        c.active = true;
-        c.micOn = true;
-        addBubble('sys', T('通話を開始しました。話しかけてください。'));
-        setCallStatus(T('聞き取り中…'), 'listening');
-        c.loopTimer = setInterval(callLoop, 300);
+            await window.dscDuplex.start();
+            setCallStatus('已连接（全双工）', 'listening');
+            addBubble('sys', '连接成功，请说话！');
+        } catch(e) {
+            addBubble('sys', '连接失败：' + e.message);
+            setCallStatus('连接错误', '');
+        }
     }
 
     function stopCall() {
         var c = S.call;
         if (!c) return;
-        if (c.rtc && window.dscRtc) {
-            try { window.dscRtc.stop(); } catch (e) {}
-        }
         if (c.duplex && window.dscDuplex) {
             try { window.dscDuplex.stop(); } catch (e) {}
         }
-        c.duplex = false;
         c.active = false;
-        if (c.loopTimer) { clearInterval(c.loopTimer); c.loopTimer = null; }
-        try { if (c.recorder && c.recording) c.recorder.stop(); } catch (e) {}
-        c.recording = false;
-        try { if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
-        c.stream = null;
-        try { if (c.ctx && c.ctx.close) c.ctx.close(); } catch (e) {}
-        c.ctx = null;
-        try { if (c.audio) { c.audio.pause(); c.audio.src = ''; } } catch (e) {}
-        c.audio = null;
-        c.playing = false;
-        c.thinking = false;
+        c.duplex = false;
+        if (c.audio) { c.audio.pause(); c.audio = null; }
+        setCallStatus('待機中', '');
+        addBubble('sys', '通话已结束。');
     }
 
     function toggleMic() {
@@ -2344,8 +2328,8 @@
 
     function callLoop() {
         var c = S.call;
-        if (!c || !c.active) return;
-        if (c.playing || c.thinking || !c.micOn || !c.analyser || c.recording) return;
+        if (!c || !c.active || c.playing || c.thinking || !c.micOn || !c.analyser || c.recording) return;
+        
         var buf = new Uint8Array(c.analyser.fftSize);
         c.analyser.getByteTimeDomainData(buf);
         var sum = 0;
@@ -2354,16 +2338,21 @@
             sum += v * v;
         }
         var rms = Math.sqrt(sum / buf.length);
-        if (rms > 0.055) {
-            c.voiceFrames++;
+        
+        // ★ 修复：降低阈值到 0.015，只要稍微有点声音就开始录音
+        if (rms > 0.015) {
+            c.voiceFrames = (c.voiceFrames || 0) + 1;
             if (c.voiceFrames >= 2 && !c.recording) {
                 startRec();
             }
         } else {
             c.voiceFrames = 0;
             if (c.recording) {
-                c.silenceMs += 300;
-                if (c.silenceMs >= 900) stopRec();
+                // 停顿 1.2 秒没有声音就切断
+                c.silenceMs = (c.silenceMs || 0) + 200;
+                if (c.silenceMs >= 1200) {
+                    stopRec();
+                }
             }
         }
     }
@@ -2488,6 +2477,12 @@
                     c.playing = false;
                     addBubble('sys', T('自動再生がブロックされました：{0}', e.message || e));
                     setCallStatus(T('聞き取り中…'), 'listening');
+                    // 二次兜底：部分浏览器需用户点击才能播放
+                    if (window.confirm("浏览器拦截了音频播放，是否尝试手动点击播放？")) {
+                        var manualAudio = new Audio(url);
+                        manualAudio.play();
+                        c.audio = manualAudio;
+                    }
                 });
             }
         } catch (e) {
@@ -2895,5 +2890,289 @@
     } else {
         boot();
     }
+
+    
+    // ------------------------------------------------------------
+    // 豆包机器翻译（支持32国语言，全功能版）
+    // ------------------------------------------------------------
+    var TRANSLATE_LANGS = [
+        { value: 'zh', label: '中文（简体）' }, { value: 'zh-Hant', label: '中文（繁体）' },
+        { value: 'en', label: '英语' }, { value: 'ja', label: '日语' },
+        { value: 'ko', label: '韩语' }, { value: 'fr', label: '法语' },
+        { value: 'de', label: '德语' }, { value: 'es', label: '西班牙语' },
+        { value: 'ru', label: '俄语' }, { value: 'pt', label: '葡萄牙语' },
+        { value: 'it', label: '意大利语' }, { value: 'ar', label: '阿拉伯语' },
+        { value: 'th', label: '泰语' }, { value: 'vi', label: '越南语' },
+        { value: 'id', label: '印尼语' }, { value: 'ms', label: '马来语' },
+        { value: 'hi', label: '印地语' }, { value: 'tr', label: '土耳其语' },
+        { value: 'nl', label: '荷兰语' }, { value: 'pl', label: '波兰语' },
+        { value: 'uk', label: '乌克兰语' }, { value: 'ro', label: '罗马尼亚语' },
+        { value: 'el', label: '希腊语' }, { value: 'cs', label: '捷克语' },
+        { value: 'sv', label: '瑞典语' }, { value: 'da', label: '丹麦语' },
+        { value: 'fi', label: '芬兰语' }, { value: 'hu', label: '匈牙利语' },
+        { value: 'bg', label: '保加利亚语' }, { value: 'sk', label: '斯洛伐克语' },
+        { value: 'he', label: '希伯来语' }, { value: 'fa', label: '波斯语' }
+    ];
+
+    function getTTSVoiceForLang(langCode) {
+        var map = {
+            'zh': 'zh-CN-XiaoyiNeural', 'zh-Hant': 'zh-TW-HsiaoChenNeural',
+            'en': 'en-US-AriaNeural', 'ja': 'ja-JP-NanamiNeural',
+            'ko': 'ko-KR-SunHiNeural', 'fr': 'fr-FR-DeniseNeural',
+            'de': 'de-DE-KatjaNeural', 'es': 'es-ES-ElviraNeural',
+            'ru': 'ru-RU-SvetlanaNeural', 'pt': 'pt-BR-FranciscaNeural',
+            'it': 'it-IT-ElsaNeural', 'ar': 'ar-SA-ZariyahNeural',
+            'th': 'th-TH-PremwadeeNeural', 'vi': 'vi-VN-HoaiMyNeural',
+            'id': 'id-ID-GadisNeural', 'ms': 'ms-MY-YasminNeural',
+            'hi': 'hi-IN-SwaraNeural', 'tr': 'tr-TR-EmelNeural',
+            'nl': 'nl-NL-ColetteNeural', 'pl': 'pl-PL-ZofiaNeural',
+            'uk': 'uk-UA-PolinaNeural', 'ro': 'ro-RO-EmilNeural',
+            'el': 'el-GR-AthinaNeural', 'cs': 'cs-CZ-VlastaNeural',
+            'sv': 'sv-SE-SofieNeural', 'da': 'da-DK-ChristelNeural',
+            'fi': 'fi-FI-NooraNeural', 'hu': 'hu-HU-NoemiNeural',
+            'bg': 'bg-BG-KalinaNeural', 'sk': 'sk-SK-ViktoriaNeural',
+            'he': 'he-IL-HilaNeural', 'fa': 'fa-IR-DilaraNeural'
+        };
+        return map[langCode] || 'zh-CN-XiaoxiaoNeural';
+    }
+
+    function openTranslateModal() {
+        ensureModal('dscDbTranslateOverlay', buildTranslateModal, false);
+        openModal('dscDbTranslateOverlay');
+    }
+
+    function buildTranslateModal() {
+        var md = buildModal('dscDbTranslateOverlay', '🌐', '豆包机器翻译', '支持 32 种语言互译。');
+        var langRow = el('div', 'dsc-db-grid');
+        langRow.appendChild(field('源语言（不选则自动检测）', select('dscDbTransSrcLang', 
+            [{ value: '', label: '自动检测' }].concat(TRANSLATE_LANGS), '')));
+        langRow.appendChild(field('目标语言（必填）', select('dscDbTransTgtLang', TRANSLATE_LANGS, 'zh')));
+        md.appendChild(langRow);
+
+        md.appendChild(field('待翻译文本（每行一条）', textarea('dscDbTransText', '请输入文本...')));
+        
+        var st = el('div', 'dsc-db-status'); st.id = 'dscDbTransStatus'; md.appendChild(st);
+        var res = el('div', 'dsc-db-result'); res.id = 'dscDbTransResult'; md.appendChild(res);
+        
+        var foot = el('div', 'dsc-db-footer');
+        var close = el('button', 'dsc-db-btn', T('关闭'));
+        var go = el('button', 'dsc-db-btn primary', T('翻译'));
+        foot.appendChild(close); foot.appendChild(go); md.appendChild(foot);
+        
+        close.onclick = function () { closeModal('dscDbTranslateOverlay'); };
+        go.onclick = function () {
+            var raw = $('dscDbTransText').value;
+            var lines = raw.split('\n').filter(function(s){return s.trim().length>0;});
+            if (!lines.length) return;
+
+            go.disabled = true; setStatus(st, '翻译中...', 'busy');
+            api('/translate', { method: 'POST', body: { target_language: $('dscDbTransTgtLang').value, text_list: lines, source_language: $('dscDbTransSrcLang').value } }).then(function(d){
+                var list = d.data.translation_list || [];
+                var html = '<div class="dsc-db-trans-result">';
+                list.forEach(function(item, i){
+                    var text = item.translation || '';
+                    var safeText = text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += '<div class="dsc-db-trans-item" style="background:#f9fafb;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid #eef0f4;">';
+                    html += '<div style="color:#6b7280;font-size:0.8rem;margin-bottom:6px;">' + lines[i] + '</div>';
+                    html += '<div style="font-weight:600;margin-bottom:10px;">' + text + '</div>';
+                    html += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
+                    html += '<button class="dsc-db-btn dsc-btn-anim" onclick="window.dscCopyText(this, \'' + safeText + '\')">📋 复制</button>';
+                    html += '<button class="dsc-db-btn dsc-btn-anim" onclick="window.dscSpeakTrans(this, \'' + safeText + '\', \'' + $('dscDbTransTgtLang').value + '\')">🔊 朗读</button>';
+                    html += '</div></div>';
+                });
+                html += '</div>';
+                $('dscDbTransResult').innerHTML = html;
+                setStatus(st, '✅ 翻译成功', 'ok');
+            }).catch(function(e){ 
+                setStatus(st, '❌ ' + e.message, 'err'); 
+            }).finally(function(){ go.disabled = false; });
+        };
+    }
+
+    
+    window.dscCopyText = function(btn, text) {
+        navigator.clipboard.writeText(text).then(function() {
+            var orig = btn.innerHTML;
+            btn.innerHTML = '✅ 已复制';
+            btn.classList.add('is-copied');
+            setTimeout(function() {
+                btn.innerHTML = orig;
+                btn.classList.remove('is-copied');
+            }, 1500);
+        }).catch(function(e) {
+            toast('复制失败：' + e.message, 'error');
+        });
+    };
+
+    window.dscSpeakTrans = function(btn, text, lang) {
+        var orig = btn.innerHTML;
+        btn.innerHTML = '⏳ 播放中...';
+        btn.classList.add('is-playing');
+        btn.disabled = true;
+        
+        api('/tts', { method: 'POST', body: { text: text, voice: getTTSVoiceForLang(lang), lang: lang } }).then(function(d){
+            if(d.audioUrl) {
+                var audio = new Audio(d.audioUrl);
+                audio.onended = function() {
+                    btn.innerHTML = orig;
+                    btn.classList.remove('is-playing');
+                    btn.disabled = false;
+                };
+                audio.onerror = function() {
+                    btn.innerHTML = orig;
+                    btn.classList.remove('is-playing');
+                    btn.disabled = false;
+                };
+                audio.play().catch(function(e){ 
+                    toast('播放失败，请点击屏幕后再试', 'error'); 
+                    btn.innerHTML = orig;
+                    btn.classList.remove('is-playing');
+                    btn.disabled = false;
+                });
+            } else {
+                toast('合成失败', 'error');
+                btn.innerHTML = orig;
+                btn.classList.remove('is-playing');
+                btn.disabled = false;
+            }
+        }).catch(function(e){ 
+            toast('语音服务错误：' + e.message, 'error'); 
+            btn.innerHTML = orig;
+            btn.classList.remove('is-playing');
+            btn.disabled = false;
+        });
+    };
+            
+
+    function openGlossaryModal() {
+        ensureModal('dscDbGlossaryOverlay', buildGlossaryModal, false);
+        openModal('dscDbGlossaryOverlay');
+        loadGlossaryTableListInModal();
+    }
+
+    function buildGlossaryModal() {
+        var md = buildModal('dscDbGlossaryOverlay', '📖', '术语表管理',
+            '术语表保存在服务端，格式为 .sts 文件，每行一条术语（id|原词|译词|源语言|目标语言）。');
+
+        // 现有术语表列表
+        var listRow = el('div', 'dsc-db-glossary-row');
+        var sel = select('dscDbGlossarySelect', [{ value: '', label: '— 请选择 —' }], '');
+        sel.id = 'dscDbGlossarySelect';
+        listRow.appendChild(field('选择术语表', sel));
+        var delBtn = el('button', 'dsc-db-btn danger', T('删除'));
+        delBtn.type = 'button';
+        delBtn.id = 'dscDbGlossaryDelBtn';
+        listRow.appendChild(delBtn);
+        md.appendChild(listRow);
+
+        // 新建术语表
+        md.appendChild(field('新建术语表名称', input('dscDbGlossaryNewName', 'text', '例如：ai_terms')));
+        var createBtn = el('button', 'dsc-db-btn', T('创建 / 保存'));
+        createBtn.type = 'button';
+        createBtn.id = 'dscDbGlossaryCreateBtn';
+        md.appendChild(createBtn);
+
+        // 术语编辑区（JSON 文本框）
+        md.appendChild(field('术语条目（JSON 数组，每项 {source, target, sourceLang?, targetLang?}）',
+            textarea('dscDbGlossaryEntries', '[\n  {"source":"AI","target":"人工智能"}\n]')));
+
+        // 状态 & 底部按钮
+        var st = el('div', 'dsc-db-status');
+        st.id = 'dscDbGlossaryStatus';
+        md.appendChild(st);
+
+        var foot = el('div', 'dsc-db-footer');
+        var close = el('button', 'dsc-db-btn', T('閉じる'));
+        close.type = 'button';
+        foot.appendChild(close);
+        md.appendChild(foot);
+
+        close.addEventListener('click', function () { closeModal('dscDbGlossaryOverlay'); });
+        createBtn.addEventListener('click', saveGlossaryFromModal);
+        delBtn.addEventListener('click', deleteGlossaryFromModal);
+        sel.addEventListener('change', function () {
+            var name = sel.value;
+            if (!name) {
+                $('dscDbGlossaryEntries').value = '';
+                return;
+            }
+            api('/glossary/get?name=' + encodeURIComponent(name)).then(function (d) {
+                var entries = d.entries || [];
+                $('dscDbGlossaryEntries').value = JSON.stringify(entries.map(function (e) {
+                    return { source: e.source, target: e.target, sourceLang: e.sourceLang, targetLang: e.targetLang };
+                }), null, 2);
+            }).catch(function (e) {
+                setStatus(st, '❌ 加载术语表失败：' + e.message, 'err');
+            });
+        });
+    }
+
+    function loadGlossaryTableListInModal() {
+        var sel = $('dscDbGlossarySelect');
+        if (!sel) return;
+        api('/glossary/list').then(function (d) {
+            var tables = d.tables || [];
+            sel.innerHTML = '<option value="">— 请选择 —</option>';
+            tables.forEach(function (name) {
+                var o = document.createElement('option');
+                o.value = name;
+                o.textContent = name;
+                sel.appendChild(o);
+            });
+        }).catch(function () {});
+    }
+
+    function saveGlossaryFromModal() {
+        var st = $('dscDbGlossaryStatus');
+        var nameInput = $('dscDbGlossaryNewName');
+        var entriesArea = $('dscDbGlossaryEntries');
+        var name = (nameInput ? nameInput.value : '').trim();
+        if (!name) {
+            setStatus(st, '⚠️ 请输入术语表名称', 'err');
+            return;
+        }
+        var raw = entriesArea ? entriesArea.value.trim() : '';
+        var entries;
+        try {
+            entries = JSON.parse(raw);
+        } catch (e) {
+            setStatus(st, '⚠️ 术语条目不是有效的 JSON：' + e.message, 'err');
+            return;
+        }
+        if (!Array.isArray(entries)) {
+            setStatus(st, '⚠️ 术语条目必须是 JSON 数组', 'err');
+            return;
+        }
+        api('/glossary/save', {
+            method: 'POST',
+            body: { name: name, entries: entries }
+        }).then(function (d) {
+            setStatus(st, '✅ 已保存术语表「' + name + '」，共 ' + (d.count || 0) + ' 条', 'ok');
+            toast(T('✅ 术语表已保存'), 'success');
+            loadGlossaryTableListInModal();
+            loadGlossaryTableList(); // 同步翻译弹窗的下拉框
+        }).catch(function (e) {
+            setStatus(st, '❌ 保存失败：' + e.message, 'err');
+        });
+    }
+
+    function deleteGlossaryFromModal() {
+        var sel = $('dscDbGlossarySelect');
+        var name = sel ? sel.value : '';
+        if (!name) {
+            setStatus($('dscDbGlossaryStatus'), '⚠️ 请先选择要删除的术语表', 'err');
+            return;
+        }
+        if (!window.confirm(T('确定删除术语表「{0}」？', name))) return;
+        api('/glossary/delete?name=' + encodeURIComponent(name), { method: 'DELETE' }).then(function (d) {
+            setStatus($('dscDbGlossaryStatus'), d.deleted ? '✅ 已删除' : '⚠️ 术语表不存在', d.deleted ? 'ok' : 'err');
+            toast(T('术语表已删除'), 'info');
+            loadGlossaryTableListInModal();
+            loadGlossaryTableList();
+        }).catch(function (e) {
+            setStatus($('dscDbGlossaryStatus'), '❌ 删除失败：' + e.message, 'err');
+        });
+    }
+
 })();
 

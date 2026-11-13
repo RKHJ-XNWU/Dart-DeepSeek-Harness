@@ -38,6 +38,56 @@
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
+
+
+/* ============================================================
+ * 豆包机器翻译结果样式
+ * ============================================================ */
+.dsc-db-trans-result { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+}
+.dsc-db-trans-item { 
+    background: #f9fafb; 
+    border: 1px solid #eef0f4; 
+    border-radius: 10px; 
+    padding: 10px 12px; 
+}
+.dsc-db-trans-src { 
+    font-size: 0.8rem; 
+    color: #6b7280; 
+    line-height: 1.5; 
+    word-break: break-word; 
+}
+.dsc-db-trans-arrow { 
+    text-align: center; 
+    color: #9ca3af; 
+    font-size: 0.75rem; 
+    margin: 2px 0; 
+}
+.dsc-db-trans-tgt { 
+    font-size: 0.86rem; 
+    color: #1f2937; 
+    font-weight: 600; 
+    line-height: 1.6; 
+    word-break: break-word; 
+}
+.dsc-db-trans-meta { 
+    font-size: 0.7rem; 
+    color: #9ca3af; 
+    margin-top: 4px; 
+}
+.dsc-db-glossary-row { 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+}
+.dsc-db-glossary-row .dsc-db-field { 
+    flex: 1; 
+    margin-bottom: 10px; 
+}
+
 @media (max-width: 420px) {
     .dsc-db-grid { grid-template-columns: 1fr; }
     .dsc-db-card { margin: 14px 18px 20px; }
@@ -899,4 +949,22 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .dsc-src-cards { animation: none; }
+}
+
+/* 翻译按钮交互动画 */
+.dsc-btn-anim {
+    transition: all 0.15s ease-in-out;
+}
+.dsc-btn-anim:active {
+    transform: scale(0.92);
+}
+.dsc-btn-anim.is-copied {
+    background-color: #ecfdf5 !important;
+    color: #059669 !important;
+    border-color: #a7f3d0 !important;
+}
+.dsc-btn-anim.is-playing {
+    background-color: #eef2ff !important;
+    color: #4f46e5 !important;
+    border-color: #c7d2fe !important;
 }

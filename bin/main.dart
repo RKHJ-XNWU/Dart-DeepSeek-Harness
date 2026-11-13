@@ -36,6 +36,7 @@ import 'package:ddsh/src/session_ref.dart';
 import 'package:ddsh/src/sessions.dart';
 import 'package:ddsh/src/tools.dart';
 import 'package:ddsh/src/xtweet.dart';
+import 'package:ddsh/src/doubao_translate.dart';
 
 // ------------------------------------------------------------
 // .env 加载（Go: dotenv.go）
@@ -181,6 +182,13 @@ void registerRoutes() {
   // ---------- 备份 / 恢复 ----------
   _register('/api/backup', handleBackup);
   _register('/api/restore', handleRestore);
+  
+  // ---------- 豆包机器翻译 & 术语表 ----------
+  _register('/api/doubao/translate', handleDbTranslate);
+  _register('/api/doubao/glossary/list', handleGlossaryList);
+  _register('/api/doubao/glossary/get', handleGlossaryGet);
+  _register('/api/doubao/glossary/save', handleGlossarySave);
+  _register('/api/doubao/glossary/delete', handleGlossaryDelete);
 
   // ---------- 峰谷提醒（前缀匹配） ----------
   registerPrefixHandler('/api/peakvalley/', pvHandleAPI);

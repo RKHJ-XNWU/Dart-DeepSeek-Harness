@@ -164,10 +164,6 @@ Map<String, String> dbDuplexAuthHeaders(DbConfig cfg) {
       'Authorization': 'Bearer; $token',
     };
   }
-  final ark = cfg.apiKey.trim();
-  if (ark.isNotEmpty) {
-    return <String, String>{'X-Api-Key': ark};
-  }
   return <String, String>{};
 }
 
