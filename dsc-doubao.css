@@ -968,3 +968,185 @@
     color: #4f46e5 !important;
     border-color: #c7d2fe !important;
 }
+
+/* ============================================================
+ * 入力欄のモデル選択器（対話モデルのみ · 自定义モデル対応）
+ * ============================================================ */
+.dsc-quick-model-btn {
+    max-width: 48vw;
+    gap: 5px;
+    padding: 0 10px;
+}
+.dsc-quick-model-btn .dsc-qm-name {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #4f46e5;
+    letter-spacing: 0.01em;
+    max-width: 30vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+}
+.dsc-quick-model-btn.db-on {
+    border-color: #a855f7;
+    background: #f5f0ff;
+}
+.dsc-quick-model-btn.db-on .dsc-qm-name { color: #7c3aed; }
+
+.dsc-qm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100060;
+    background: rgba(17, 24, 39, 0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+}
+.dsc-qm-overlay.open { display: flex; }
+.dsc-qm-box {
+    width: 100%;
+    max-width: 560px;
+    max-height: 76vh;
+    background: #ffffff;
+    border-radius: 18px 18px 0 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+    animation: dscQmUp 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes dscQmUp { from { transform: translateY(18px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+.dsc-qm-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #eef0f4;
+}
+.dsc-qm-title { font-size: 0.92rem; font-weight: 800; color: #111827; }
+.dsc-qm-cur {
+    margin-left: auto;
+    font-size: 0.68rem;
+    color: #6b7280;
+    max-width: 46%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dsc-qm-close {
+    border: none;
+    background: #f3f4f6;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: #6b7280;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.dsc-qm-list {
+    padding: 8px 10px 4px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.dsc-qm-group {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #9ca3af;
+    letter-spacing: 0.06em;
+    padding: 10px 6px 6px;
+}
+.dsc-qm-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border: 1px solid #eef0f4;
+    border-radius: 12px;
+    background: #fbfbfd;
+    color: #374151;
+    font-size: 0.82rem;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+.dsc-qm-item:active { background: #eef2ff; }
+.dsc-qm-item.active {
+    border-color: #a855f7;
+    background: #f5f0ff;
+    color: #5b21b6;
+    font-weight: 700;
+}
+.dsc-qm-item-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dsc-qm-tag {
+    font-size: 0.6rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #4f46e5;
+    border: 1px solid #e0e7ff;
+    flex-shrink: 0;
+}
+.dsc-qm-check { color: #7c3aed; font-weight: 900; flex-shrink: 0; }
+.dsc-qm-add {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid #eef0f4;
+    background: #ffffff;
+}
+.dsc-qm-add input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+}
+.dsc-qm-add input:focus { border-color: #a855f7; }
+.dsc-qm-add button {
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: none;
+    background: #7c3aed;
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+/* 翻訳結果：コピー／朗読ボタンの行と本文 */
+.dsc-db-trans-tgt {
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.6;
+    word-break: break-word;
+}
+.dsc-db-trans-ops {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.dsc-db-btn.is-copied {
+    background: #ecfdf5 !important;
+    border-color: #a7f3d0 !important;
+    color: #047857 !important;
+}

@@ -5262,6 +5262,91 @@
     };
     window.dscGetToolMode = function () { return !!state.enableTools; };
 
+    /* ---------- 対話モデル クイック選択インターフェース ----------
+       dsc-doubao.js の入力欄モデル選択器から呼ばれる。
+       ・公开するのは「対話（chat）モデル」だけ：内蔵 DeepSeek モデル + ユーザー定義モデル
+       ・豆包系モデルは豆包側が自前で列挙するので、ここには出さない（相互汚染防止）
+       ・画像 / 動画 / 音声などの非対話モデルは絶対に混ぜない（選ぶと 400 になる） */
+    window.dscListChatModels = function () {
+        var out = [], seen = {};
+        var custom = getCustomModels();
+        function push(v, label, isCustom) {
+            var val = String(v == null ? '' : v).trim();
+            if (!val || seen[val]) return;
+            if (typeof window.dscIsDoubaoModelId === 'function' && window.dscIsDoubaoModelId(val)) return;
+            seen[val] = 1;
+            out.push({ value: val, label: label || val, custom: !!isCustom });
+        }
+        var ms = $('dscModelSelect');
+        if (ms) {
+            for (var i = 0; i < ms.options.length; i++) {
+                var o = ms.options[i];
+                var txt = String(o.textContent || o.value).replace(/（カスタム）|（自定义）|（設定ファイル由来）|（配置来源）/g, '').trim();
+                push(o.value, txt || o.value, custom.indexOf(o.value) >= 0);
+            }
+        }
+        for (var j = 0; j < custom.length; j++) push(custom[j], custom[j] + '（自定义）', true);
+        return out;
+    };
+
+    window.dscGetChatModel = function () {
+        return state.currentModel || 'deepseek-flash';
+    };
+
+    window.dscSetChatModel = function (model, persist) {
+        var m = String(model == null ? '' : model).trim();
+        if (!m) return '';
+        state.currentModel = m;
+        var ms = $('dscModelSelect');
+        if (ms) {
+            var hit = false;
+            for (var i = 0; i < ms.options.length; i++) {
+                if (ms.options[i].value === m) { hit = true; break; }
+            }
+            if (!hit) {
+                var o = document.createElement('option');
+                o.value = m;
+                o.textContent = m + dscT('（カスタム）');
+                ms.appendChild(o);
+            }
+            ms.value = m;
+        }
+        try { localStorage.setItem('dsc_currentModel', m); } catch (e) {}
+        try { updateTitle(); } catch (e) {}
+        if (persist !== false) {
+            fetch('/api/ds-chat/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: m })
+            }).then(function (r) { return r.json(); })
+              .then(function (d) {
+                  if (!d || d.success === false) {
+                      toast(dscErrText('モデルの保存に失敗: ', (d && d.error) || ''), 'error');
+                  }
+              })
+              .catch(function (e) { toast(dscErrText('モデルの保存に失敗: ', e.message), 'error'); });
+        }
+        return m;
+    };
+
+    window.dscAddChatModel = function (name) {
+        var v = String(name == null ? '' : name).trim();
+        if (!v) return Promise.resolve(false);
+        if (/\s/.test(v)) { toast('モデル名に空白は使用できません', 'error'); return Promise.resolve(false); }
+        if (v.length > 120) { toast('モデル名が長すぎます（最大 120 字）', 'error'); return Promise.resolve(false); }
+        var arr = getCustomModels();
+        if (arr.indexOf(v) < 0) { arr.push(v); setCustomModels(arr); }
+        addModelOption(v, true);
+        renderModelHint();
+        return fetch('/api/displaymodels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: v })
+        }).then(function (r) { return r.json(); })
+          .then(function (d) { return !!(d && d.success); })
+          .catch(function () { return false; });
+    };
+
     function cleanTextForTTS(text, lang) {
         if (!text) return '';
         lang = lang || detectTTSLang(text);

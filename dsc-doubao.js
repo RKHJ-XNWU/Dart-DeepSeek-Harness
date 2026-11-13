@@ -757,6 +757,24 @@
             var n = $(id);
             if (n) n.value = map[id] || '';
         });
+        // 入力欄で上書きした豆包モデルがある場合、設定画面にもその値を出す
+        //   （ここで保存すれば後端にも反映され、表示と実使用がずれない）
+        (function () {
+            var sel = $('dscDbChatModel');
+            var ov = dbChatModelOverride();
+            if (!sel || !ov) return;
+            var found = false;
+            for (var i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === ov) { found = true; break; }
+            }
+            if (!found) {
+                var o = document.createElement('option');
+                o.value = ov;
+                o.textContent = ov;
+                sel.appendChild(o);
+            }
+            sel.value = ov;
+        })();
         var k = $('dscDbApiKey');
         if (k) {
             k.value = '';
@@ -2546,7 +2564,26 @@
         try { return localStorage.getItem(DB_MODE_KEY) === '1'; } catch (e) { return false; }
     }
 
+    // 入力欄のモデル選択器で選んだ豆包モデルは localStorage に保持する。
+    //   ・後端 /api/doubao/config への単項目 POST は、実装が「全項目上書き」だった場合に
+    //     API Key を空で潰す危険があるため行わない（安全側に倒す）。
+    //   ・代わりにこのキーを最優先で参照し、送信モデルの解決に使う。
+    var DB_CHAT_MODEL_OVERRIDE_KEY = 'dsc_doubao_chat_model';
+
+    function dbChatModelOverride() {
+        try { return String(localStorage.getItem(DB_CHAT_MODEL_OVERRIDE_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+
+    function setDbChatModelOverride(v) {
+        try {
+            if (v) localStorage.setItem(DB_CHAT_MODEL_OVERRIDE_KEY, v);
+            else localStorage.removeItem(DB_CHAT_MODEL_OVERRIDE_KEY);
+        } catch (e) {}
+    }
+
     function dbChatModel() {
+        var ov = dbChatModelOverride();
+        if (ov) return ov;
         var m = (S.cfg && S.cfg.chatModel) ? String(S.cfg.chatModel).trim() : '';
         return m || 'doubao-seed-2-1-pro-260628';
     }
@@ -2569,6 +2606,7 @@
         var on = isDbMode();
         if (on) b.classList.add('active'); else b.classList.remove('active');
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        qmSyncBtn();   // 入力欄のモデル選択器も同時に追従
         var lbl = b.querySelector('.dsc-db-mode-lbl');
         ensureDbModeIcon(lbl);
         // title は静的な文だけを翻訳対象にし、モデル値は識別子として連結する
@@ -2882,6 +2920,279 @@
     }
 
     // ------------------------------------------------------------
+    // 入力欄のモデル選択器（DeepSeek harness 風）
+    //   設定ダイアログを開かなくても、送信直前にその場で対話モデルを選ぶ。
+    //   ・DeepSeek 系 / 自定义モデル → DeepSeek 通道（豆包モードは自動 OFF）
+    //   ・豆包会話モデル           → 豆包モードを ON にして豆包通道で送信
+    //   非対話モデル（画像/動画/音声など）は一切出さない。
+    // ------------------------------------------------------------
+    var QM_LOCAL_DB_KEY = 'dsc_doubao_custom_models';
+
+    function qmLocalDbModels() {
+        try {
+            var raw = localStorage.getItem(QM_LOCAL_DB_KEY);
+            var arr = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(arr)) return [];
+            var out = [];
+            for (var i = 0; i < arr.length; i++) {
+                if (typeof arr[i] === 'string' && arr[i].trim()) out.push(arr[i].trim());
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+
+    function qmAddLocalDbModel(name) {
+        var arr = qmLocalDbModels();
+        if (arr.indexOf(name) < 0) {
+            arr.push(name);
+            try { localStorage.setItem(QM_LOCAL_DB_KEY, JSON.stringify(arr)); } catch (e) {}
+        }
+    }
+
+    function qmCurrentDeepSeek() {
+        if (typeof window.dscGetChatModel === 'function') {
+            try { var v = window.dscGetChatModel(); if (v) return String(v); } catch (e) {}
+        }
+        var sel = $('dscModelSelect');
+        if (sel && sel.value) return String(sel.value);
+        try { return String(localStorage.getItem('dsc_currentModel') || 'deepseek-flash'); } catch (e) { return 'deepseek-flash'; }
+    }
+
+    function qmListDeepSeek() {
+        var arr = [];
+        if (typeof window.dscListChatModels === 'function') {
+            try { arr = window.dscListChatModels() || []; } catch (e) { arr = []; }
+        }
+        if (!arr.length) arr = [{ value: 'deepseek-flash', label: 'deepseek-flash', custom: false }];
+        var cur = qmCurrentDeepSeek(), has = false;
+        for (var i = 0; i < arr.length; i++) { if (arr[i].value === cur) { has = true; break; } }
+        if (!has && cur) arr.unshift({ value: cur, label: cur, custom: true });
+        return arr;
+    }
+
+    function qmListDoubao() {
+        var out = [], seen = {};
+        (S.catalog || []).forEach(function (m) {
+            if (!m || m.category !== 'chat') return;
+            var v = String(m.value || '').trim();
+            if (!v || seen[v]) return;
+            seen[v] = 1;
+            out.push({ value: v, label: T(m.label || v), custom: !!m.custom });
+        });
+        qmLocalDbModels().forEach(function (v) {
+            if (seen[v]) return;
+            seen[v] = 1;
+            out.push({ value: v, label: v + T('（自定义）'), custom: true });
+        });
+        var cur = dbChatModel(), has = false;
+        for (var i = 0; i < out.length; i++) { if (out[i].value === cur) { has = true; break; } }
+        if (!has && cur) out.unshift({ value: cur, label: cur + T('（自定义）'), custom: true });
+        return out;
+    }
+
+    function qmShortName(name) {
+        var s = String(name || '');
+        s = s.replace(/^doubao-/, 'db-').replace(/^deepseek-/, 'ds-');
+        return s.length > 14 ? s.slice(0, 13) + '…' : s;
+    }
+
+    function qmSyncBtn() {
+        var b = $('dscQuickModelBtn');
+        if (!b) return;
+        var lbl = b.querySelector('.dsc-qm-name');
+        var name = isDbMode() ? dbChatModel() : qmCurrentDeepSeek();
+        if (lbl) lbl.textContent = qmShortName(name);
+        var on = isDbMode();
+        if (on) b.classList.add('db-on'); else b.classList.remove('db-on');
+        b.title = (on ? T('対話モデル（豆包）：') : T('対話モデル（DeepSeek）：')) + name;
+        b.setAttribute('aria-label', b.title);
+    }
+
+    function qmEnsurePanel() {
+        if ($('dscQmOverlay')) return;
+        var ov = el('div', 'dsc-qm-overlay');
+        ov.id = 'dscQmOverlay';
+        var box = el('div', 'dsc-qm-box');
+        var head = el('div', 'dsc-qm-head');
+        head.appendChild(el('span', 'dsc-qm-title', T('对话模型')));
+        var cur = el('span', 'dsc-qm-cur');
+        cur.id = 'dscQmCur';
+        head.appendChild(cur);
+        var cls = el('button', 'dsc-qm-close', '✕');
+        cls.type = 'button';
+        cls.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); qmClose(); });
+        head.appendChild(cls);
+        box.appendChild(head);
+
+        var list = el('div', 'dsc-qm-list');
+        list.id = 'dscQmList';
+        box.appendChild(list);
+
+        var add = el('div', 'dsc-qm-add');
+        var inp = document.createElement('input');
+        inp.id = 'dscQmNewInput';
+        inp.type = 'text';
+        inp.autocomplete = 'off';
+        inp.placeholder = T('模型名を追加（対話モデルのみ）');
+        add.appendChild(inp);
+        var ok = el('button', 'dsc-qm-add-ok', T('追加'));
+        ok.type = 'button';
+        ok.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); qmConfirmAdd(); });
+        add.appendChild(ok);
+        box.appendChild(add);
+
+        ov.appendChild(box);
+        ov.addEventListener('click', function (e) { if (e.target === ov) qmClose(); });
+        document.body.appendChild(ov);
+
+        inp.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') { ev.preventDefault(); qmConfirmAdd(); }
+        });
+    }
+
+    function qmItem(kind, item, active) {
+        var b = el('button', 'dsc-qm-item' + (active ? ' active' : ''));
+        b.type = 'button';
+        b.appendChild(el('span', 'dsc-qm-item-name', item.label || item.value));
+        if (item.custom) b.appendChild(el('span', 'dsc-qm-tag', T('自定义')));
+        if (active) b.appendChild(el('span', 'dsc-qm-check', '✓'));
+        b.addEventListener('click', function (ev) {
+            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+            qmApply(kind, item.value);
+        });
+        return b;
+    }
+
+    function qmRender() {
+        var list = $('dscQmList');
+        if (!list) return;
+        list.innerHTML = '';
+        var curEl = $('dscQmCur');
+        if (curEl) {
+            curEl.textContent = T('当前：') + (isDbMode() ? dbChatModel() : qmCurrentDeepSeek());
+        }
+
+        list.appendChild(el('div', 'dsc-qm-group', T('DeepSeek 对话模型')));
+        var dsList = qmListDeepSeek();
+        var dsCur = qmCurrentDeepSeek();
+        dsList.forEach(function (it) {
+            list.appendChild(qmItem('ds', it, !isDbMode() && it.value === dsCur));
+        });
+
+        list.appendChild(el('div', 'dsc-qm-group', T('豆包对话模型（火山方舟）')));
+        var dbList = qmListDoubao();
+        var dbCur = dbChatModel();
+        dbList.forEach(function (it) {
+            list.appendChild(qmItem('db', it, isDbMode() && it.value === dbCur));
+        });
+    }
+
+    function qmOpen() {
+        qmEnsurePanel();
+        qmRender();
+        var ov = $('dscQmOverlay');
+        if (ov) ov.classList.add('open');
+    }
+
+    function qmClose() {
+        var ov = $('dscQmOverlay');
+        if (ov) ov.classList.remove('open');
+    }
+
+    function qmToggle() {
+        var ov = $('dscQmOverlay');
+        if (ov && ov.classList.contains('open')) qmClose(); else qmOpen();
+    }
+
+    function qmApply(kind, value) {
+        var v = String(value || '').trim();
+        if (!v) return;
+        if (kind === 'db') {
+            setDbChatModelOverride(v);
+            var needSwitch = !isDbMode();
+            if (needSwitch) {
+                if (S.cfg && S.cfg.hasKey === false) {
+                    toast(T('⚠️ 豆包 API Key が未設定です。設定 → 豆包から入力してください'), 'error');
+                }
+                setDbMode(true, true);
+            }
+            syncDbModeUI();
+            qmSyncBtn();
+            qmClose();
+            toast(T('✅ 送信モデルを豆包に切り替えました：') + v, 'success');
+        } else {
+            if (isDbMode()) setDbMode(false, true);
+            if (typeof window.dscSetChatModel === 'function') window.dscSetChatModel(v);
+            qmSyncBtn();
+            qmClose();
+            toast(T('✅ 送信モデルを切り替えました：') + v, 'success');
+        }
+    }
+
+    function qmConfirmAdd() {
+        var inp = $('dscQmNewInput');
+        var v = inp ? String(inp.value || '').trim() : '';
+        if (!v) { toast(T('モデル名を入力してください'), 'info'); return; }
+        if (/\s/.test(v)) { toast(T('モデル名に空白は使用できません'), 'error'); return; }
+        if (v.length > 120) { toast(T('モデル名が長すぎます（最大 120 字）'), 'error'); return; }
+        var isDbName = /^(doubao|glm|seed|volc)/i.test(v);
+        if (!isDbName && typeof window.dscIsDoubaoModelId === 'function') {
+            try { isDbName = !!window.dscIsDoubaoModelId(v); } catch (e) { isDbName = false; }
+        }
+        if (isDbName) {
+            qmAddLocalDbModel(v);
+            if (inp) inp.value = '';
+            qmRender();
+            toast(T('✅ 豆包对话模型を追加しました：') + v, 'success');
+            qmApply('db', v);
+        } else {
+            var p = (typeof window.dscAddChatModel === 'function')
+                ? window.dscAddChatModel(v)
+                : Promise.resolve(false);
+            Promise.resolve(p).then(function (saved) {
+                if (inp) inp.value = '';
+                qmRender();
+                toast(saved
+                    ? (T('✅ 对话模型を追加しました：') + v)
+                    : (T('画面には追加しましたが .sts の書き込みに失敗（バックエンド未コンパイル？）：') + v),
+                    saved ? 'success' : 'error');
+                qmApply('ds', v);
+            }).catch(function () {
+                if (inp) inp.value = '';
+                qmRender();
+                toast(T('追加に失敗しました：') + v, 'error');
+            });
+        }
+    }
+
+    function injectQuickModelBtn() {
+        var panel = $('dscToolsExtra');
+        if (!panel) return;
+        if (!$('dscQuickModelBtn')) {
+            var b = el('button', 'dsc-switch-btn dsc-quick-model-btn');
+            b.id = 'dscQuickModelBtn';
+            b.type = 'button';
+            var ic = el('span', 'ic');
+            ic.textContent = '🤖';
+            b.appendChild(ic);
+            b.appendChild(el('span', 'dsc-qm-name', ''));
+            // 去抖：WebView で注入ボタンが二重 click を起こすことがある
+            var lastTap = 0;
+            b.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var now = Date.now();
+                if (now - lastTap < 300) return;
+                lastTap = now;
+                qmToggle();
+            });
+            // 横向滚动区の末尾だと隠れるので先頭へ挿す
+            panel.insertBefore(b, panel.firstChild);
+        }
+        qmSyncBtn();
+    }
+
+    // ------------------------------------------------------------
     // 起動処理
     // ------------------------------------------------------------
     function boot() {
@@ -2889,11 +3200,16 @@
         buildSettingsCard();
         injectDbModeButton();
         injectWikiBtn();
+        injectQuickModelBtn();
         installFetchHook();
         // 言語切替時（再読込が無効化されている場合も）ボタンの title を追従させる
         document.addEventListener('dsc:langchange', function () {
             applyMenuLabels();   // メニュー文言の残留防止
             syncDbModeUI();      // 豆包モードボタンの title 追従
+            // 入力欄モデル選択器：ボタン名とパネル文言も追従（開いていれば再描画）
+            qmSyncBtn();
+            var ovv = $('dscQmOverlay');
+            if (ovv && ovv.classList.contains('open')) qmRender();
         });
         purgeLegacyChatModels();
         loadConfig().then(function () {
@@ -2980,6 +3296,95 @@
         return map[langCode] || 'zh-CN-XiaoxiaoNeural';
     }
 
+    // ------------------------------------------------------------
+    // 汎用コピー（WebView でも確実に動く三段フォールバック）
+    //   1) navigator.clipboard.writeText（https / localhost でのみ有効）
+    //   2) 不可視 textarea + document.execCommand('copy')
+    //   3) copy イベントを手動発火して execCommand('copy')
+    //   成功した時だけ「✅ 已复制」を出し、失敗時は必ず失敗を通知する（捏造しない）
+    // ------------------------------------------------------------
+    function escHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function legacyCopyText(t) {
+        var ok = false;
+        var ta = document.createElement('textarea');
+        ta.value = t;
+        ta.setAttribute('readonly', 'readonly');
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+        document.body.appendChild(ta);
+        try {
+            var sel = document.getSelection ? document.getSelection() : null;
+            var prev = (sel && sel.rangeCount > 0) ? sel.getRangeAt(0) : null;
+            ta.focus();
+            ta.select();
+            try { ta.setSelectionRange(0, ta.value.length); } catch (e0) {}
+            ok = (document.execCommand('copy') === true);
+            if (prev && sel) { sel.removeAllRanges(); sel.addRange(prev); }
+        } catch (e) { ok = false; }
+        try { if (ta.parentNode) ta.parentNode.removeChild(ta); } catch (e1) {}
+
+        if (!ok) {
+            // 最終手段：copy イベントにデータを載せてから実行
+            try {
+                var handler = function (e) {
+                    try {
+                        if (e.clipboardData) {
+                            e.clipboardData.setData('text/plain', t);
+                            e.preventDefault();
+                        }
+                    } catch (e2) {}
+                };
+                document.addEventListener('copy', handler, true);
+                ok = (document.execCommand('copy') === true);
+                document.removeEventListener('copy', handler, true);
+            } catch (e3) { ok = false; }
+        }
+        return ok;
+    }
+
+    function copyTextToClipboard(text) {
+        var t = String(text == null ? '' : text);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                var p = navigator.clipboard.writeText(t);
+                if (p && typeof p.then === 'function') {
+                    return p.then(function () { return true; }, function () { return legacyCopyText(t); });
+                }
+            } catch (e) {}
+        }
+        return Promise.resolve(legacyCopyText(t));
+    }
+
+    function flashCopied(btn) {
+        if (!btn) return;
+        var old = btn.innerHTML;
+        btn.innerHTML = '✅ 已复制';
+        btn.classList.add('is-copied');
+        btn.disabled = true;
+        setTimeout(function () {
+            btn.innerHTML = old;
+            btn.classList.remove('is-copied');
+            btn.disabled = false;
+        }, 1200);
+    }
+
+    // 他のモジュール / 旧キャッシュからも呼べるよう公開
+    window.dscCopyText = function (btn, text) {
+        return copyTextToClipboard(text).then(function (ok) {
+            if (ok) {
+                flashCopied(btn);
+                toast(T('📋 已复制到剪贴板'), 'success');
+            } else {
+                toast(T('复制失败：请长按文本手动选择复制'), 'error');
+            }
+            return ok;
+        });
+    };
+
     function openTranslateModal() {
         ensureModal('dscDbTranslateOverlay', buildTranslateModal, false);
         openModal('dscDbTranslateOverlay');
@@ -3010,25 +3415,52 @@
             if (!lines.length) return;
 
             go.disabled = true; setStatus(st, '翻译中...', 'busy');
-            api('/translate', { method: 'POST', body: { target_language: $('dscDbTransTgtLang').value, text_list: lines, source_language: $('dscDbTransSrcLang').value } }).then(function(d){
-                var list = d.data.translation_list || [];
+            var tgtLang = $('dscDbTransTgtLang').value;
+            api('/translate', { method: 'POST', body: { target_language: tgtLang, text_list: lines, source_language: $('dscDbTransSrcLang').value } }).then(function(d){
+                var list = (d && d.data && d.data.translation_list) || [];
+                var outTexts = [];
                 var html = '<div class="dsc-db-trans-result">';
                 list.forEach(function(item, i){
-                    var text = item.translation || '';
-                    var safeText = text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    html += '<div class="dsc-db-trans-item" style="background:#f9fafb;padding:12px;border-radius:10px;margin-bottom:10px;border:1px solid #eef0f4;">';
-                    html += '<div style="color:#6b7280;font-size:0.8rem;margin-bottom:6px;">' + lines[i] + '</div>';
-                    html += '<div style="font-weight:600;margin-bottom:10px;">' + text + '</div>';
-                    html += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
-                    html += '<button class="dsc-db-btn dsc-btn-anim" onclick="window.dscCopyText(this, \'' + safeText + '\')">📋 复制</button>';
-                    html += '<button class="dsc-db-btn dsc-btn-anim" onclick="window.dscSpeakTrans(this, \'' + safeText + '\', \'' + $('dscDbTransTgtLang').value + '\')">🔊 朗读</button>';
+                    var text = (item && item.translation != null) ? String(item.translation) : '';
+                    outTexts.push(text);
+                    /* 原文与译文一律走 escHtml：< > & 不会被当成标签，
+                       也不会再破坏按钮的属性（旧版内联 onclick 拼接就是这么坏的）。 */
+                    html += '<div class="dsc-db-trans-item">';
+                    html += '<div class="dsc-db-trans-src">' + escHtml(lines[i] || '') + '</div>';
+                    html += '<div class="dsc-db-trans-tgt">' + escHtml(text) + '</div>';
+                    html += '<div class="dsc-db-trans-ops">';
+                    html += '<button type="button" class="dsc-db-btn dsc-btn-anim dsc-trans-copy" data-idx="' + i + '">📋 复制</button>';
+                    html += '<button type="button" class="dsc-db-btn dsc-btn-anim dsc-trans-speak" data-idx="' + i + '">🔊 朗读</button>';
                     html += '</div></div>';
                 });
                 html += '</div>';
-                $('dscDbTransResult').innerHTML = html;
+                var host = $('dscDbTransResult');
+                host.innerHTML = html;
+                /* 结果文本不进 DOM 属性，只留在闭包数组里，点击时按索引取，
+                   任何引号 / 换行 / 反斜杠都不会让按钮失效。 */
+                var copyBtns = host.querySelectorAll('.dsc-trans-copy');
+                for (var ci = 0; ci < copyBtns.length; ci++) {
+                    (function (b) {
+                        b.addEventListener('click', function (ev) {
+                            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+                            var idx = parseInt(b.getAttribute('data-idx'), 10) || 0;
+                            window.dscCopyText(b, outTexts[idx] || '');
+                        });
+                    })(copyBtns[ci]);
+                }
+                var speakBtns = host.querySelectorAll('.dsc-trans-speak');
+                for (var si = 0; si < speakBtns.length; si++) {
+                    (function (b) {
+                        b.addEventListener('click', function (ev) {
+                            if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+                            var idx = parseInt(b.getAttribute('data-idx'), 10) || 0;
+                            window.dscSpeakTrans(b, outTexts[idx] || '', tgtLang);
+                        });
+                    })(speakBtns[si]);
+                }
                 setStatus(st, '✅ 翻译成功', 'ok');
             }).catch(function(e){ 
-                setStatus(st, '❌ ' + e.message, 'err'); 
+                setStatus(st, '❌ ' + (e && e.message ? e.message : '翻译失败'), 'err'); 
             }).finally(function(){ go.disabled = false; });
         };
     }
